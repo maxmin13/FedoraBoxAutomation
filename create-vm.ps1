@@ -245,17 +245,6 @@ try {
     Write-Host "VM '$vmName' created successfully!" -ForegroundColor Green
     Write-Host "You can now start the VM to begin Fedora installation." -ForegroundColor Cyan
 
-    Write-Host ""
-    Write-Host "During Fedora installation, create a user account." -ForegroundColor Yellow
-    Write-Host "Remember these credentials for the provisioning step:" -ForegroundColor Yellow
-    $guestUser = Read-Host "Planned guest username"
-    $guestPass = Read-Host "Planned guest password" -AsSecureString
-    $guestPassPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestPass))
-    Write-Host "Username: $guestUser" -ForegroundColor Cyan
-    Write-Host "Password: $guestPassPlain" -ForegroundColor Cyan
-    Write-Host "Keep these safe for later use in provisioning." -ForegroundColor Yellow
-
     $attachGA = Read-YesNo "Do you want to attach the VirtualBox Guest Additions ISO now so it is ready for later installation?"
     if ($attachGA) {
         $gaIso = Get-VBoxGuestAdditionsIso
@@ -273,6 +262,19 @@ try {
         Invoke-VBox "startvm", $vmName
         Write-Host "VM started." -ForegroundColor Green
     }
+
+    Write-Host ""
+    Write-Host "  Next steps after Fedora installation completes:" -ForegroundColor Cyan
+    Write-Host "    1. Complete the Fedora installer." -ForegroundColor White
+    Write-Host "       Before rebooting, eject the Live ISO: Devices -> Optical Drives -> Remove disk from virtual drive." -ForegroundColor DarkGray
+    Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
+    Write-Host "    2. Install Guest Additions:" -ForegroundColor White
+    Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
+    Write-Host "         sudo mount /dev/sr1 /mnt/ga" -ForegroundColor DarkGray
+    Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
+    Write-Host "    3. Reboot the VM." -ForegroundColor White
+    Write-Host "    4. Run provision-vm.ps1 to install software." -ForegroundColor White
+    Write-Host ""
 
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red

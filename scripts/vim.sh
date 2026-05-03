@@ -1,0 +1,151 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+set +o xtrace
+
+STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+
+if [[ 0 -eq $# ]] 
+then
+   echo 'ERROR: login user not found.'
+   exit 1
+fi
+
+LOGIN_USER="${1}"
+cd /home/"${LOGIN_USER}"
+
+####
+STEP "Vim"
+####
+
+dnf install -y vim
+
+if [[ ! -f .vimrc ]]
+then
+   touch .vimrc
+   chown "${LOGIN_USER}":"${LOGIN_USER}" .vimrc
+fi 
+
+####
+STEP "Pathogen"
+####
+
+# pathogen.vim makes it easy to install plugins and runtime files in their own private directories.
+
+mkdir -p .vim/{autoload,bundle}
+chown -R "${LOGIN_USER}":"${LOGIN_USER}" .vim
+
+if [[ ! -d .vim/bundle/vim-pathogen ]]
+then
+   git clone https://github.com/tpope/vim-pathogen.git .vim/bundle/vim-pathogen
+fi
+
+if [[ ! -f .vim/autoload/pathogen.vim ]]
+then
+   wget https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
+fi
+
+if [[ -z "$(grep pathogen .vimrc)" ]]
+then
+cat <<-EOT >> .vimrc
+	execute pathogen#infect()
+	syntax on
+	filetype plugin indent on
+	Helptags 
+EOT
+fi
+
+echo 'Pathogen installed.'
+
+###############################################################
+# VALIDATORS
+###############################################################
+
+####
+STEP Syntastic 
+####
+
+if [[ ! -d .vim/bundle/syntastic ]]
+then
+   git clone https://github.com/vim-syntastic/syntastic.git .vim/bundle/syntastic
+fi
+
+#if [[ -z "$(grep SyntasticInfo .vimrc)" ]]
+#then
+#cat <<-EOT >> .vimrc
+#	SyntasticInfo
+#	help syntastic-checkers
+#EOT
+#fi
+
+###############################################################
+
+####
+STEP Bash shellcheck
+####
+
+dnf install -y ShellCheck
+
+if [[ -z "$(grep shellcheck .vimrc)" ]]
+then
+cat <<-EOT >> .vimrc
+	let g:syntastic_sh_checkers = ['shellcheck']
+EOT
+fi
+
+echo 'Bash shellCheck enabled.'
+
+###############################################################
+
+####
+STEP Perl perlcritic
+####
+
+dnf install -y perl-Perl-Critic
+
+if [[ -z "$(grep perlcritic .vimrc)" ]]
+then
+cat <<-EOT >> .vimrc
+	let g:syntastic_enable_perl_checkers = 1
+	let g:syntastic_perl_checkers = ['perl','perlcritic']
+EOT
+fi
+
+echo 'Perl perlcritic enabled.'
+
+###############################################################
+
+####
+STEP Python pylint
+####
+
+dnf install -y pylint
+
+if [[ -z "$(grep pylint .vimrc)" ]]
+then
+cat <<-EOT >> .vimrc
+	let g:syntastic_python_checkers = ['pylint']
+EOT
+fi
+
+echo 'Python pylint enabled.'
+
+###############################################################
+
+####
+STEP JQuery jshint
+####
+
+dnf install -y npm
+npm install jshint -g
+
+if [[ -z "$(grep jshint .vimrc)" ]]
+then
+cat <<-EOT >> .vimrc
+	let g:syntastic_javascript_checkers = ['jshint']
+EOT
+fi
+
+echo 'JQuery jshint enabled.'
