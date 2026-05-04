@@ -94,7 +94,7 @@ function Get-VBoxIDEControllerName {
     return 'IDE Controller'
 }
 
-function Attach-VBoxGuestAdditionsIso {
+function Add-VBoxGuestAdditionsIso {
     param(
         [string]$vmName,
         [string]$isoPath
@@ -113,8 +113,10 @@ function Attach-VBoxGuestAdditionsIso {
     Write-Host "  To install Guest Additions inside the VM:" -ForegroundColor Cyan
     Write-Host "    1. Complete the Fedora OS installation and log in." -ForegroundColor Cyan
     Write-Host "    2. Open a terminal and run:" -ForegroundColor Cyan
+    Write-Host "         sudo dnf update -y" -ForegroundColor White
+    Write-Host "         sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "         sudo mount /dev/sr1 /mnt/ga" -ForegroundColor White
+    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
     Write-Host "    3. Reboot the VM when the installer finishes." -ForegroundColor Cyan
     Write-Host "    4. Guest Additions will then be active (shared clipboard, better resolution, guest control)." -ForegroundColor Cyan
@@ -144,9 +146,10 @@ if ([string]::IsNullOrWhiteSpace($vmName)) {
 $existingVms = & $script:vbox list vms 2>$null | ForEach-Object { if ($_ -match '"(.+)"') { $Matches[1] } }
 if ($existingVms -contains $vmName) {
     Write-Host "  WARNING: A VM named '$vmName' already exists." -ForegroundColor Yellow
-    $confirm = Read-Host "  Unregister it to proceed? [y/N]"
+    Write-Host "  If you want to provision it, run provision-vm.ps1 instead." -ForegroundColor Cyan
+    $confirm = Read-Host "  Unregister and recreate it from scratch? [y/N]"
     if ($confirm -notmatch '^[Yy]$') {
-        Write-Host "  Aborted. Choose a different VM name or unregister it manually." -ForegroundColor Red
+        Write-Host "  Aborted." -ForegroundColor Red
         exit 1
     }
     Write-Host "  Unregistering '$vmName'..." -ForegroundColor DarkGray
@@ -249,7 +252,7 @@ try {
     if ($attachGA) {
         $gaIso = Get-VBoxGuestAdditionsIso
         if ($gaIso) {
-            Attach-VBoxGuestAdditionsIso -vmName $vmName -isoPath $gaIso
+            Add-VBoxGuestAdditionsIso -vmName $vmName -isoPath $gaIso
         } else {
             Write-Host "  Guest Additions ISO not found. Install VirtualBox on the host or download VBoxGuestAdditions.iso." -ForegroundColor Yellow
         }
@@ -268,11 +271,16 @@ try {
     Write-Host "    1. Complete the Fedora installer." -ForegroundColor White
     Write-Host "       Before rebooting, eject the Live ISO: Devices -> Optical Drives -> Remove disk from virtual drive." -ForegroundColor DarkGray
     Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
-    Write-Host "    2. Install Guest Additions:" -ForegroundColor White
+    Write-Host "    2. Install Guest Additions and disable SELinux:" -ForegroundColor White
+    Write-Host "         sudo dnf update -y" -ForegroundColor DarkGray
+    Write-Host "         sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
+    Write-Host "         sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor DarkGray
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
-    Write-Host "         sudo mount /dev/sr1 /mnt/ga" -ForegroundColor DarkGray
+    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
-    Write-Host "    3. Reboot the VM." -ForegroundColor White
+    Write-Host "    3. Set root password and reboot:" -ForegroundColor White
+    Write-Host "         sudo passwd root" -ForegroundColor DarkGray
+    Write-Host "         sudo reboot" -ForegroundColor DarkGray
     Write-Host "    4. Run provision-vm.ps1 to install software." -ForegroundColor White
     Write-Host ""
 

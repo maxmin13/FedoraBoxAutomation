@@ -110,6 +110,16 @@ function Send-ScriptToGuest {
     $result = & $script:vbox @uploadArgs 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Upload failed: $result" }
 
+    $stripCrlfArgs = @(
+        'guestcontrol', $script:vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', $script:vmUser,
+        '--password', $script:vmPass,
+        '--wait-stdout', '--wait-stderr',
+        '--', '-c', "sed -i 's/\r//' $guestPath"
+    )
+    & $script:vbox @stripCrlfArgs 2>&1 | Out-Null
+
     $chmodArgs = @(
         'guestcontrol', $script:vmName,
         'run', '--exe', '/bin/bash',
@@ -118,7 +128,8 @@ function Send-ScriptToGuest {
         '--wait-stdout', '--wait-stderr',
         '--', '-c', "chmod +x $guestPath"
     )
-    & $script:vbox @chmodArgs 2>&1 | Out-Null
+    $chmodResult = & $script:vbox @chmodArgs 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "chmod failed: $chmodResult" }
 
     Write-Host " OK" -ForegroundColor Green
     return $guestPath
@@ -130,9 +141,9 @@ function Invoke-GuestScript {
     $guestPath = Send-ScriptToGuest -LocalPath $LocalPath
 
     $cmd = if ($script:vmUser -eq 'root') {
-        "$guestPath $ScriptArgs".Trim()
+        "$guestPath $ScriptArgs 2>&1 | tee -a /var/log/fedora-box-automation.log".Trim()
     } else {
-        "sudo $guestPath $ScriptArgs".Trim()
+        "sudo $guestPath $ScriptArgs 2>&1 | tee -a /var/log/fedora-box-automation.log".Trim()
     }
 
     Write-Host "  Running: $cmd" -ForegroundColor DarkGray
@@ -149,7 +160,15 @@ function Invoke-GuestScript {
     $result = & $script:vbox @runArgs 2>&1
     $ErrorActionPreference = 'Stop'
     $resultText = ($result | ForEach-Object { $_.ToString() }) -join "`n"
-    $resultText -split "`n" | ForEach-Object { Write-Host "    $_" }
+    $resultText -split "`n" | ForEach-Object {
+        if ($_ -match '(?i)(error|failed|fatal|command not found|permission denied|no such file)') {
+            Write-Host "    $_" -ForegroundColor Red
+        } elseif ($_ -match '(?i)(warning|warn)') {
+            Write-Host "    $_" -ForegroundColor Yellow
+        } else {
+            Write-Host "    $_"
+        }
+    }
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  FAILED (exit code $LASTEXITCODE)" -ForegroundColor Red
@@ -203,9 +222,10 @@ if ([string]::IsNullOrWhiteSpace($gaVersion)) {
     Write-Host ""
     Write-Host "  Guest Additions are not installed or not running." -ForegroundColor Red
     Write-Host "  Inside the VM run:" -ForegroundColor Yellow
+    Write-Host "    sudo dnf update -y" -ForegroundColor White
     Write-Host "    sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "    sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "    sudo mount /dev/sr1 /mnt/ga" -ForegroundColor White
+    Write-Host "    sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
     Write-Host "    sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
     Write-Host "    sudo reboot" -ForegroundColor White
     exit 1
@@ -213,9 +233,16 @@ if ([string]::IsNullOrWhiteSpace($gaVersion)) {
 Write-Host " OK (v$gaVersion)" -ForegroundColor Green
 
 Write-Host ""
+Write-Host "  IMPORTANT: If you have not done so, complete these steps inside the VM before continuing:" -ForegroundColor Yellow
+Write-Host "       sudo dnf update -y" -ForegroundColor White
+Write-Host "       sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor White
+Write-Host "       sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor White
+Write-Host "       sudo mkdir -p /mnt/ga" -ForegroundColor White
+Write-Host "       sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
+Write-Host "       sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
 Write-Host "  IMPORTANT: Scripts must run as root inside the VM." -ForegroundColor Yellow
-Write-Host "  If you have not done so, set a root password inside the VM before continuing:" -ForegroundColor Yellow
 Write-Host "       sudo passwd root" -ForegroundColor White
+Write-Host "       sudo reboot" -ForegroundColor White
 Write-Host "  Then enter 'root' as the username below." -ForegroundColor Yellow
 Write-Host ""
 
@@ -258,16 +285,17 @@ if (-not (Test-GuestCredentials)) {
     Write-Host "  1. Wrong username or password." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  2. Guest Additions not installed - open a terminal inside the VM and run:" -ForegroundColor Yellow
+    Write-Host "       sudo dnf update -y" -ForegroundColor White
     Write-Host "       sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "       sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "       sudo mount /dev/sr1 /mnt/ga" -ForegroundColor White
+    Write-Host "       sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
     Write-Host "       sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
     Write-Host "       sudo reboot" -ForegroundColor White
     Write-Host ""
     Write-Host "  3. SELinux is blocking VBoxService - open a terminal inside the VM and run:" -ForegroundColor Yellow
-    Write-Host "       sudo setenforce 0" -ForegroundColor White
-    Write-Host "     Then retry this script. Once connected, run setup\selinux-config.sh" -ForegroundColor White
-    Write-Host "     to configure SELinux properly." -ForegroundColor White
+    Write-Host "       sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor White
+    Write-Host "       sudo reboot" -ForegroundColor White
+    Write-Host "     Then retry this script." -ForegroundColor White
     Write-Host ""
     Write-Host "  4. sudo requires a TTY - use root instead. Set a root password inside the VM:" -ForegroundColor Yellow
     Write-Host "       sudo passwd root" -ForegroundColor White
@@ -288,6 +316,7 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 
 # --- Menu loop ----------------------------------------------------------------
 
+$failures = [System.Collections.Generic.List[string]]::new()
 $done = $false
 while (-not $done) {
     Write-Header "Provisioning Menu"
@@ -306,22 +335,13 @@ while (-not $done) {
 
             $hostname = (Read-Host "Hostname for the VM").Trim()
 
-            # Upload background image to ~/.background/ before desktop-config runs
+            # Upload background image to /usr/share/backgrounds/ before desktop-config runs
             $bgLocalPath = Join-Path $scriptsRoot "img\blue-background.png"
             $bgFileName  = "blue-background.png"
-            $bgGuestDir  = "/home/$($script:vmUser)/.background"
+            $bgGuestDir  = "/usr/share/backgrounds"
 
             if (Test-Path $bgLocalPath) {
                 Write-Host "  Installing background image..." -ForegroundColor Cyan
-                $mkdirArgs = @(
-                    'guestcontrol', $script:vmName,
-                    'run', '--exe', '/bin/bash',
-                    '--username', $script:vmUser, '--password', $script:vmPass,
-                    '--wait-stdout', '--wait-stderr',
-                    '--', '-c', "mkdir -p $bgGuestDir"
-                )
-                & $script:vbox @mkdirArgs 2>&1 | Out-Null
-
                 $uploadArgs = @(
                     'guestcontrol', $script:vmName,
                     'copyto', $bgLocalPath, "$bgGuestDir/$bgFileName",
@@ -343,7 +363,7 @@ while (-not $done) {
                 @{ Path = "setup\system-prep.sh";    Args = $script:vmUser },
                 @{ Path = "setup\network-config.sh"; Args = $hostname },
                 @{ Path = "setup\selinux-config.sh"; Args = "" },
-                @{ Path = "setup\desktop-config.sh"; Args = if ($bgFileName) { "$($script:vmUser) $bgFileName" } else { $script:vmUser } },
+                @{ Path = "setup\desktop-config.sh"; Args = "$($script:vmUser) $bgFileName".Trim() },
                 @{ Path = "setup\dev-tools.sh";      Args = "" }
             )
 
@@ -356,6 +376,7 @@ while (-not $done) {
                 Write-Header $step.Path
                 $ok = Invoke-GuestScript -LocalPath $fullPath -ScriptArgs $step.Args
                 if (-not $ok) {
+                    $failures.Add($step.Path)
                     if (-not (Read-YesNo "Script failed. Continue with remaining steps?" $false)) {
                         break
                     }
@@ -393,10 +414,21 @@ while (-not $done) {
             $scriptArgs = (Read-Host "Arguments (leave blank if none)").Trim()
 
             Write-Header $chosen.Name
-            Invoke-GuestScript -LocalPath $chosen.FullName -ScriptArgs $scriptArgs
+            $ok = Invoke-GuestScript -LocalPath $chosen.FullName -ScriptArgs $scriptArgs
+            if (-not $ok) { $failures.Add($chosen.Name) }
         }
 
-        'Q' { $done = $true }
+        'Q' {
+            $done = $true
+            if ($failures.Count -gt 0) {
+                Write-Host ""
+                Write-Host "  Session summary - failed scripts:" -ForegroundColor Red
+                $failures | ForEach-Object { Write-Host "    - $_" -ForegroundColor Red }
+                Write-Host "  Check /var/log/fedora-box-automation.log inside the VM for details." -ForegroundColor Yellow
+            } else {
+                Write-Host "  All scripts completed successfully." -ForegroundColor Green
+            }
+        }
 
         default { Write-Host "  Invalid choice. Enter 1, 2, or Q." -ForegroundColor Yellow }
     }

@@ -13,16 +13,36 @@ set -o pipefail
 set -o nounset
 set +o xtrace
 
+exec > >(tee -a /var/log/fedora-box-automation.log) 2>&1
+
 STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
 
-if [[ 2 -gt $# ]] 
+if [[ 1 -gt $# ]]
 then
    echo 'ERROR: missing parameters.'
    exit 1
 fi
 
 LOGIN_USER="${1}"
-BACKGROUND_IMG="${2}"
+BACKGROUND_IMG="${2:-}"
+
+# If running as root, auto-detect the logged-in graphical user
+if [[ "${LOGIN_USER}" == "root" ]]; then
+    DETECTED=$(loginctl list-users --no-legend | awk '{print $2}' | grep -v root | head -1)
+    if [[ -n "${DETECTED}" ]]; then
+        echo "Auto-detected login user: ${DETECTED}"
+        LOGIN_USER="${DETECTED}"
+    else
+        echo 'ERROR: Could not detect a non-root logged-in user.'
+        exit 1
+    fi
+fi
+
+####
+STEP "Dependencies"
+####
+
+dnf install -y dbus-x11
 
 ####
 STEP "Disable Wayland"
@@ -38,39 +58,54 @@ fi
 
 echo "XORG set."
 
+USER_UID="$(id -u "${LOGIN_USER}")"
+DBUS="unix:path=/run/user/${USER_UID}/bus"
+
+gsettings_set() {
+    sudo -u "${LOGIN_USER}" DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="${DBUS}" gsettings set "$@"
+}
+
+gsettings_get() {
+    sudo -u "${LOGIN_USER}" DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="${DBUS}" gsettings get "$@"
+}
+
 ####
 STEP "Background image"
 ####
 
-# Get the current background image.
-img_uri="$(sudo -u "${LOGIN_USER}" gsettings get org.gnome.desktop.background picture-uri)"
-img_nm="$(basename "${img_uri}" \')"
-
-echo "The current background image is ${img_nm}"
-
-if [[ "${img_nm}" == "${BACKGROUND_IMG}" ]]
+if [[ -z "${BACKGROUND_IMG}" ]]
 then
-   echo 'Background image already changed.'
-else  
-   sudo -u "${LOGIN_USER}" dbus-launch gsettings set org.gnome.desktop.background picture-uri file:///home/"${LOGIN_USER}"/.background/"${BACKGROUND_IMG}"
+   echo 'WARNING: No background image provided, skipping.'
+elif [[ ! -f "/usr/share/backgrounds/${BACKGROUND_IMG}" ]]
+then
+   echo "WARNING: Background image not found at /usr/share/backgrounds/${BACKGROUND_IMG}, skipping."
+else
+   img_uri="$(gsettings_get org.gnome.desktop.background picture-uri)"
+   img_nm="$(basename "${img_uri}" \')"
 
-   echo 'Background image changed.'   
+   echo "The current background image is ${img_nm}"
+
+   if [[ "${img_nm}" == "${BACKGROUND_IMG}" ]]
+   then
+      echo 'Background image already changed.'
+   else
+      gsettings_set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/${BACKGROUND_IMG}"
+      echo 'Background image changed.'
+   fi
 fi
 
 ####
 STEP "Bell"
 ####
 
-# Get the current bell settings.
-audible_bell="$(sudo -u "${LOGIN_USER}" gsettings get org.gnome.desktop.wm.preferences audible-bell)"
+audible_bell="$(gsettings_get org.gnome.desktop.wm.preferences audible-bell)"
 
 if [[ 'false' == "${audible_bell}" ]]
 then
    echo 'Bell settings already changed.'
-else  
-   sudo -u "${LOGIN_USER}" dbus-launch gsettings set org.gnome.desktop.wm.preferences audible-bell false
-
-   echo 'Bell settings changed.'   
+else
+   gsettings_set org.gnome.desktop.wm.preferences audible-bell false
+   echo 'Bell settings changed.'
 fi
 
 ####
@@ -78,14 +113,13 @@ STEP "Gedit text editor"
 ####
 
 # not possible to change files in shared folder, enabling backup files fix the bug.
-create_backup="$(sudo -u "${LOGIN_USER}" gsettings get org.gnome.gedit.preferences.editor create-backup-copy)"
+create_backup="$(gsettings_get org.gnome.gedit.preferences.editor create-backup-copy)"
 
 if [[ 'true' == "${create_backup}" ]]
 then
    echo 'Gedit create backup files already configured.'
-else  
-   sudo -u "${LOGIN_USER}" dbus-launch gsettings set org.gnome.gedit.preferences.editor create-backup-copy true 
-
+else
+   gsettings_set org.gnome.gedit.preferences.editor create-backup-copy true
    echo 'Gedit create backup files configured.'
 fi
 
@@ -93,7 +127,7 @@ fi
 STEP "Nautilus file manager"
 ####
 
-sudo -u "${LOGIN_USER}" dbus-launch gsettings set org.gnome.nautilus.list-view default-visible-columns "['name', 'size', 'date_modified', 'type']"
+gsettings_set org.gnome.nautilus.list-view default-visible-columns "['name', 'size', 'date_modified', 'type']"
 
 echo 'Added additional type colum.'
 
