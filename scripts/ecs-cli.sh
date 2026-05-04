@@ -3,12 +3,7 @@
 # Amazon Elastic Container Service (Amazon ECS) is a highly scalable and fast container management service. 
 # You can use it to run, stop, and manage containers on a cluster.
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "ECS client"

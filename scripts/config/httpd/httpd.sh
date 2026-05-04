@@ -5,14 +5,9 @@
 #
 ################################################################################################
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
 ## Install Apache Web Server on /etc/httpd directory,
 
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then

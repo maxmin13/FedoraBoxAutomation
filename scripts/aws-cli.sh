@@ -1,32 +1,25 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "AWS client"
 ####
 
-if ! aws --version > /dev/null 2>&1 
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "${WORK_DIR}"' EXIT
+
+if ! aws --version > /dev/null 2>&1
 then
-   mkdir -p ./tempcli && cd ./tempcli
-   
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "${WORK_DIR}/awscliv2.zip"
 
-   unzip awscliv2.zip
+   unzip "${WORK_DIR}/awscliv2.zip" -d "${WORK_DIR}"
 
-   ./aws/install
+   "${WORK_DIR}/aws/install"
 
    echo 'AWS client installed.'
    echo 'Configure AWS client by running:'
    echo 'aws configure'
-   
-   cd ..
-   rm -rf ./tempcli
 else
    echo 'AWS client already installed.'
 fi

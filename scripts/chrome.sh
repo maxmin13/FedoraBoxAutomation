@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "Chrome"

@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "Eclipse Enterprise"
@@ -16,10 +11,13 @@ if [[ -d '/opt/eclipse-installer' ]]
 then
 	echo 'Eclipse enterprise already downloaded.'
 else
-  cd /usr/src
-  wget https://mirror.dkm.cz/eclipse/oomph/epp/2023-12/R/eclipse-inst-jre-linux64.tar.gz -O eclipse_ee.tar.gz
-  tar -zxf eclipse_ee.tar.gz --directory /opt 
-  
+  WORK_DIR=$(mktemp -d)
+  trap 'rm -rf "${WORK_DIR}"' EXIT
+
+  ECLIPSE_VERSION=$(curl -sL https://api.github.com/repos/eclipse-packaging/packages/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+  wget "https://www.eclipse.org/downloads/download.php?file=/oomph/epp/${ECLIPSE_VERSION}/R/eclipse-inst-jre-linux64.tar.gz&mirror_id=1" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+  tar -zxf "${WORK_DIR}/eclipse_ee.tar.gz" --directory /opt
+
   echo 'Eclipse Enterprise downloaded.'
 fi  
  

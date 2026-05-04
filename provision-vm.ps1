@@ -314,6 +314,20 @@ Write-Host " OK" -ForegroundColor Green
 
 $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 
+$commonScript = Join-Path $scriptsRoot "common.sh"
+if (Test-Path $commonScript) {
+    Write-Host "  Uploading common.sh..." -NoNewline
+    $uploadArgs = @(
+        'guestcontrol', $script:vmName,
+        'copyto', $commonScript, '/tmp/common.sh',
+        '--username', $script:vmUser,
+        '--password', $script:vmPass
+    )
+    $result = & $script:vbox @uploadArgs 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Failed to upload common.sh: $result" }
+    Write-Host " OK" -ForegroundColor Green
+}
+
 # --- Menu loop ----------------------------------------------------------------
 
 $failures = [System.Collections.Generic.List[string]]::new()

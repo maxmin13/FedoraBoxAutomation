@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "Eclipse"
@@ -19,11 +14,13 @@ else
    then
        rm /usr/share/applications/eclipse.desktop
    fi
-   
-   cd /usr/src
-   wget https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/2026-03/R/eclipse-jee-2026-03-R-linux-gtk-x86_64.tar.gz&mirror_id=1045 -O eclipse.tar.gz
-   tar -zxf eclipse.tar.gz --directory /opt 
-   ln -sf /opt/eclipse/eclipse /usr/bin/eclipse 
+
+   WORK_DIR=$(mktemp -d)
+   trap 'rm -rf "${WORK_DIR}"' EXIT
+
+   wget 'https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/2026-03/R/eclipse-jee-2026-03-R-linux-gtk-x86_64.tar.gz&mirror_id=1045' -O "${WORK_DIR}/eclipse.tar.gz"
+   tar -zxf "${WORK_DIR}/eclipse.tar.gz" --directory /opt
+   ln -sf /opt/eclipse/eclipse /usr/bin/eclipse
 
    cat <<- EOF > /usr/share/applications/eclipse.desktop
 		[Desktop Entry]
@@ -36,8 +33,6 @@ else
 		Type=Application
 		Terminal=0
 EOF
-
-   rm -f eclipse.tar.gz
 
    echo
    echo 'Eclipse successfully installed.'

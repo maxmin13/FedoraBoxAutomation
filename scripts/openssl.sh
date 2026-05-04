@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
@@ -55,17 +50,17 @@ else
    make test
    make install
    
-   rm -f /etc/ld.so.conf.d/openssl-"${OPENSSL_VERSION}".conf
-   sh -c "echo ${OPENSSL_DIR}/lib64" > /etc/ld.so.conf.d/openssl-"${OPENSSL_VERSION}".conf
+   rm -f "/etc/ld.so.conf.d/openssl-${OPENSSL_VERSION}.conf"
+   echo "${OPENSSL_DIR}/lib64" > "/etc/ld.so.conf.d/openssl-${OPENSSL_VERSION}.conf"
    
    ldconfig -v
   
-   if ! grep -q "openssl" "/home/${LOGIN_USER}/.bash_profile"; then 
+   if ! grep -q "openssl" "/home/${LOGIN_USER}/.bash_profile"; then
      {
         echo "";
-	    echo "PATH=$PATH:${OPENSSL_DIR}/bin";
-	    echo "export PATH";
-	 } >> /home/"${LOGIN_USER}"/.bash_profile
+        echo "PATH=$PATH:${OPENSSL_DIR}/bin";
+        echo "export PATH";
+     } >> "/home/${LOGIN_USER}/.bash_profile"
    fi  
       
    rm -rf "${OPENSSL_SRC_DIR}"

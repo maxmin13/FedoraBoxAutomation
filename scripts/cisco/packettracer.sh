@@ -4,12 +4,7 @@
 ## Environment: Fedora 41+ // Packet Tracer 8.x
 ## login: https://www.netacad.com/portal/learning
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 if [[ 2 -gt $# ]]
 then

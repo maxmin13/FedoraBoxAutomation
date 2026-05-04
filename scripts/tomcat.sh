@@ -1,15 +1,10 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
+source /tmp/common.sh
 
 ##########################
 # Provision Tomcat 10.1.33
 ##########################
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
 
 ####
 STEP "Tomcat"
@@ -21,11 +16,11 @@ then
 else
    echo 'Install Tomcat 10.1.33'
 
-   cd /usr/src
-   wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.33/bin/apache-tomcat-10.1.33.tar.gz -O tomcat.tar.gz
-   tar -zxf tomcat.tar.gz --directory /opt
+   WORK_DIR=$(mktemp -d)
+   trap 'rm -rf "${WORK_DIR}"' EXIT
 
-   rm -f tomcat.tar.gz
+   wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.33/bin/apache-tomcat-10.1.33.tar.gz -O "${WORK_DIR}/tomcat.tar.gz"
+   tar -zxf "${WORK_DIR}/tomcat.tar.gz" --directory /opt
 
    echo
    echo 'Tomcat successfully installed.'

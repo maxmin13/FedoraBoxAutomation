@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 ####
 STEP "minikube"
@@ -37,16 +32,12 @@ echo 'sudo minikube dashboard'
 STEP "kubectl"
 ####
 
-set +e
-kubectl version --client > /dev/null 2>&1
-exit_code=$?
-set -e
-
-if [[ 0 -ne $exit_code ]]
+if ! kubectl version --client > /dev/null 2>&1
 then
-   wget https://dl.k8s.io/release/v1.23.0/bin/linux/amd64/kubectl -O /usr/bin/kubectl
+   KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+   wget "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -O /usr/bin/kubectl
    chmod +x /usr/bin/kubectl
-   kubectl version --client 
+   kubectl version --client
    echo 'kubectl installed.'
 else
    echo 'kubectl already installed.'

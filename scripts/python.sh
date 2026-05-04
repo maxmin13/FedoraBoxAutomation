@@ -1,11 +1,6 @@
 #!/bin/bash
 
-set -o errexit
-set -o pipefail
-set -o nounset
-set +o xtrace
-
-STEP() { echo ; echo ; echo "==\\" ; echo "===>" "$@" ; echo "==/" ; echo ; }
+source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
@@ -32,39 +27,36 @@ else
    echo
    echo 'Installing Python 3.11.2 ...'
 
-   cd /usr/src
-   rm -rf Python-3.11.2
-   rm -rf Python-3.11.2.tar.xz
-   wget https://www.python.org/ftp/python/3.11.2/Python-3.11.2.tar.xz
+   WORK_DIR=$(mktemp -d)
+   trap 'rm -rf "${WORK_DIR}"' EXIT
 
-   tar -xf Python-3.11.2.tar.xz
+   wget https://www.python.org/ftp/python/3.11.2/Python-3.11.2.tar.xz -O "${WORK_DIR}/Python-3.11.2.tar.xz"
 
-   cd Python-3.11.2
+   tar -xf "${WORK_DIR}/Python-3.11.2.tar.xz" -C "${WORK_DIR}"
+
+   cd "${WORK_DIR}/Python-3.11.2"
    ./configure --enable-optimizations
 
    # make altinstall is used to prevent replacing the default python binary file /usr/bin/python .
    make -j 4
    make altinstall
 
-   rm -rf Python-3.11.2
-   rm -rf Python-3.11.2.tar.xz
-
    python --version
-   python3.11 -V 
-   
-   echo 'Python 3.11.2 successfully installed.'  
+   python3.11 -V
+
+   echo 'Python 3.11.2 successfully installed.'
 fi
 
 python3.11 -m pip install --root-user-action=ignore --upgrade pip
 
 echo
-python_venv_dir=/home/"${LOGIN_USER}"/python_venv
+python_venv_dir="/home/${LOGIN_USER}/python_venv"
 echo "Creating a Python virtual envirnoment in ${python_venv_dir}"
 
-mkdir -p "${python_venv_dir}" 
+mkdir -p "${python_venv_dir}"
 python3.11 -m venv "${python_venv_dir}"
-source "${python_venv_dir}"/bin/activate
-which python
+source "${python_venv_dir}/bin/activate"
+command -v python
 
 echo "Python virtual envirnoment created!"
 echo
