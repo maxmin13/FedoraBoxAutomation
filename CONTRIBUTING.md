@@ -19,12 +19,17 @@ source /tmp/common.sh
 
 ### Error handling
 
-Source `common.sh` at the top of every script. It enables strict error handling automatically:
+Source `common.sh` at the top of every script. It enables strict error handling and enforces root automatically:
 
 ```bash
 set -o errexit   # exit on error
 set -o pipefail  # exit on pipe failure
 set -o nounset   # exit on undefined variable
+
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo 'ERROR: This script must be run as root.' >&2
+    exit 1
+fi
 ```
 
 ### Logging

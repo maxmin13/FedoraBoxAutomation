@@ -13,6 +13,11 @@ set -o pipefail
 set -o nounset
 set +o xtrace
 
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo 'ERROR: This script must be run as root.' >&2
+    exit 1
+fi
+
 exec > >(tee -a /var/log/fedora-box-automation.log) 2>&1
 
 SCRIPT_NAME="$(basename "${BASH_SOURCE[1]:-$0}")"
