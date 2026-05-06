@@ -331,6 +331,11 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 #   'user'   - pass the desktop login username
 #   'none'   - no arguments needed
 #   'custom' - prompt the user for arguments
+$scriptArgPrompts = @{
+    'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
+    'packettracer.sh' = 'Arguments for packettracer.sh'
+}
+
 $scriptArgDefs = @{
     'java.sh'                = 'user'
     'vim.sh'                 = 'user'
@@ -338,12 +343,13 @@ $scriptArgDefs = @{
     'wireshark.sh'           = 'user'
     'docker.sh'              = 'user'
     'openssl.sh'             = 'user'
-    'maven.sh'               = 'user'
+    'maven.sh'               = 'custom'
     'python.sh'              = 'user'
     'httpd.sh'               = 'user'
     'tomcat.sh'              = 'user'
     'aws-cli.sh'             = 'user'
     'k8-install.sh'          = 'user'
+    'git.sh'                 = 'none'
     'chrome.sh'              = 'none'
     'mysql.sh'               = 'none'
     'ecs-cli.sh'             = 'none'
@@ -379,7 +385,7 @@ while (-not $done) {
     Write-Host "  [1] Run full setup  (setup scripts in recommended order)" -ForegroundColor White
     Write-Host "  [2] Run individual script" -ForegroundColor White
     Write-Host "  [Q] Quit" -ForegroundColor White
-    Write-Host ""
+    Write-Host ""2
     $choice = (Read-Host "Choice").Trim().ToUpper()
 
     switch ($choice) {
@@ -471,7 +477,7 @@ while (-not $done) {
             $scriptArgs = switch ($argType) {
                 'user'   { $script:loginUser }
                 'none'   { '' }
-                'custom' { (Read-Host "Arguments for $($chosen.Name)").Trim() }
+                'custom' { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Arguments for $($chosen.Name)" }; (Read-Host $prompt).Trim() }
                 default  { (Read-Host "Arguments (leave blank if none)").Trim() }
             }
             if ($argType -eq 'user') {

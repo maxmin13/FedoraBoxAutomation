@@ -12,7 +12,13 @@ source /tmp/common.sh
 STEP "Chrome"
 ####
 
-dnf install -y fedora-workstation-repositories
-dnf config-manager --enable google-chrome
-dnf install -y google-chrome-stable
+if rpm -q google-chrome-stable &>/dev/null
+then
+    log_info 'Google Chrome already installed.'
+else
+    dnf install -y dnf-plugins-core fedora-workstation-repositories
+    dnf config-manager enable google-chrome
+    dnf install -y google-chrome-stable
+    log_info 'Google Chrome successfully installed.'
+fi
 

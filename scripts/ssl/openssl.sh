@@ -1,8 +1,9 @@
 #!/bin/bash
 
 ##
-## Description: Builds and installs OpenSSL 3.3.2 from source to /usr/local/ssl
-##              and adds it to the login user's PATH in ~/.bash_profile.
+## Description: Installs build dependencies and builds OpenSSL 3.3.2 from
+##              source to /usr/local/ssl. Adds it to the login user's PATH
+##              in ~/.bash_profile. Skips the build if already installed.
 ## Usage:       sudo ./openssl.sh <login-user>
 ##
 
@@ -27,11 +28,8 @@ dnf update -y
 dnf groupinstall "Development Tools" -y
 dnf install -y perl-core zlib-devel
 
-set +e
-installed_version="$(openssl version 2>/dev/null)"
-set -e
-
-if [[ "${installed_version}" =~ .*"${OPENSSL_VERSION}".* ]]
+if [[ -x "${OPENSSL_DIR}/bin/openssl" ]] && \
+   "${OPENSSL_DIR}/bin/openssl" version 2>/dev/null | grep -q "${OPENSSL_VERSION}"
 then
     log_info "OpenSSL ${OPENSSL_VERSION} already installed."
 else
