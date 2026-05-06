@@ -22,7 +22,7 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz" -O "${WORK_DIR}/maven.tar.gz"
+    wget --progress=dot "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz" -O "${WORK_DIR}/maven.tar.gz"
     tar -xzf "${WORK_DIR}/maven.tar.gz" -C "${WORK_DIR}"
     mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" /opt/maven
 

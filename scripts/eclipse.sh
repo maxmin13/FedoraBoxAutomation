@@ -31,23 +31,9 @@ else
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
     log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
-    wget -q "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz" &
-    pid=$!; dots=0
-    while kill -0 $pid 2>/dev/null; do
-        printf '.'; dots=$((dots + 1))
-        [[ $((dots % 20)) -eq 0 ]] && echo
-        sleep 5
-    done
-    wait $pid; echo
+    wget --progress=dot "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz"
     log_info "Download complete. Extracting ..."
-    tar -xf "${WORK_DIR}/eclipse.tar.gz" --directory /opt &
-    pid=$!; dots=0
-    while kill -0 $pid 2>/dev/null; do
-        printf '.'; dots=$((dots + 1))
-        [[ $((dots % 20)) -eq 0 ]] && echo
-        sleep 2
-    done
-    wait $pid; echo
+    tar -xf "${WORK_DIR}/eclipse.tar.gz" --directory /opt
     mv /opt/eclipse "${ECLIPSE_DIR}"
     ln -sf "${ECLIPSE_DIR}/eclipse" /usr/bin/eclipse
     log_info "Extraction complete."

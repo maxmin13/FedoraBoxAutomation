@@ -26,7 +26,7 @@ DRIVER_NM='docker'
 
 if ! minikube version > /dev/null 2>&1
 then
-    wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -O /usr/local/bin/minikube
+    wget --progress=dot https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -O /usr/local/bin/minikube
     chmod 0755 /usr/local/bin/minikube
     log_info 'minikube installed.'
 fi
@@ -45,7 +45,7 @@ STEP "kubectl"
 if ! kubectl version --client > /dev/null 2>&1
 then
    KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
-   wget "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -O /usr/bin/kubectl
+   wget --progress=dot "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -O /usr/bin/kubectl
    chmod +x /usr/bin/kubectl
    kubectl version --client
    echo 'kubectl installed.'

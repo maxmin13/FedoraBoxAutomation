@@ -154,6 +154,7 @@ function Invoke-GuestScript {
         '--username', $script:vmUser,
         '--password', $script:vmPass,
         '--wait-stdout', '--wait-stderr',
+        '--timeout', '3600000',
         '--', '-c', $cmd
     )
     $ErrorActionPreference = 'SilentlyContinue'
@@ -334,6 +335,7 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 $scriptArgPrompts = @{
     'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
     'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
+    'eclipse-ee.sh'   = 'Eclipse release to install (leave blank for default 2026-03)'
     'packettracer.sh' = 'Arguments for packettracer.sh'
 }
 
@@ -355,7 +357,7 @@ $scriptArgDefs = @{
     'mysql.sh'               = 'none'
     'ecs-cli.sh'             = 'none'
     'eclipse.sh'             = 'custom'
-    'eclipse-ee.sh'          = 'none'
+    'eclipse-ee.sh'          = 'custom'
     'visualstudiocode.sh'    = 'none'
     'dev-tools.sh'           = 'none'
     'postgresql.sh'          = 'none'

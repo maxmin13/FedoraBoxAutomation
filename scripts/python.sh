@@ -38,7 +38,7 @@ else
    WORK_DIR=$(mktemp -d)
    trap 'rm -rf "${WORK_DIR}"' EXIT
 
-   wget https://www.python.org/ftp/python/3.11.2/Python-3.11.2.tar.xz -O "${WORK_DIR}/Python-3.11.2.tar.xz"
+   wget --progress=dot https://www.python.org/ftp/python/3.11.2/Python-3.11.2.tar.xz -O "${WORK_DIR}/Python-3.11.2.tar.xz"
 
    tar -xf "${WORK_DIR}/Python-3.11.2.tar.xz" -C "${WORK_DIR}"
 
