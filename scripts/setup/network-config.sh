@@ -8,9 +8,9 @@
 
 source /tmp/common.sh
 
-if [[ 1 -gt $# ]] 
+if [[ 1 -gt $# ]]
 then
-   echo 'ERROR: network parameters not found.'
+   log_error 'network parameters not found.'
    exit 1
 fi
 
@@ -23,21 +23,19 @@ current_hostname="$(nmcli general hostname)"
 if [[ "${HOSTNAME}" != "${current_hostname}" ]]
 then
    nmcli general hostname "${HOSTNAME}"
-   
-   echo 'Hostname set.'
+   log_info 'Hostname set.'
 fi
 
 current_hostname="$(nmcli general hostname)"
-
-echo "Hostname ${current_hostname}"
+log_info "Hostname: ${current_hostname}"
 
 STEP 'Connections'
 
-nmcli connection 
+nmcli connection
 
 STEP 'Devices'
 
-nmcli device 
+nmcli device
 echo
 ip address
 

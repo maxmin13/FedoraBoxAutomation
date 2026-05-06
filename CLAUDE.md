@@ -66,12 +66,19 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
 1. If ISO is attached, it appears as a second DVD drive (`/dev/sr1`) inside the VM
 2. After OS installation, open a terminal and run:
    ```bash
+   sudo dnf update -y
+   sudo dnf install -y kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2
+   sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+   sudo reboot
+   ```
+3. After reboot, mount and install Guest Additions:
+   ```bash
    sudo mkdir -p /mnt/ga
-   sudo mount /dev/sr1 /mnt/ga
+   sudo mount /dev/sr1 /mnt/ga   # if it fails, run lsblk and try /dev/sr0
    sudo /mnt/ga/VBoxLinuxAdditions.run
    ```
-3. Reboot the VM; Guest Additions will then be active (shared clipboard, better resolution, guest control)
-4. Without Guest Additions, remote script execution via `provision-vm.ps1` will not work
+4. Reboot again; Guest Additions and SELinux changes will then be active (shared clipboard, drag-and-drop, better resolution, guest control)
+5. Without Guest Additions, remote script execution via `provision-vm.ps1` will not work
 
 ## Troubleshooting
 

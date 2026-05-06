@@ -4,8 +4,35 @@
     Creates a new Fedora VirtualBox VM from a downloaded ISO.
 
 .DESCRIPTION
-    Prompts for VM configuration options and creates a new VirtualBox VM
-    with Fedora ISO attached, ready for installation.
+    Prompts for VM configuration options and creates a new Fedora 64-bit VirtualBox VM.
+
+    Prompts:
+      - VM name (offers to unregister existing VM with the same name; files are kept)
+      - VM folder location
+      - Fedora ISO path
+      - RAM in MB (default: 4096)
+      - CPU count (default: 4)
+      - Disk size in MB (default: 40000)
+      - Disk format: VDI (default, VirtualBox native), VMDK (VMware-compatible), VHD (Hyper-V)
+      - Video RAM in MB (default: 128)
+      - Network adapter type: NAT (default), bridged, host-only, or none
+      - Planned guest username and password (recorded for reference during Fedora setup)
+      - Option to attach Guest Additions ISO
+      - Option to start the VM immediately
+
+    VM settings applied automatically:
+      - Graphics controller: VMSVGA
+      - Clipboard: bidirectional
+      - Drag and drop: bidirectional
+      - Hardware clock: UTC (prevents time drift between Windows and Fedora)
+      - Paravirt provider: KVM (improves CPU/IO performance for Linux guests)
+      - 3D acceleration: enabled (requires Guest Additions to take effect)
+      - Boot order: DVD first, then disk
+
+    Guest Additions note:
+      Clipboard, drag-and-drop, 3D acceleration, and guest control (used by provision-vm.ps1)
+      all require VirtualBox Guest Additions to be installed inside the VM.
+      If the ISO is attached, it appears as /dev/sr1 inside Fedora after OS installation.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File ".\create-vm.ps1"
@@ -225,6 +252,8 @@ try {
 
     Invoke-VBox "createvm", "--name", $vmName, "--ostype", "Fedora_64", "--register", "--basefolder", $vmFolder
     Invoke-VBox "modifyvm", $vmName, "--memory", $ramMB, "--cpus", $cpus, "--vram", $vramMB, "--graphicscontroller", "vmsvga"
+    Invoke-VBox "modifyvm", $vmName, "--clipboard", "bidirectional", "--draganddrop", "bidirectional"
+    Invoke-VBox "modifyvm", $vmName, "--rtcuseutc", "on", "--paravirtprovider", "kvm", "--accelerate3d", "on"
     if ($nicType -ne "none") {
         Invoke-VBox "modifyvm", $vmName, "--nic1", $nicType
     }

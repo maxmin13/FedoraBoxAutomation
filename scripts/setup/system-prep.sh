@@ -9,9 +9,9 @@
 
 source /tmp/common.sh
 
-if [[ 0 -eq $# ]] 
+if [[ 0 -eq $# ]]
 then
-   echo 'ERROR: login user not found.'
+   log_error 'login user not found.'
    exit 1
 fi
 
@@ -23,38 +23,33 @@ STEP "Unused software"
 ####
 
 dnf remove -y libreoffice* firefox
+log_info 'Removed libreoffice, firefox.'
 
-echo 'Removed libreoffice, firefox.'
-
-if nmcli connection show virbr0 > /dev/null
+if nmcli connection show virbr0 > /dev/null 2>&1
 then
    nmcli connection delete virbr0
-   
-   echo 'virbr0 network connection deleted'
+   log_info 'virbr0 network connection deleted.'
 fi
 
-if nmcli device show virbr0 > /dev/null
+if nmcli device show virbr0 > /dev/null 2>&1
 then
    nmcli device delete virbr0
-   
-   echo 'virbr0 network device deleted'
+   log_info 'virbr0 network device deleted.'
 fi
 
-if systemctl is-active libvirtd.service > /dev/null
+if systemctl is-active libvirtd.service > /dev/null 2>&1
 then
    systemctl stop libvirtd.service
    systemctl disable libvirtd.service
 else
-   echo 'libvirtd service not active.'
+   log_info 'libvirtd service not active.'
 fi
 
 dnf remove -y qemu-kvm.x86_64
-
-echo 'libvirt library removed'
+log_info 'libvirt library removed.'
 
 dnf autoremove -y
-
-echo 'Unused software removed.'
+log_info 'Unused software removed.'
 
 ####
 STEP "System update"
@@ -70,4 +65,4 @@ STEP "Kernel"
 #####dnf install -y kernel-devel-matched
 uname -r
 
-echo 'System configured.'
+log_info 'System configured.'

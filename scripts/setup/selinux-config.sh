@@ -8,17 +8,13 @@
 
 source /tmp/common.sh
 
-STEP 'selinux'
+STEP 'SELinux'
 
-echo 'selinux audit tools installed.'
-echo 'Do you have SELinux enabled?'
-
+log_info 'SELinux status:'
 sestatus
 
-yum install -y audit setools setroubleshoot setroubleshoot-server policycoreutils-python-utils 
+log_info 'Installing SELinux audit tools ...'
+yum install -y audit setools setroubleshoot setroubleshoot-server policycoreutils-python-utils
 systemctl start auditd
 
-echo 'selinux audit tools installed.'
-
-
-
+log_info 'SELinux audit tools installed.'
