@@ -3,36 +3,40 @@
 ##
 ## Description: Installs minikube (configured to use Docker as the driver) and
 ##              kubectl (latest stable release) for local Kubernetes development.
-## Usage:       sudo ./k8-install.sh
+##              Sets minikube driver config for the login user.
+## Usage:       sudo ./k8-install.sh <login-user>
 ##
 
 source /tmp/common.sh
+
+if [[ 0 -eq $# ]]
+then
+    log_error 'login user not found.'
+    exit 1
+fi
+
+LOGIN_USER="${1}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 ####
 STEP "minikube"
 ####
 
-# You need to have "passwordless sudo" to have Minikube properly working with Podman.
-DRIVER_NM='docker' ## 'podman'
+DRIVER_NM='docker'
 
-if ! minikube version > /dev/null 2>&1 
+if ! minikube version > /dev/null 2>&1
 then
-   wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -O /usr/local/bin/minikube
-   chmod 0755 /usr/local/bin/minikube
-   minikube config set driver "${DRIVER_NM}"
+    wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -O /usr/local/bin/minikube
+    chmod 0755 /usr/local/bin/minikube
+    log_info 'minikube installed.'
 fi
 
-minikube version
-minikube config view
+sudo -u "${LOGIN_USER}" minikube config set driver "${DRIVER_NM}"
+sudo -u "${LOGIN_USER}" minikube version
+sudo -u "${LOGIN_USER}" minikube config view
 
-echo
-echo 'Commands:'
-echo 'sudo minikube logs'
-echo 'sudo minikube config view'
-echo 'sudo minikube status'
-echo 'sudo minikube start --force'
-echo 'sudo minikube stop'
-echo 'sudo minikube dashboard'
+log_info "minikube driver set to ${DRIVER_NM} for ${LOGIN_USER}."
+log_info 'Commands: minikube start --force | stop | status | dashboard | logs'
 
 ####
 STEP "kubectl"
