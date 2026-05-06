@@ -243,7 +243,11 @@ Write-Host "       sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
 Write-Host "  IMPORTANT: Scripts must run as root inside the VM." -ForegroundColor Yellow
 Write-Host "       sudo passwd root" -ForegroundColor White
 Write-Host "       sudo reboot" -ForegroundColor White
-Write-Host "  Then enter 'root' as the username below." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  You will be asked for two usernames:" -ForegroundColor Cyan
+Write-Host "    1. Root credentials  — used by VBoxManage to connect to the VM remotely (always 'root')" -ForegroundColor White
+Write-Host "    2. Desktop username  — your non-root login user (e.g. 'maxmin'), used by scripts" -ForegroundColor White
+Write-Host "                          to configure home directory, PATH, and user-specific tools" -ForegroundColor White
 Write-Host ""
 
 $saved = Get-VmCredentials -VmName $script:vmName
@@ -313,7 +317,9 @@ if (-not (Test-GuestCredentials)) {
 Write-Host " OK" -ForegroundColor Green
 
 Write-Host ""
-$script:loginUser = (Read-Host "Guest desktop username (non-root)").Trim()
+Write-Host "  Desktop username — the non-root user whose environment will be configured" -ForegroundColor Cyan
+Write-Host "  (home directory, PATH, JAVA_HOME, .vimrc, .aws, etc.)" -ForegroundColor DarkGray
+$script:loginUser = (Read-Host "Guest desktop username").Trim()
 if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
     Write-Host "  ERROR: Desktop username cannot be empty." -ForegroundColor Red
     exit 1
