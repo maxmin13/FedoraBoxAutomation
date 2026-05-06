@@ -312,7 +312,43 @@ if (-not (Test-GuestCredentials)) {
 }
 Write-Host " OK" -ForegroundColor Green
 
+Write-Host ""
+$script:loginUser = (Read-Host "Guest desktop username (non-root)").Trim()
+if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
+    Write-Host "  ERROR: Desktop username cannot be empty." -ForegroundColor Red
+    exit 1
+}
+
 $scriptsRoot = Join-Path $PSScriptRoot "scripts"
+
+# Maps each script filename to its argument type:
+#   'user'   — pass the desktop login username
+#   'none'   — no arguments needed
+#   'custom' — prompt the user for arguments
+$scriptArgDefs = @{
+    'java.sh'                = 'user'
+    'vim.sh'                 = 'user'
+    'php.sh'                 = 'user'
+    'wireshark.sh'           = 'user'
+    'docker.sh'              = 'user'
+    'openssl.sh'             = 'user'
+    'maven.sh'               = 'user'
+    'python.sh'              = 'user'
+    'httpd.sh'               = 'user'
+    'tomcat.sh'              = 'user'
+    'aws-cli.sh'             = 'user'
+    'k8-install.sh'          = 'user'
+    'chrome.sh'              = 'none'
+    'mysql.sh'               = 'none'
+    'ecs-cli.sh'             = 'none'
+    'eclipse.sh'             = 'none'
+    'eclipse-ee.sh'          = 'none'
+    'visualstudiocode.sh'    = 'none'
+    'dev-tools.sh'           = 'none'
+    'postgresql.sh'          = 'none'
+    'virtualbox-install.sh'  = 'none'
+    'packettracer.sh'        = 'custom'
+}
 
 $commonScript = Join-Path $scriptsRoot "common.sh"
 if (Test-Path $commonScript) {
@@ -374,10 +410,10 @@ while (-not $done) {
             }
 
             $setupSteps = @(
-                @{ Path = "setup\system-prep.sh";    Args = $script:vmUser },
+                @{ Path = "setup\system-prep.sh";    Args = $script:loginUser },
                 @{ Path = "setup\network-config.sh"; Args = $hostname },
                 @{ Path = "setup\selinux-config.sh"; Args = "" },
-                @{ Path = "setup\desktop-config.sh"; Args = "$($script:vmUser) $bgFileName".Trim() },
+                @{ Path = "setup\desktop-config.sh"; Args = "$($script:loginUser) $bgFileName".Trim() },
                 @{ Path = "setup\dev-tools.sh";      Args = "" }
             )
 
@@ -424,8 +460,17 @@ while (-not $done) {
                 continue
             }
 
-            $chosen     = $allScripts[[int]$sel - 1]
-            $scriptArgs = (Read-Host "Arguments (leave blank if none)").Trim()
+            $chosen   = $allScripts[[int]$sel - 1]
+            $argType  = $scriptArgDefs[$chosen.Name]
+            $scriptArgs = switch ($argType) {
+                'user'   { $script:loginUser }
+                'none'   { '' }
+                'custom' { (Read-Host "Arguments for $($chosen.Name)").Trim() }
+                default  { (Read-Host "Arguments (leave blank if none)").Trim() }
+            }
+            if ($argType -eq 'user') {
+                Write-Host "  Using login user: $scriptArgs" -ForegroundColor DarkGray
+            }
 
             Write-Header $chosen.Name
             $ok = Invoke-GuestScript -LocalPath $chosen.FullName -ScriptArgs $scriptArgs
