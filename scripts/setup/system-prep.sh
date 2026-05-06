@@ -16,7 +16,8 @@ then
 fi
 
 LOGIN_USER="${1}"
-cd /home/"${LOGIN_USER}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
+cd "${HOME_DIR}"
 
 ####
 STEP "Unused software"

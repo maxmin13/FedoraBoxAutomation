@@ -22,7 +22,7 @@
 
     VM settings applied automatically:
       - Graphics controller: VMSVGA
-      - Clipboard: bidirectional
+      - Clipboard: bidirectional    
       - Drag and drop: bidirectional
       - Hardware clock: UTC (prevents time drift between Windows and Fedora)
       - Paravirt provider: KVM (improves CPU/IO performance for Linux guests)
@@ -141,7 +141,7 @@ function Add-VBoxGuestAdditionsIso {
     Write-Host "    1. Complete the Fedora OS installation and log in." -ForegroundColor Cyan
     Write-Host "    2. Open a terminal and run:" -ForegroundColor Cyan
     Write-Host "         sudo dnf update -y" -ForegroundColor White
-    Write-Host "         sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor White
+    Write-Host "         sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor White
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
@@ -302,7 +302,7 @@ try {
     Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
     Write-Host "    2. Install Guest Additions and disable SELinux:" -ForegroundColor White
     Write-Host "         sudo dnf update -y" -ForegroundColor DarkGray
-    Write-Host "         sudo dnf install -y kernel-devel kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
+    Write-Host "         sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
     Write-Host "         sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor DarkGray
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
