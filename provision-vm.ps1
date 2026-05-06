@@ -207,31 +207,45 @@ if ($runningVMs) {
     Write-Host "  WARNING: No running VMs found. Make sure the VM is started." -ForegroundColor Yellow
 }
 
-Write-Host ""
-$script:vmName = (Read-Host "VM name").Trim()
-if ([string]::IsNullOrWhiteSpace($script:vmName)) {
-    Write-Host "  ERROR: VM name cannot be empty." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "  Checking Guest Additions..." -NoNewline
-$vmInfo    = & $script:vbox showvminfo $script:vmName --machinereadable 2>&1
-$gaLine    = $vmInfo | Where-Object { $_ -match '^GuestAdditionsVersion=' }
-$gaVersion = if ($gaLine) { $gaLine -replace '^GuestAdditionsVersion="?([^"]*)"?$', '$1' } else { "" }
-if ([string]::IsNullOrWhiteSpace($gaVersion)) {
-    Write-Host " NOT FOUND" -ForegroundColor Red
+$vmVerified = $false
+while (-not $vmVerified) {
     Write-Host ""
-    Write-Host "  Guest Additions are not installed or not running." -ForegroundColor Red
-    Write-Host "  Inside the VM run:" -ForegroundColor Yellow
-    Write-Host "    sudo dnf update -y" -ForegroundColor White
-    Write-Host "    sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
-    Write-Host "    sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "    sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
-    Write-Host "    sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
-    Write-Host "    sudo reboot" -ForegroundColor White
-    exit 1
+    $script:vmName = (Read-Host "VM name").Trim()
+    if ([string]::IsNullOrWhiteSpace($script:vmName)) {
+        Write-Host "  ERROR: VM name cannot be empty." -ForegroundColor Red
+        continue
+    }
+
+    $ErrorActionPreference = 'SilentlyContinue'
+    $vmInfo = & $script:vbox showvminfo $script:vmName --machinereadable 2>&1
+    $ErrorActionPreference = 'Stop'
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  VM '$script:vmName' not found." -ForegroundColor Red
+        $runningVMs | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        if (-not (Read-YesNo "Try again?" $true)) { exit 1 }
+        continue
+    }
+
+    Write-Host "  Checking Guest Additions..." -NoNewline
+    $gaLine    = $vmInfo | Where-Object { $_ -match '^GuestAdditionsVersion=' }
+    $gaVersion = if ($gaLine) { $gaLine -replace '^GuestAdditionsVersion="?([^"]*)"?$', '$1' } else { "" }
+    if ([string]::IsNullOrWhiteSpace($gaVersion)) {
+        Write-Host " NOT FOUND" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Guest Additions are not installed or not running." -ForegroundColor Red
+        Write-Host "  Inside the VM run:" -ForegroundColor Yellow
+        Write-Host "    sudo dnf update -y" -ForegroundColor White
+        Write-Host "    sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
+        Write-Host "    sudo mkdir -p /mnt/ga" -ForegroundColor White
+        Write-Host "    sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
+        Write-Host "    sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
+        Write-Host "    sudo reboot" -ForegroundColor White
+        exit 1
+    }
+    Write-Host " OK (v$gaVersion)" -ForegroundColor Green
+    $vmVerified = $true
 }
-Write-Host " OK (v$gaVersion)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "  IMPORTANT: If you have not done so, complete these steps inside the VM before continuing:" -ForegroundColor Yellow
@@ -340,11 +354,13 @@ while (-not $loginVerified) {
 $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 
 # Maps each script filename to its argument type:
-#   'user'   - pass the desktop login username
-#   'none'   - no arguments needed
-#   'custom' - prompt the user for arguments
+#   'user'        - pass the desktop login username
+#   'none'        - no arguments needed
+#   'custom'      - prompt the user for all arguments
+#   'user+custom' - pass login username then prompt for additional arguments
 $scriptArgPrompts = @{
     'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
+    'tomcat.sh'       = 'Tomcat version to install (leave blank for default 10.1.33)'
     'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
     'eclipse-ee.sh'   = 'Eclipse release to install (leave blank for default 2026-03)'
     'packettracer.sh' = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
@@ -360,7 +376,7 @@ $scriptArgDefs = @{
     'maven.sh'               = 'custom'
     'python.sh'              = 'user'
     'httpd.sh'               = 'user'
-    'tomcat.sh'              = 'user'
+    'tomcat.sh'              = 'user+custom'
     'aws-cli.sh'             = 'user'
     'k8-install.sh'          = 'user'
     'git.sh'                 = 'none'
@@ -490,12 +506,13 @@ while (-not $done) {
             $argType  = $scriptArgDefs[$chosen.Name]
             $scriptArgs = switch ($argType) {
                 'user'   { $script:loginUser }
-                'none'   { '' }
-                'custom' { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Arguments for $($chosen.Name)" }; (Read-Host $prompt).Trim() }
-                default  { (Read-Host "Arguments (leave blank if none)").Trim() }
+                'none'        { '' }
+                'custom'      { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Arguments for $($chosen.Name)" }; (Read-Host $prompt).Trim() }
+                'user+custom' { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Additional arguments for $($chosen.Name) (leave blank if none)" }; $extra = (Read-Host $prompt).Trim(); if ($extra) { "$($script:loginUser) $extra" } else { $script:loginUser } }
+                default       { (Read-Host "Arguments (leave blank if none)").Trim() }
             }
-            if ($argType -eq 'user') {
-                Write-Host "  Using login user: $scriptArgs" -ForegroundColor DarkGray
+            if ($argType -in 'user', 'user+custom') {
+                Write-Host "  Using login user: $script:loginUser" -ForegroundColor DarkGray
             }
 
             Write-Header $chosen.Name
