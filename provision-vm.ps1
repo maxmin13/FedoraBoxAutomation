@@ -245,9 +245,9 @@ Write-Host "       sudo passwd root" -ForegroundColor White
 Write-Host "       sudo reboot" -ForegroundColor White
 Write-Host ""
 Write-Host "  You will be asked for two usernames:" -ForegroundColor Cyan
-Write-Host "    1. Root credentials  — used by VBoxManage to connect to the VM remotely (always 'root')" -ForegroundColor White
-Write-Host "    2. Desktop username  — your non-root login user (e.g. 'maxmin'), used by scripts" -ForegroundColor White
-Write-Host "                          to configure home directory, PATH, and user-specific tools" -ForegroundColor White
+Write-Host "    1. Root credentials : used by VBoxManage to connect to the VM remotely (always root)" -ForegroundColor White
+Write-Host "    2. Desktop username : your non-root login user (e.g. maxmin), used by scripts" -ForegroundColor White
+Write-Host "                         to configure home directory, PATH, and user-specific tools" -ForegroundColor White
 Write-Host ""
 
 $saved = Get-VmCredentials -VmName $script:vmName
