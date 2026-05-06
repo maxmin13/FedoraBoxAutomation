@@ -209,7 +209,7 @@ echo 'Kernel parameters configured.'
 STEP "/opt"
 ####
 
-sudo chown "${LOGIN_USER}":"${LOGIN_USER}" -R /opt/
+chown "${LOGIN_USER}":"${LOGIN_USER}" -R /opt/
 
 echo "Configured ${LOGIN_USER} /opt directory owner." 
 
@@ -217,4 +217,4 @@ echo "Configured ${LOGIN_USER} /opt directory owner."
 STEP "Disable Keyring"
 ####
 
-sudo chmod -x /usr/bin/gnome-keyring
+chmod -x /usr/bin/gnome-keyring
