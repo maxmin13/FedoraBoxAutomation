@@ -20,6 +20,7 @@ STEP 'python'
 ####
 
 LOGIN_USER="${1}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 dnf update -y
 dnf install gcc openssl-devel bzip2-devel libffi-devel zlib-devel wget make 
@@ -57,7 +58,7 @@ fi
 python3.11 -m pip install --root-user-action=ignore --upgrade pip
 
 echo
-python_venv_dir="/home/${LOGIN_USER}/python_venv"
+python_venv_dir="${HOME_DIR}/python_venv"
 echo "Creating a Python virtual envirnoment in ${python_venv_dir}"
 
 mkdir -p "${python_venv_dir}"

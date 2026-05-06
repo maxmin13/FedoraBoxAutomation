@@ -20,6 +20,7 @@ STEP 'OpenSSL'
 ####
 
 LOGIN_USER="${1}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
 #OPENSSL_VERSION="3.0.7"
 OPENSSL_VERSION="1.1.1u"
 OPENSSL_DIR="/usr/local/ssl"
@@ -62,12 +63,12 @@ else
    
    ldconfig -v
   
-   if ! grep -q "openssl" "/home/${LOGIN_USER}/.bash_profile"; then
+   if ! grep -q "openssl" "${HOME_DIR}/.bash_profile"; then
      {
         echo "";
         echo "PATH=$PATH:${OPENSSL_DIR}/bin";
         echo "export PATH";
-     } >> "/home/${LOGIN_USER}/.bash_profile"
+     } >> "${HOME_DIR}/.bash_profile"
    fi  
       
    rm -rf "${OPENSSL_SRC_DIR}"

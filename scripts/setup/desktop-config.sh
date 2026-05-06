@@ -18,19 +18,6 @@ fi
 
 LOGIN_USER="${1}"
 BACKGROUND_IMG="${2:-}"
-
-# If running as root, auto-detect the logged-in graphical user
-if [[ "${LOGIN_USER}" == "root" ]]; then
-    DETECTED=$(loginctl list-users --no-legend | awk '{print $2}' | grep -v root | head -1)
-    if [[ -n "${DETECTED}" ]]; then
-        echo "Auto-detected login user: ${DETECTED}"
-        LOGIN_USER="${DETECTED}"
-    else
-        echo 'ERROR: Could not detect a non-root logged-in user.'
-        exit 1
-    fi
-fi
-
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 ####

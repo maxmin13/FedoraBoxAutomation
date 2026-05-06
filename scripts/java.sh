@@ -3,23 +3,19 @@
 ##
 ## Description: Installs the latest Oracle JDK via the Foojay API, and sets
 ##              JAVA_HOME in the login user's ~/.bash_profile.
-## Usage:       sudo ./java.sh [login-user]
+## Usage:       sudo ./java.sh <login-user>
 ##
 
 source /tmp/common.sh
 
-LOGIN_USER="${1:-root}"
-
-if [[ "${LOGIN_USER}" == "root" ]]; then
-    DETECTED=$(loginctl list-users --no-legend | awk '{print $2}' | grep -v root | head -1)
-    if [[ -n "${DETECTED}" ]]; then
-        log_info "Auto-detected login user: ${DETECTED}"
-        LOGIN_USER="${DETECTED}"
-    else
-        log_error 'Could not detect a non-root logged-in user.'
-        exit 1
-    fi
+if [[ 0 -eq $# ]]
+then
+    log_error 'login user not found.'
+    exit 1
 fi
+
+LOGIN_USER="${1}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 ####
 STEP "Java"
@@ -54,7 +50,7 @@ else
    log_info 'Oracle JDK successfully installed.'
 fi
 
-BASH_PROFILE="/home/${LOGIN_USER}/.bash_profile"
+BASH_PROFILE="${HOME_DIR}/.bash_profile"
 if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
    JAVA_HOME_VAL="$(readlink -f /usr/bin/java | sed 's:/bin/java::')"
    printf "\nexport JAVA_HOME=%s\n" "${JAVA_HOME_VAL}" >> "${BASH_PROFILE}"
