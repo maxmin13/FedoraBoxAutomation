@@ -1,5 +1,12 @@
 #!/bin/bash
 
+##
+## Description: Builds and installs OpenSSL 1.1.1u from source to
+##              /usr/local/ssl and adds it to the login user's PATH in
+##              ~/.bash_profile.
+## Usage:       sudo ./openssl.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 

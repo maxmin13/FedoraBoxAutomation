@@ -1,5 +1,13 @@
 #!/bin/bash
 
+##
+## Description: Shared library sourced by all provisioning scripts. Enables
+##              strict error handling, tees all output to
+##              /var/log/fedora-box-automation.log, and provides structured
+##              logging functions: log_info, log_warn, log_error, and STEP.
+## Usage:       source /tmp/common.sh  (do not execute directly)
+##
+
 set -o errexit
 set -o pipefail
 set -o nounset

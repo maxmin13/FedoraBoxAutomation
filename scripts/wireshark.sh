@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs Wireshark and adds the login user to the wireshark
+##              group to allow packet capture without root.
+## Usage:       sudo ./wireshark.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 

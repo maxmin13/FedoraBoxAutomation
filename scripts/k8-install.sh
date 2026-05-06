@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs minikube (configured to use Docker as the driver) and
+##              kubectl (latest stable release) for local Kubernetes development.
+## Usage:       sudo ./k8-install.sh
+##
+
 source /tmp/common.sh
 
 ####

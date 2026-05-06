@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Amazon Elastic Container Service (Amazon ECS) is a highly scalable and fast container management service. 
-# You can use it to run, stop, and manage containers on a cluster.
+##
+## Description: Installs the Amazon ECS CLI, a tool for running and managing
+##              containers on Amazon Elastic Container Service clusters.
+## Usage:       sudo ./ecs-cli.sh
+##
 
 source /tmp/common.sh
 

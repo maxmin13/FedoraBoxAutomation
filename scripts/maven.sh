@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Downloads and installs Apache Maven 3.9.5 to /opt/maven and
+##              configures M2_HOME and PATH via /etc/profile.d/maven.sh.
+## Usage:       sudo ./maven.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 

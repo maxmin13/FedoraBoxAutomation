@@ -1,5 +1,12 @@
 #!/bin/bash
 
+##
+## Description: Downloads the Eclipse Enterprise Edition installer (latest
+##              release) to /opt/eclipse-installer. Run the installer manually
+##              after download to select the desired Eclipse flavour.
+## Usage:       sudo ./eclipse-ee.sh
+##
+
 source /tmp/common.sh
 
 ####

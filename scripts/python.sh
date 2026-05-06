@@ -1,5 +1,12 @@
 #!/bin/bash
 
+##
+## Description: Installs Python 3.11.2 from source, creates a virtual
+##              environment in ~/python_venv, and installs pytest, boto3,
+##              moto, pycodestyle, flake8, and black into it.
+## Usage:       sudo ./python.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 

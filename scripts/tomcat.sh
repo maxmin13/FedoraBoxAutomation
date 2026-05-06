@@ -1,10 +1,11 @@
 #!/bin/bash
 
-source /tmp/common.sh
+##
+## Description: Downloads and installs Apache Tomcat 10.1.33 to /opt.
+## Usage:       sudo ./tomcat.sh
+##
 
-##########################
-# Provision Tomcat 10.1.33
-##########################
+source /tmp/common.sh
 
 ####
 STEP "Tomcat"

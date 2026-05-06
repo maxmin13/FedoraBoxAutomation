@@ -1,5 +1,12 @@
 #!/bin/bash
 
+##
+## Description: Installs Docker CE from the official Docker repository, starts
+##              and enables the Docker service, runs a hello-world smoke test,
+##              and adds the login user to the docker group.
+## Usage:       sudo ./docker.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 1 -gt $# ]] 

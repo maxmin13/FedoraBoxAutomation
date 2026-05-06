@@ -1,5 +1,12 @@
 #!/bin/bash
 
+##
+## Description: Installs Vim with the Pathogen plugin manager and configures
+##              Syntastic linting for Bash (ShellCheck), Perl (perlcritic),
+##              Python (pylint), and JavaScript (jshint).
+## Usage:       sudo ./vim.sh <login-user>
+##
+
 source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 

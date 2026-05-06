@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs VirtualBox 6.1.26 and its Extension Pack on Fedora
+##              by downloading the RPM from the official VirtualBox CDN.
+## Usage:       sudo ./virtualbox-install.sh
+##
+
 source /tmp/common.sh
 
 ####VBOX_DOWNLOAD_URL='https://download.virtualbox.org/virtualbox/6.1.30/VirtualBox-6.1-6.1.30_148432_fedora33-1.x86_64.rpm'

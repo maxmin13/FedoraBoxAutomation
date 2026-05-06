@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs Google Chrome stable on Fedora by enabling the
+##              Google Chrome repository via fedora-workstation-repositories.
+## Usage:       sudo ./chrome.sh
+##
+
 source /tmp/common.sh
 
 ####

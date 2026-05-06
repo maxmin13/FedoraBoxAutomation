@@ -1,8 +1,12 @@
 #!/bin/bash
 
-## see: https://gist.github.com/siliconjesus/c3590b8d4fdb6ebea57bb1ccd66c8434
-## Environment: Fedora 41+ // Packet Tracer 8.x
-## login: https://www.netacad.com/portal/learning
+##
+## Description: Installs Cisco Packet Tracer on Fedora by extracting a .deb
+##              package, copying files to /usr/share and /opt, and registering
+##              GNOME desktop entries and MIME types.
+## Usage:       sudo ./packettracer.sh <provision-dir> <installer.deb>
+## Note:        Installer .deb must be downloaded from https://www.netacad.com/portal/learning
+##
 
 source /tmp/common.sh
 

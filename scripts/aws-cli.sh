@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs the AWS CLI v2 from the official Amazon ZIP bundle.
+##              After installation, run 'aws configure' to set credentials.
+## Usage:       sudo ./aws-cli.sh
+##
+
 source /tmp/common.sh
 
 ####

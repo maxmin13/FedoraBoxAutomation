@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Downloads and installs Eclipse IDE for Java Developers (2026-03)
+##              to /opt/eclipse and registers a GNOME desktop entry.
+## Usage:       sudo ./eclipse.sh
+##
+
 source /tmp/common.sh
 
 ####

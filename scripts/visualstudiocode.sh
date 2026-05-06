@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs Visual Studio Code by adding the Microsoft package
+##              repository and installing the 'code' package via dnf.
+## Usage:       sudo ./visualstudiocode.sh
+##
+
 source /tmp/common.sh
 
 ####

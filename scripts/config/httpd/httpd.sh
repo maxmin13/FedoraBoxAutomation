@@ -1,11 +1,11 @@
 #!/bin/bash
 
-################################################################################################
-# Install apache server, fcgi is enabled by default in Fedora, cache disabled.
-#
-################################################################################################
-
-## Install Apache Web Server on /etc/httpd directory,
+##
+## Description: Installs Apache HTTP Server, configures sites-available and
+##              sites-enabled directories, disables cache, sets SELinux boolean
+##              httpd_read_user_content, and deploys a phpinfo.php test page.
+## Usage:       sudo ./httpd.sh <login-user>
+##
 
 source /tmp/common.sh
 

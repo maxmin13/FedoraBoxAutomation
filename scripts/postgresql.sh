@@ -1,5 +1,11 @@
 #!/bin/bash
 
+##
+## Description: Installs PostgreSQL server, initialises the database cluster,
+##              enables remote connections, and installs pgAdmin 4 desktop.
+## Usage:       sudo ./postgresql.sh
+##
+
 source /tmp/common.sh
 
 WORK_DIR=$(mktemp -d)
