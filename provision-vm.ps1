@@ -317,7 +317,7 @@ if (-not (Test-GuestCredentials)) {
 Write-Host " OK" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "  Desktop username — the non-root user whose environment will be configured" -ForegroundColor Cyan
+Write-Host "  Desktop username : the non-root user whose environment will be configured" -ForegroundColor Cyan
 Write-Host "  (home directory, PATH, JAVA_HOME, .vimrc, .aws, etc.)" -ForegroundColor DarkGray
 $script:loginUser = (Read-Host "Guest desktop username").Trim()
 if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
@@ -328,9 +328,9 @@ if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
 $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 
 # Maps each script filename to its argument type:
-#   'user'   — pass the desktop login username
-#   'none'   — no arguments needed
-#   'custom' — prompt the user for arguments
+#   'user'   - pass the desktop login username
+#   'none'   - no arguments needed
+#   'custom' - prompt the user for arguments
 $scriptArgDefs = @{
     'java.sh'                = 'user'
     'vim.sh'                 = 'user'
