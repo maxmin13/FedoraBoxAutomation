@@ -15,7 +15,7 @@ MVN_VERSION="${1:-3.9.5}"
 STEP "Maven"
 ####
 
-if [[ -d /opt/maven ]]
+if [[ -x '/opt/maven/bin/mvn' ]]
 then
     log_info "Maven already installed."
 else
@@ -23,7 +23,7 @@ else
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
     wget --progress=dot "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz" -O "${WORK_DIR}/maven.tar.gz"
-    tar -xzf "${WORK_DIR}/maven.tar.gz" -C "${WORK_DIR}"
+    tar -xf "${WORK_DIR}/maven.tar.gz" -C "${WORK_DIR}"
     mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" /opt/maven
 
     if [[ ! -f /etc/profile.d/maven.sh ]]

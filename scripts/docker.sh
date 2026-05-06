@@ -9,45 +9,39 @@
 
 source /tmp/common.sh
 
-if [[ 1 -gt $# ]] 
+if [[ 0 -eq $# ]]
 then
-   echo 'ERROR: missing parameters.'
-   exit 1
+    log_error 'login user not found.'
+    exit 1
 fi
 
 LOGIN_USER="${1}"
 
-uname -r
-
 ####
-STEP "docker"
+STEP "Docker"
 ####
-
-# kernel version 3.10 or greater is needed.
-uname -r
 
 if ! docker version > /dev/null 2>&1
 then
-   dnf -y install dnf-plugins-core
-   dnf-3 config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-   dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    dnf install -y dnf-plugins-core
+    dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-   systemctl start docker
-   systemctl enable docker
-   docker run hello-world
-   log_info 'Docker successfully installed.'
+    systemctl start docker
+    systemctl enable docker
+    docker run hello-world
+    log_info 'Docker successfully installed.'
 else
-   log_info 'Docker already installed.'
+    log_info 'Docker already installed.'
 fi
 
-systemctl status docker
+systemctl status docker --no-pager
 docker version
 
-if ! groups "${LOGIN_USER}" | grep docker
+if ! groups "${LOGIN_USER}" | grep -q docker
 then
-   usermod -aG docker "${LOGIN_USER}"
-   
-   echo "${LOGIN_USER} added to docker group."
+    usermod -aG docker "${LOGIN_USER}"
+    log_info "${LOGIN_USER} added to docker group."
 else
-   echo "${LOGIN_USER} already added to docker group."
+    log_info "${LOGIN_USER} already in docker group."
 fi

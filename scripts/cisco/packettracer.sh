@@ -2,7 +2,7 @@
 
 ##
 ## Description: Installs Cisco Packet Tracer on Fedora by extracting a .deb
-##              package, copying files to /usr/share and /opt, and registering
+##              package, copying files to /usr and /opt, and registering
 ##              GNOME desktop entries and MIME types.
 ## Usage:       sudo ./packettracer.sh <provision-dir> <installer.deb>
 ## Note:        Installer .deb must be downloaded from https://www.netacad.com/portal/learning
@@ -12,8 +12,8 @@ source /tmp/common.sh
 
 if [[ 2 -gt $# ]]
 then
-   echo 'ERROR: missing parameters.'
-   echo 'Usage: sudo ./packettracer.sh <provision-dir> <installer.deb>'
+   log_error 'missing parameters.'
+   log_error 'Usage: sudo ./packettracer.sh <provision-dir> <installer.deb>'
    exit 1
 fi
 
@@ -26,18 +26,18 @@ if [[ "${PROVISION_FILE}" != /* ]]; then
 fi
 
 if [[ ! -f "${PROVISION_FILE}" ]]; then
-   echo "ERROR: installer file not found: ${PROVISION_FILE}"
+   log_error "installer file not found: ${PROVISION_FILE}"
    exit 1
 fi
 
 if [[ "${PROVISION_FILE}" != *.deb ]]; then
-   echo "ERROR: expected a .deb file, got: ${PROVISION_FILE}"
+   log_error "expected a .deb file, got: ${PROVISION_FILE}"
    exit 1
 fi
 
 for cmd in ar tar xdg-desktop-menu gtk-update-icon-cache update-mime-database xdg-mime; do
    if ! command -v "${cmd}" &> /dev/null; then
-      echo "ERROR: required command not found: ${cmd}"
+      log_error "required command not found: ${cmd}"
       exit 1
    fi
 done
@@ -46,7 +46,7 @@ STEP 'PacketTracer'
 
 if [[ -d /opt/pt ]]
 then
-   echo 'PacketTracer already installed'
+   log_info 'PacketTracer already installed.'
    exit 0
 fi
 
@@ -74,4 +74,4 @@ gtk-update-icon-cache --force --ignore-theme-index /usr/share/icons/gnome
 xdg-mime default cisco-ptsa.desktop x-scheme-handler/pttp
 ln -sf /opt/pt/PacketTracer /usr/local/bin/PacketTracer
 
-echo 'PacketTracer installed. Reboot the system.'
+log_info 'PacketTracer installed. Reboot the system.'

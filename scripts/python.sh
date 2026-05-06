@@ -11,7 +11,7 @@ source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
-   echo 'ERROR: login user not found.'
+   log_error 'login user not found.'
    exit 1
 fi
 
@@ -29,11 +29,9 @@ version="$(python3.11 -V)"
 
 if [[ "${version}" =~ .*'Python 3.11.2'.* ]]
 then
-   echo 
-   echo 'Python 3.11.2 alredy installed.'
+   log_info 'Python 3.11.2 already installed.'
 else
-   echo
-   echo 'Installing Python 3.11.2 ...'
+   log_info 'Installing Python 3.11.2 ...'
 
    WORK_DIR=$(mktemp -d)
    trap 'rm -rf "${WORK_DIR}"' EXIT
@@ -52,22 +50,20 @@ else
    python --version
    python3.11 -V
 
-   echo 'Python 3.11.2 successfully installed.'
+   log_info 'Python 3.11.2 successfully installed.'
 fi
 
 python3.11 -m pip install --root-user-action=ignore --upgrade pip
 
-echo
 python_venv_dir="${HOME_DIR}/python_venv"
-echo "Creating a Python virtual envirnoment in ${python_venv_dir}"
+log_info "Creating Python virtual environment in ${python_venv_dir}"
 
 mkdir -p "${python_venv_dir}"
 python3.11 -m venv "${python_venv_dir}"
 source "${python_venv_dir}/bin/activate"
 command -v python
 
-echo "Python virtual envirnoment created!"
-echo
+log_info 'Python virtual environment created.'
 
 python -m pip install pytest boto3 moto[all] pycodestyle flake8 black -U
 

@@ -11,7 +11,7 @@ source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
-   echo 'ERROR: login user not found.'
+   log_error 'login user not found.'
    exit 1
 fi
 
@@ -28,9 +28,9 @@ APACHE_INSTALL_DIR='/etc/httpd'
 APACHE_SITES_AVAILABLE_DIR='/etc/httpd/sites-available'
 APACHE_SITES_ENABLED_DIR='/etc/httpd/sites-enabled'
 
-echo 'Installing Apache Web Server ...'
+log_info 'Installing Apache Web Server ...'
 
-yum install -y httpd
+dnf install -y httpd
 mkdir -p "${APACHE_SITES_AVAILABLE_DIR}" "${APACHE_SITES_ENABLED_DIR}"
 
 if ! grep -q sites-enabled "${APACHE_INSTALL_DIR}"/conf/httpd.conf
@@ -56,14 +56,14 @@ setsebool -P httpd_read_user_content 1
 systemctl enable httpd.service
 systemctl restart httpd.service
 
-echo 'Apache Web Server installed.'
+log_info 'Apache Web Server installed.'
 
 if [[ -f phpinfo.php ]]
 then
     mv phpinfo.php /var/www/html/
 fi
 
-echo 'selinux httpd_read_user_content boolean turned on.'
+log_info 'selinux httpd_read_user_content boolean turned on.'
 
 echo '-------------------------------------------------'
 echo 'Directory modules:'
@@ -78,7 +78,7 @@ echo '-------------------------------------------------'
 echo 'Server version:'
 /usr/sbin/httpd -V
 echo '-------------------------------------------------'
-echo 'Apache Web Server successfully installed.'
+log_info 'Apache Web Server successfully installed.'
 echo 'verify installation:'
 echo 'http://localhost/phpinfo.php'
 echo

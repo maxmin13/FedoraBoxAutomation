@@ -11,7 +11,7 @@ source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
-   echo 'ERROR: login user not found.'
+   log_error 'login user not found.'
    exit 1
 fi
 
@@ -60,7 +60,7 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-echo 'Pathogen installed.'
+log_info 'Pathogen installed.'
 
 ###############################################################
 # VALIDATORS
@@ -98,7 +98,7 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-echo 'Bash shellCheck enabled.'
+log_info 'Bash shellCheck enabled.'
 
 ###############################################################
 
@@ -116,7 +116,7 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-echo 'Perl perlcritic enabled.'
+log_info 'Perl perlcritic enabled.'
 
 ###############################################################
 
@@ -133,7 +133,7 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-echo 'Python pylint enabled.'
+log_info 'Python pylint enabled.'
 
 ###############################################################
 
@@ -154,4 +154,4 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-echo 'JQuery jshint enabled.'
+log_info 'JQuery jshint enabled.'

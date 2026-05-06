@@ -99,7 +99,7 @@ function Send-ScriptToGuest {
     $fileName  = [System.IO.Path]::GetFileName($LocalPath)
     $guestPath = "/tmp/$fileName"
 
-    Write-Host "  Uploading $fileName..." -NoNewline
+    Write-Host "  Uploading $fileName script ..." -NoNewline
 
     $uploadArgs = @(
         'guestcontrol', $script:vmName,
@@ -251,6 +251,10 @@ Write-Host "    2. Desktop username : your non-root login user (e.g. maxmin), us
 Write-Host "                         to configure home directory, PATH, and user-specific tools" -ForegroundColor White
 Write-Host ""
 
+$credVerified = $false
+$script:vmUser = $null
+$script:vmPass = $null
+
 $saved = Get-VmCredentials -VmName $script:vmName
 if ($saved) {
     Write-Host "  Saved credentials found for '$($script:vmName)' (user: $($saved.User))." -ForegroundColor DarkGray
@@ -258,72 +262,79 @@ if ($saved) {
     if ($useSaved) {
         $script:vmUser = $saved.User
         $script:vmPass = $saved.Pass
-    } else {
-        $script:vmUser = (Read-Host "Guest username").Trim()
+    }
+}
+
+while (-not $credVerified) {
+    if (-not $script:vmUser) {
+        $script:vmUser = (Read-Host "VM root username (used by VBoxManage to connect, e.g. root)").Trim()
         $script:vmPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
             [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR(
-                (Read-Host "Guest password" -AsSecureString)))
+                (Read-Host "VM root password" -AsSecureString)))
+    }
+
+    Write-Host "  Closing any open guest sessions..." -NoNewline
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox guestcontrol $script:vmName closesession --all 2>&1 | Out-Null
+    } catch {} finally {
+        $ErrorActionPreference = 'Stop'
+    }
+    Write-Host " Done" -ForegroundColor DarkGray
+
+    Write-Host "  Verifying credentials..." -NoNewline
+    if (Test-GuestCredentials) {
+        Write-Host " OK" -ForegroundColor Green
         Save-VmCredentials -VmName $script:vmName -User $script:vmUser -Pass $script:vmPass
+        $credVerified = $true
+    } else {
+        Write-Host " FAILED" -ForegroundColor Red
+        Write-Host "  Cannot authenticate as '$script:vmUser'. Possible causes:" -ForegroundColor Yellow
+        Write-Host "  1. Wrong username or password." -ForegroundColor White
+        Write-Host "  2. Guest Additions not installed or SELinux blocking VBoxService." -ForegroundColor White
+        Write-Host "  3. Use root: sudo passwd root inside the VM, then enter root here." -ForegroundColor White
+        $credFile = Get-CredentialFile -VmName $script:vmName
+        if (Test-Path $credFile) {
+            Remove-Item $credFile -Force
+            Write-Host "  Saved credentials deleted." -ForegroundColor DarkGray
+        }
+        $script:vmUser = $null
+        $script:vmPass = $null
+        if (-not (Read-YesNo "Try again?" $true)) { exit 1 }
     }
-} else {
-    $script:vmUser = (Read-Host "Guest username").Trim()
-    $script:vmPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR(
-            (Read-Host "Guest password" -AsSecureString)))
-    Save-VmCredentials -VmName $script:vmName -User $script:vmUser -Pass $script:vmPass
 }
 
-Write-Host "  Closing any open guest sessions..." -NoNewline
-try {
+$loginVerified = $false
+while (-not $loginVerified) {
+    Write-Host ""
+    Write-Host "  Desktop username : the non-root user whose environment will be configured" -ForegroundColor Cyan
+    Write-Host "  (home directory, PATH, JAVA_HOME, .vimrc, .aws, etc.) e.g. maxmin" -ForegroundColor DarkGray
+    $script:loginUser = (Read-Host "Guest desktop username").Trim()
+    if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
+        Write-Host "  ERROR: Desktop username cannot be empty." -ForegroundColor Red
+        continue
+    }
+
+    Write-Host "  Verifying desktop user '$script:loginUser' exists in VM..." -NoNewline
+    $checkUserArgs = @(
+        'guestcontrol', $script:vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', $script:vmUser,
+        '--password', $script:vmPass,
+        '--wait-stdout', '--wait-stderr',
+        '--', '-c', "id $script:loginUser"
+    )
     $ErrorActionPreference = 'SilentlyContinue'
-    & $script:vbox guestcontrol $script:vmName closesession --all 2>&1 | Out-Null
-} catch {} finally {
+    & $script:vbox @checkUserArgs 2>&1 | Out-Null
     $ErrorActionPreference = 'Stop'
-}
-Write-Host " Done" -ForegroundColor DarkGray
-
-Write-Host "  Verifying credentials..." -NoNewline
-if (-not (Test-GuestCredentials)) {
-    Write-Host " FAILED" -ForegroundColor Red
-    Write-Host "  Cannot authenticate as '$script:vmUser'. Possible causes:" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "  1. Wrong username or password." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "  2. Guest Additions not installed - open a terminal inside the VM and run:" -ForegroundColor Yellow
-    Write-Host "       sudo dnf update -y" -ForegroundColor White
-    Write-Host "       sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
-    Write-Host "       sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "       sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
-    Write-Host "       sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
-    Write-Host "       sudo reboot" -ForegroundColor White
-    Write-Host ""
-    Write-Host "  3. SELinux is blocking VBoxService - open a terminal inside the VM and run:" -ForegroundColor Yellow
-    Write-Host "       sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor White
-    Write-Host "       sudo reboot" -ForegroundColor White
-    Write-Host "     Then retry this script." -ForegroundColor White
-    Write-Host ""
-    Write-Host "  4. sudo requires a TTY - use root instead. Set a root password inside the VM:" -ForegroundColor Yellow
-    Write-Host "       sudo passwd root" -ForegroundColor White
-    Write-Host "     Then re-run this script with username: root" -ForegroundColor White
-    Write-Host ""
-    Write-Host "  5. VBoxService session issue - restart it inside the VM:" -ForegroundColor Yellow
-    Write-Host "       sudo systemctl restart vboxadd-service" -ForegroundColor White
-    $credFile = Get-CredentialFile -VmName $script:vmName
-    if (Test-Path $credFile) {
-        Remove-Item $credFile -Force
-        Write-Host "  Saved credentials deleted." -ForegroundColor DarkGray
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host " NOT FOUND" -ForegroundColor Red
+        Write-Host "  User '$script:loginUser' does not exist in the VM." -ForegroundColor Yellow
+        if (-not (Read-YesNo "Try again?" $true)) { exit 1 }
+    } else {
+        Write-Host " OK" -ForegroundColor Green
+        $loginVerified = $true
     }
-    exit 1
-}
-Write-Host " OK" -ForegroundColor Green
-
-Write-Host ""
-Write-Host "  Desktop username : the non-root user whose environment will be configured" -ForegroundColor Cyan
-Write-Host "  (home directory, PATH, JAVA_HOME, .vimrc, .aws, etc.)" -ForegroundColor DarkGray
-$script:loginUser = (Read-Host "Guest desktop username").Trim()
-if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
-    Write-Host "  ERROR: Desktop username cannot be empty." -ForegroundColor Red
-    exit 1
 }
 
 $scriptsRoot = Join-Path $PSScriptRoot "scripts"
@@ -336,7 +347,7 @@ $scriptArgPrompts = @{
     'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
     'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
     'eclipse-ee.sh'   = 'Eclipse release to install (leave blank for default 2026-03)'
-    'packettracer.sh' = 'Arguments for packettracer.sh'
+    'packettracer.sh' = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
 }
 
 $scriptArgDefs = @{

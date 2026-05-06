@@ -10,7 +10,7 @@ source /tmp/common.sh
 
 if [[ 0 -eq $# ]] 
 then
-   echo 'ERROR: login user not found.'
+   log_error 'login user not found.'
    exit 1
 fi
 
@@ -20,10 +20,10 @@ STEP "php"
 
 LOGIN_USER="${1}"
 
-echo 'Installing PHP ...'
+log_info 'Installing PHP ...'
 dnf install -y php php-common php-cli
 php -v
-echo 'PHP installed.'
+log_info 'PHP installed.'
 
 if grep -Rq 'apc.enabled' /etc/php.ini
 then
@@ -32,7 +32,7 @@ fi
 
 echo 'apc.enabled=0' >> /etc/php.ini
 
-echo 'PHP cache disabled.'
+log_info 'PHP cache disabled.'
 
 exit 0
 

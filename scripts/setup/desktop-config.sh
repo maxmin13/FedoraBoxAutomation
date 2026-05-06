@@ -12,7 +12,7 @@ source /tmp/common.sh
 
 if [[ 1 -gt $# ]]
 then
-   echo 'ERROR: missing parameters.'
+   log_error 'missing parameters.'
    exit 1
 fi
 
@@ -32,13 +32,13 @@ STEP "Disable Wayland"
 
 sed -i 's/#WaylandEnable=false/WaylandEnable=false/g' /etc/gdm/custom.conf
 
-echo "Wayland disabled."
+log_info 'Wayland disabled.'
 
 if ! grep -q 'DefaultSession=gnome-xorg.desktop' '/etc/gdm/custom.conf'; then
   sed -i '/WaylandEnable=false/a DefaultSession=gnome-xorg.desktop' /etc/gdm/custom.conf
 fi
 
-echo "XORG set."
+log_info 'XORG set.'
 
 USER_UID="$(id -u "${LOGIN_USER}")"
 DBUS="unix:path=/run/user/${USER_UID}/bus"
@@ -57,22 +57,22 @@ STEP "Background image"
 
 if [[ -z "${BACKGROUND_IMG}" ]]
 then
-   echo 'WARNING: No background image provided, skipping.'
+   log_warn 'No background image provided, skipping.'
 elif [[ ! -f "/usr/share/backgrounds/${BACKGROUND_IMG}" ]]
 then
-   echo "WARNING: Background image not found at /usr/share/backgrounds/${BACKGROUND_IMG}, skipping."
+   log_warn "Background image not found at /usr/share/backgrounds/${BACKGROUND_IMG}, skipping."
 else
    img_uri="$(gsettings_get org.gnome.desktop.background picture-uri)"
    img_nm="$(basename "${img_uri}" \')"
 
-   echo "The current background image is ${img_nm}"
+   log_info "Current background image: ${img_nm}"
 
    if [[ "${img_nm}" == "${BACKGROUND_IMG}" ]]
    then
-      echo 'Background image already changed.'
+      log_info 'Background image already set.'
    else
       gsettings_set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/${BACKGROUND_IMG}"
-      echo 'Background image changed.'
+      log_info 'Background image changed.'
    fi
 fi
 
@@ -84,10 +84,10 @@ audible_bell="$(gsettings_get org.gnome.desktop.wm.preferences audible-bell)"
 
 if [[ 'false' == "${audible_bell}" ]]
 then
-   echo 'Bell settings already changed.'
+   log_info 'Bell already disabled.'
 else
    gsettings_set org.gnome.desktop.wm.preferences audible-bell false
-   echo 'Bell settings changed.'
+   log_info 'Bell disabled.'
 fi
 
 ####
@@ -99,10 +99,10 @@ create_backup="$(gsettings_get org.gnome.gedit.preferences.editor create-backup-
 
 if [[ 'true' == "${create_backup}" ]]
 then
-   echo 'Gedit create backup files already configured.'
+   log_info 'Gedit backup files already configured.'
 else
    gsettings_set org.gnome.gedit.preferences.editor create-backup-copy true
-   echo 'Gedit create backup files configured.'
+   log_info 'Gedit backup files configured.'
 fi
 
 ####
@@ -111,7 +111,7 @@ STEP "Nautilus file manager"
 
 gsettings_set org.gnome.nautilus.list-view default-visible-columns "['name', 'size', 'date_modified', 'type']"
 
-echo 'Added additional type colum.'
+log_info 'Nautilus additional type column added.'
 
 ####
 #STEP "LS_COLOR"
@@ -157,7 +157,7 @@ cat <<-EOT >> "${HOME_DIR}/.bash_profile"
 	export PS1="[\u@\h \W]\[\e[91m\]\$(parse_git_branch)\[\e[00m\]$ "
 EOT
 
-echo 'Configured Git branch name at Bash prompt.'
+log_info 'Git branch name configured at Bash prompt.'
 
 fi
 
@@ -169,8 +169,7 @@ STEP "Kernel parameters"
 if ! grep protected_regular /etc/sysctl.conf > /dev/null 2>&1 
 then
    echo 'fs.protected_regular=0' >> /etc/sysctl.conf
-   echo 'disabled fs.protected_regular Linux kernel parameter, so that root can edit anything on the system.'
-   echo
+   log_info 'fs.protected_regular=0 set in /etc/sysctl.conf.'
 fi
 
 # sysctl fs.protected_regular=0 is not applied after a reboot if it's set in /etc/sysctl.conf. 
@@ -193,9 +192,9 @@ then
 		WantedBy=multi-user.target
 	EOT
 	
-	echo 'service sysctl-reload.service created.'
+	log_info 'sysctl-reload.service created.'
 else
-    echo 'service sysctl-reload.service already created.'
+    log_info 'sysctl-reload.service already exists.'
 fi
 
 systemctl daemon-reload
@@ -203,7 +202,7 @@ systemctl enable sysctl-reload.service
 systemctl start sysctl-reload.service
 systemctl status sysctl-reload.service
 
-echo 'Kernel parameters configured.'
+log_info 'Kernel parameters configured.'
 
 ####
 STEP "/opt"
@@ -211,7 +210,7 @@ STEP "/opt"
 
 chown "${LOGIN_USER}":"${LOGIN_USER}" -R /opt/
 
-echo "Configured ${LOGIN_USER} /opt directory owner." 
+log_info "Ownership of /opt set to ${LOGIN_USER}." 
 
 ####
 STEP "Disable Keyring"

@@ -17,17 +17,17 @@ STEP "postgresql"
 
 if command -v psql > /dev/null
 then
-	echo 'postgresql installed.'
+    log_info 'postgresql already installed.'
 else
-    echo 'Installing postgresql ...'
+    log_info 'Installing postgresql ...'
 
-	dnf install -y postgresql-server postgresql
-	postgresql-setup --initdb
+    dnf install -y postgresql-server postgresql
+    postgresql-setup --initdb
 
-	systemctl enable --now postgresql.service
-	systemctl status postgresql.service
+    systemctl enable --now postgresql.service
+    systemctl status postgresql.service
 
-	echo 'postgresql successfully installed.'
+    log_info 'postgresql successfully installed.'
 
 	netstat -nlt | grep 5432
 
@@ -41,16 +41,16 @@ fi
 
 if /usr/pgadmin4/bin/pgadmin4 --version > /dev/null
 then
-	echo 'pgadmin4 installed.'
+    log_info 'pgadmin4 already installed.'
 else
-	echo 'Installing pgAdmin 4 Management ...'
+    log_info 'Installing pgAdmin 4 Management ...'
 
-	wget https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm -O "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
+    wget --progress=dot https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm -O "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
 
-	rpm -Uvh --force "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
-	
-	yum install -y pgadmin4-desktop
+    rpm -Uvh --force "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
 
-    echo 'pgAdmin 4 Management successfully installed.'    
+    dnf install -y pgadmin4-desktop
+
+    log_info 'pgAdmin 4 Management successfully installed.'
 fi
 
