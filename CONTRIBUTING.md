@@ -75,7 +75,7 @@ cd "${HOME_DIR}"
 
 ### Parameters
 
-Validate required parameters at the top of the script:
+All parameters are mandatory — never use default values (e.g. `"${1:-root}"`). Validate at the top:
 
 ```bash
 if [[ 0 -eq $# ]]
@@ -83,6 +83,9 @@ then
     log_error 'login user not found.'
     exit 1
 fi
+
+LOGIN_USER="${1}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
 ```
 
 ### Temporary files
