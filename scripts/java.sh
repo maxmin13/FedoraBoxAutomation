@@ -1,10 +1,12 @@
 #!/bin/bash
 
-source /tmp/common.sh
+##
+## Description: Installs the latest Oracle JDK via the Foojay API, and sets
+##              JAVA_HOME in the login user's ~/.bash_profile.
+## Usage:       sudo ./java.sh [login-user]
+##
 
-###################
-# Provision Oracle JDK (latest)
-###################
+source /tmp/common.sh
 
 LOGIN_USER="${1:-root}"
 
