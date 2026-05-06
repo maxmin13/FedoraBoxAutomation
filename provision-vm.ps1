@@ -360,10 +360,14 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 #   'user+custom' - pass login username then prompt for additional arguments
 $scriptArgPrompts = @{
     'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
-    'tomcat.sh'       = 'Tomcat version to install (leave blank for default 10.1.33)'
+    'tomcat.sh'       = @('Tomcat version to install (leave blank for default 10.1.33)', 'Tomcat HTTP port (leave blank for default 8080)')
     'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
     'eclipse-ee.sh'   = 'Eclipse release to install (leave blank for default 2026-03)'
     'packettracer.sh' = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
+}
+
+$scriptArgDefaults = @{
+    'tomcat.sh' = @('10.1.33', '8080')
 }
 
 $scriptArgDefs = @{
@@ -376,7 +380,7 @@ $scriptArgDefs = @{
     'maven.sh'               = 'custom'
     'python.sh'              = 'user'
     'httpd.sh'               = 'user'
-    'tomcat.sh'              = 'user+custom'
+    'tomcat.sh'              = 'user+custom2'
     'aws-cli.sh'             = 'user'
     'k8-install.sh'          = 'user'
     'git.sh'                 = 'none'
@@ -509,6 +513,15 @@ while (-not $done) {
                 'none'        { '' }
                 'custom'      { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Arguments for $($chosen.Name)" }; (Read-Host $prompt).Trim() }
                 'user+custom' { $prompt = if ($scriptArgPrompts[$chosen.Name]) { $scriptArgPrompts[$chosen.Name] } else { "Additional arguments for $($chosen.Name) (leave blank if none)" }; $extra = (Read-Host $prompt).Trim(); if ($extra) { "$($script:loginUser) $extra" } else { $script:loginUser } }
+                'user+custom2' {
+                    $prompts  = $scriptArgPrompts[$chosen.Name]
+                    $defaults = $scriptArgDefaults[$chosen.Name]
+                    $extra1 = (Read-Host $prompts[0]).Trim()
+                    $extra2 = (Read-Host $prompts[1]).Trim()
+                    $v1 = if ($extra1) { $extra1 } else { $defaults[0] }
+                    $v2 = if ($extra2) { $extra2 } else { $defaults[1] }
+                    "$($script:loginUser) $v1 $v2"
+                }
                 default       { (Read-Host "Arguments (leave blank if none)").Trim() }
             }
             if ($argType -in 'user', 'user+custom') {
