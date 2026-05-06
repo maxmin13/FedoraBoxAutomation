@@ -31,6 +31,8 @@ if [[ "${LOGIN_USER}" == "root" ]]; then
     fi
 fi
 
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
+
 ####
 STEP "Dependencies"
 ####
@@ -158,9 +160,9 @@ STEP "Git"
 git config --global core.autocrlf input
 
 # Git terminal prompt
-if [[ -z "$(grep parse_git_branch .bash_profile)" ]]
+if [[ -z "$(grep parse_git_branch "${HOME_DIR}/.bash_profile")" ]]
 then
-cat <<-EOT >> .bash_profile
+cat <<-EOT >> "${HOME_DIR}/.bash_profile"
 
 	parse_git_branch() {
 	   git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'

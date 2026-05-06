@@ -16,8 +16,8 @@ then
 fi
 
 LOGIN_USER="${1}"
-
-cd /home/"${LOGIN_USER}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
+cd "${HOME_DIR}"
 
 ####
 STEP "httpd"
@@ -39,7 +39,10 @@ then
 fi
 
 # disable cache
-mv 00-default.conf "${APACHE_SITES_ENABLED_DIR}"
+if [[ -f 00-default.conf ]]
+then
+    mv 00-default.conf "${APACHE_SITES_ENABLED_DIR}"
+fi
 
 # Clear directories and configuration files.
 rm -rf /var/www/cgi-bin /var/www/error /var/www/icons
@@ -55,7 +58,10 @@ systemctl restart httpd.service
 
 echo 'Apache Web Server installed.'
 
-mv phpinfo.php /var/www/html/
+if [[ -f phpinfo.php ]]
+then
+    mv phpinfo.php /var/www/html/
+fi
 
 echo 'selinux httpd_read_user_content boolean turned on.'
 

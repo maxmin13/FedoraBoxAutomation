@@ -16,7 +16,8 @@ then
 fi
 
 LOGIN_USER="${1}"
-cd /home/"${LOGIN_USER}"
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
+cd "${HOME_DIR}"
 
 ####
 STEP "Vim"
@@ -141,7 +142,10 @@ STEP JQuery jshint
 ####
 
 dnf install -y npm
-npm install jshint -g
+if ! npm list -g jshint > /dev/null 2>&1
+then
+   npm install jshint -g
+fi
 
 if [[ -z "$(grep jshint .vimrc)" ]]
 then
