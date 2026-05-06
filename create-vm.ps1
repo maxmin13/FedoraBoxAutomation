@@ -22,7 +22,7 @@
 
     VM settings applied automatically:
       - Graphics controller: VMSVGA
-      - Clipboard: bidirectional    
+      - Clipboard: bidirectional
       - Drag and drop: bidirectional
       - Hardware clock: UTC (prevents time drift between Windows and Fedora)
       - Paravirt provider: KVM (improves CPU/IO performance for Linux guests)
