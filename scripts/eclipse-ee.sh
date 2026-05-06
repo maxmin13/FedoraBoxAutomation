@@ -22,7 +22,7 @@ else
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
     ECLIPSE_VERSION=$(curl -sL https://api.github.com/repos/eclipse-packaging/packages/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
-    wget "https://www.eclipse.org/downloads/download.php?file=/oomph/epp/${ECLIPSE_VERSION}/R/eclipse-inst-jre-linux64.tar.gz&mirror_id=1" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+    wget "https://download.eclipse.org/oomph/epp/${ECLIPSE_VERSION}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
     tar -zxf "${WORK_DIR}/eclipse_ee.tar.gz" --directory /opt
 
     log_info 'Eclipse Enterprise installer downloaded.'

@@ -333,6 +333,7 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 #   'custom' - prompt the user for arguments
 $scriptArgPrompts = @{
     'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
+    'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
     'packettracer.sh' = 'Arguments for packettracer.sh'
 }
 
@@ -353,7 +354,7 @@ $scriptArgDefs = @{
     'chrome.sh'              = 'none'
     'mysql.sh'               = 'none'
     'ecs-cli.sh'             = 'none'
-    'eclipse.sh'             = 'none'
+    'eclipse.sh'             = 'custom'
     'eclipse-ee.sh'          = 'none'
     'visualstudiocode.sh'    = 'none'
     'dev-tools.sh'           = 'none'

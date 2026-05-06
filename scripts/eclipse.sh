@@ -1,48 +1,69 @@
 #!/bin/bash
 
 ##
-## Description: Downloads and installs Eclipse IDE for Java Developers (2026-03)
-##              to /opt/eclipse and registers a GNOME desktop entry.
-## Usage:       sudo ./eclipse.sh
+## Description: Downloads and installs Eclipse IDE for Java Developers to /opt/eclipse
+##              and registers a GNOME desktop entry. Optionally pass a release as the
+##              first argument (default: 2026-03).
+## Usage:       sudo ./eclipse.sh [release]
 ##
 
 source /tmp/common.sh
+
+ECLIPSE_RELEASE="${1:-2026-03}"
+ECLIPSE_DIR="/opt/eclipse-${ECLIPSE_RELEASE}"
 
 ####
 STEP "Eclipse"
 ####
 
-if [[ -d '/opt/eclipse' ]]
+if [[ -d "${ECLIPSE_DIR}" && ! -x "${ECLIPSE_DIR}/eclipse" ]]
 then
-	echo 'Eclipse already installed.'
-else
-   if [[ -f /usr/share/applications/eclipse.desktop ]]
-   then
-       rm /usr/share/applications/eclipse.desktop
-   fi
-
-   WORK_DIR=$(mktemp -d)
-   trap 'rm -rf "${WORK_DIR}"' EXIT
-
-   wget 'https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/2026-03/R/eclipse-jee-2026-03-R-linux-gtk-x86_64.tar.gz&mirror_id=1045' -O "${WORK_DIR}/eclipse.tar.gz"
-   tar -zxf "${WORK_DIR}/eclipse.tar.gz" --directory /opt
-   ln -sf /opt/eclipse/eclipse /usr/bin/eclipse
-
-   cat <<- EOF > /usr/share/applications/eclipse.desktop
-		[Desktop Entry]
-		Encoding=UTF-8
-		Name=Eclipse IDE
-		Comment=Eclipse IDE for Java Developers
-		Exec=/usr/bin/eclipse
-		Icon=/opt/eclipse/icon.xpm
-		Categories=Application;Development;Java;IDE
-		Type=Application
-		Terminal=0
-EOF
-
-   echo
-   echo 'Eclipse successfully installed.'
+    log_warn "Incomplete Eclipse installation found. Removing ${ECLIPSE_DIR} ..."
+    rm -rf "${ECLIPSE_DIR}"
+    rm -f /usr/bin/eclipse /usr/share/applications/eclipse.desktop
 fi
 
+if [[ -x "${ECLIPSE_DIR}/eclipse" ]]
+then
+    log_info "Eclipse ${ECLIPSE_RELEASE} already installed."
+else
+    WORK_DIR=$(mktemp -d)
+    trap 'rm -rf "${WORK_DIR}"' EXIT
 
+    log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
+    wget -q "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz" &
+    pid=$!; dots=0
+    while kill -0 $pid 2>/dev/null; do
+        printf '.'; dots=$((dots + 1))
+        [[ $((dots % 20)) -eq 0 ]] && echo
+        sleep 5
+    done
+    wait $pid; echo
+    log_info "Download complete. Extracting ..."
+    tar -xf "${WORK_DIR}/eclipse.tar.gz" --directory /opt &
+    pid=$!; dots=0
+    while kill -0 $pid 2>/dev/null; do
+        printf '.'; dots=$((dots + 1))
+        [[ $((dots % 20)) -eq 0 ]] && echo
+        sleep 2
+    done
+    wait $pid; echo
+    mv /opt/eclipse "${ECLIPSE_DIR}"
+    ln -sf "${ECLIPSE_DIR}/eclipse" /usr/bin/eclipse
+    log_info "Extraction complete."
 
+    cat <<-EOF > /usr/share/applications/eclipse.desktop
+	[Desktop Entry]
+	Encoding=UTF-8
+	Name=Eclipse IDE
+	Comment=Eclipse IDE for Java Developers
+	Exec=/usr/bin/eclipse
+	Icon=${ECLIPSE_DIR}/icon.xpm
+	Categories=Application;Development;Java;IDE
+	Type=Application
+	Terminal=0
+	EOF
+
+    log_info 'Eclipse desktop entry registered.'
+    log_info "Eclipse ${ECLIPSE_RELEASE} successfully installed."
+fi
