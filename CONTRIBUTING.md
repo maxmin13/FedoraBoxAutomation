@@ -2,6 +2,100 @@
 
 ## Shell Scripts (.sh)
 
+### Structure
+
+Every script must start with:
+
+```bash
+#!/bin/bash
+
+##
+## Description: One or two lines describing what the script does.
+## Usage:       sudo ./script-name.sh [args]
+##
+
+source /tmp/common.sh
+```
+
+### Error handling
+
+Source `common.sh` at the top of every script. It enables strict error handling automatically:
+
+```bash
+set -o errexit   # exit on error
+set -o pipefail  # exit on pipe failure
+set -o nounset   # exit on undefined variable
+```
+
+### Logging
+
+Use structured logging functions from `common.sh` — never raw `echo` for status messages:
+
+```bash
+log_info  "message"   # informational
+log_warn  "message"   # non-fatal warning
+log_error "message"   # error (follow with exit 1)
+STEP      "name"      # major section heading
+```
+
+All output is automatically tee'd to `/var/log/fedora-box-automation.log` by `common.sh`.
+
+### Idempotency
+
+Scripts must be safe to run more than once without errors or side effects:
+
+- **Package installs:** `dnf install -y` is idempotent by default.
+- **Service commands:** `systemctl enable/start` are idempotent.
+- **File creation:** check before writing — use `[[ ! -f path ]]` or `grep -q` guards.
+- **File appends:** always check before appending to avoid duplicates.
+- **Downloads/installs:** guard with a version or existence check before downloading.
+- **`mv` commands:** guard with `[[ -f source ]]` — the file won't exist on re-run.
+- **Repo config files:** use `>` not `>>` / `tee -a` to avoid duplicate entries.
+
+Example pattern:
+
+```bash
+if ! command -v mytool > /dev/null 2>&1
+then
+    # install
+    log_info 'mytool installed.'
+else
+    log_info 'mytool already installed.'
+fi
+```
+
+### Home directory
+
+Never hardcode `/home/${LOGIN_USER}` — root's home is `/root`, not `/home/root`:
+
+```bash
+HOME_DIR=$(eval echo "~${LOGIN_USER}")
+cd "${HOME_DIR}"
+```
+
+### Parameters
+
+Validate required parameters at the top of the script:
+
+```bash
+if [[ 0 -eq $# ]]
+then
+    log_error 'login user not found.'
+    exit 1
+fi
+```
+
+### Temporary files
+
+Always use `mktemp` and clean up with a trap:
+
+```bash
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "${WORK_DIR}"' EXIT
+```
+
+### Line endings
+
 - Always use **LF line endings** (not CRLF). Windows editors default to CRLF which causes "file not found" / exit code 126 on Linux because the shebang becomes `#!/bin/bash\r`.
 - Convert before committing:
   ```powershell
@@ -10,10 +104,6 @@
       $content = [System.IO.File]::ReadAllText($_.FullName)
       [System.IO.File]::WriteAllText($_.FullName, ($content -replace "`r`n", "`n"), $utf8NoBom)
   }
-  ```
-- All `.sh` scripts must log to `/var/log/fedora-box-automation.log` via:
-  ```bash
-  exec > >(tee -a /var/log/fedora-box-automation.log) 2>&1
   ```
 
 ## PowerShell Scripts (.ps1)
