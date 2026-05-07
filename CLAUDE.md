@@ -34,7 +34,7 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
   - `Get-VBoxIDEControllerName` — creates IDE controller if needed
   - `Attach-VBoxGuestAdditionsIso` — mounts Guest Additions ISO to the VM for later installation
 
-**Guest side (Bash):** `scripts/install-java.sh` runs inside the Fedora VM via `VBoxManage guestcontrol`. It uses color-coded output helpers and structured exit codes.
+**Guest side (Bash):** Shell scripts under `tools/` run inside the Fedora VM via `VBoxManage guestcontrol`. They use color-coded output helpers and structured exit codes.
 
 **Guest control requirement:** `provision-vm.ps1` and guest script execution require VirtualBox Guest Additions to be installed in the VM. Guest Additions can be installed during the Fedora OS installation or manually after. All guest commands authenticate with the VM user credentials passed interactively.
 

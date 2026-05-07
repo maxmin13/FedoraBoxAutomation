@@ -357,7 +357,7 @@ while (-not $loginVerified) {
     }
 }
 
-$scriptsRoot = Join-Path $PSScriptRoot "scripts"
+$scriptsRoot = Join-Path $PSScriptRoot "tools"
 
 # Maps each script filename to its argument type:
 #   'user'        - pass the desktop login username
