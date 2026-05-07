@@ -89,7 +89,7 @@ mkdir -p "${CACHE_DIR}"
 
 if [[ ! -f "${CACHED_TAR}" ]]; then
     log_info "Downloading Tomcat ${TOMCAT_VERSION} ..."
-    wget --progress=dot "https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR}/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz" -O "${CACHED_TAR}"
+    wget "https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR}/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz" -O "${CACHED_TAR}"
     log_info "Download complete. Cached at ${CACHED_TAR}."
 else
     log_info "Using cached archive: ${CACHED_TAR}"
