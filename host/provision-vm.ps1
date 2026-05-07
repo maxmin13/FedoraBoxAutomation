@@ -397,7 +397,8 @@ $scriptArgDefs = @{
     'k8-install.sh'          = 'user'
     'git.sh'                 = 'none'
     'chrome.sh'              = 'none'
-    'mysql.sh'               = 'none'
+    'mariadb.sh'             = 'none'
+    'dbeaver.sh'             = 'none'
     'ecs-cli.sh'             = 'none'
     'eclipse.sh'             = 'custom'
     'eclipse-ee.sh'          = 'custom'
@@ -406,6 +407,34 @@ $scriptArgDefs = @{
     'postgresql.sh'          = 'none'
     'virtualbox-install.sh'  = 'none'
     'packettracer.sh'        = 'custom'
+}
+
+$scriptDescriptions = @{
+    'java.sh'               = 'Oracle JDK (latest LTS)'
+    'vim.sh'                = 'Vim text editor with plugins'
+    'php.sh'                = 'PHP runtime'
+    'wireshark.sh'          = 'Network packet analyser'
+    'docker.sh'             = 'Docker CE container engine'
+    'openssl.sh'            = 'OpenSSL toolkit (compiled from source)'
+    'maven.sh'              = 'Apache Maven build tool for Java'
+    'python.sh'             = 'Python (compiled from source)'
+    'httpd.sh'              = 'Apache HTTP Server'
+    'tomcat.sh'             = 'Apache Tomcat servlet container (multi-instance)'
+    'tomcat-remove.sh'      = 'Remove a Tomcat instance by version and port'
+    'aws-cli.sh'            = 'AWS CLI v2'
+    'k8-install.sh'         = 'minikube + kubectl for local Kubernetes'
+    'git.sh'                = 'Git version control'
+    'chrome.sh'             = 'Google Chrome browser'
+    'mariadb.sh'            = 'MariaDB relational database (MySQL-compatible)'
+    'dbeaver.sh'            = 'DBeaver CE - universal database GUI client'
+    'ecs-cli.sh'            = 'Amazon ECS CLI'
+    'eclipse.sh'            = 'Eclipse IDE for Java'
+    'eclipse-ee.sh'         = 'Eclipse IDE for Java EE (installer edition)'
+    'visualstudiocode.sh'   = 'Visual Studio Code editor'
+    'dev-tools.sh'          = 'Common dev utilities (jq, curl, wget, unzip, ...)'
+    'postgresql.sh'         = 'PostgreSQL database + pgAdmin 4 desktop'
+    'virtualbox-install.sh' = 'VirtualBox guest tools'
+    'packettracer.sh'       = 'Cisco Packet Tracer network simulator'
 }
 
 $commonScript = Join-Path $projectRoot "vm\lib\common.sh"
@@ -529,8 +558,13 @@ while (-not $done) {
 
             Write-Host ""
             for ($i = 0; $i -lt $allScripts.Count; $i++) {
-                $rel = $allScripts[$i].FullName.Substring($catDir.Length + 1)
-                Write-Host ("  [{0,2}] {1}" -f ($i + 1), $rel) -ForegroundColor White
+                $rel  = $allScripts[$i].FullName.Substring($catDir.Length + 1)
+                $desc = $scriptDescriptions[$allScripts[$i].Name]
+                if ($desc) {
+                    Write-Host ("  [{0,2}] {1,-28} {2}" -f ($i + 1), $rel, $desc) -ForegroundColor White
+                } else {
+                    Write-Host ("  [{0,2}] {1}" -f ($i + 1), $rel) -ForegroundColor White
+                }
             }
             Write-Host ""
 

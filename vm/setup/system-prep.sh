@@ -3,7 +3,8 @@
 ##
 ## Description: Prepares a fresh Fedora installation for use with VirtualBox.
 ##              Removes unused software (LibreOffice, Firefox, libvirt/QEMU),
-##              runs a full system update, and prints the running kernel version.
+##              enables RPM Fusion repositories, runs a full system update,
+##              and prints the running kernel version.
 ## Usage:       sudo ./system-prep.sh <login-user>
 ## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
@@ -52,6 +53,28 @@ log_info 'libvirt library removed.'
 
 dnf autoremove -y
 log_info 'Unused software removed.'
+
+####
+STEP "RPM Fusion repositories"
+####
+
+FEDORA_VERSION=$(rpm -E %fedora)
+
+if ! rpm -q rpmfusion-free-release &>/dev/null
+then
+    dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm"
+    log_info 'RPM Fusion free repository enabled.'
+else
+    log_info 'RPM Fusion free already enabled.'
+fi
+
+if ! rpm -q rpmfusion-nonfree-release &>/dev/null
+then
+    dnf install -y "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
+    log_info 'RPM Fusion nonfree repository enabled.'
+else
+    log_info 'RPM Fusion nonfree already enabled.'
+fi
 
 ####
 STEP "System update"

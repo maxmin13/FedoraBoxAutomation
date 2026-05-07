@@ -99,7 +99,7 @@ HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 ### Downloads
 
-- Use `wget --progress=dot` for large file downloads so progress is visible in the log.
+- Use plain `wget` for large file downloads (`--progress=dot` is not implemented in Fedora's wget and produces a warning).
 - Use `curl -#` (or `curl -sL` for small text-only fetches like version strings).
 - Always validate version strings fetched via curl before using them in URLs:
 
@@ -146,6 +146,7 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 ## PowerShell Scripts (.ps1)
 
 - Always use `$ErrorActionPreference = 'Stop'` and `try/catch` for error handling.
+- Never use Unicode punctuation in string literals — PowerShell 5.1 renders em dashes (`—`), curly quotes (`""`), and similar characters as garbled text (`â€"`). Use plain ASCII equivalents (`-`, `"`, `'`) instead.
 - Guest script output printed to the console must be color-coded:
   - **Red** — lines matching `error`, `failed`, `fatal`, `command not found`, `permission denied`
   - **Yellow** — lines matching `warning`
