@@ -362,6 +362,11 @@ $scriptsRoot = Join-Path $projectRoot "vm\tools"
 $setupRoot   = Join-Path $projectRoot "vm\setup"
 $assetsRoot  = Join-Path $projectRoot "assets"
 
+$latestPython = try {
+    $data = Invoke-RestMethod -Uri 'https://endoflife.date/api/python.json' -UseBasicParsing
+    $data[0].latest
+} catch { '3.13.3' }
+
 # Maps each script filename to its argument type:
 #   'user'        - pass the desktop login username
 #   'none'        - no arguments needed
@@ -369,6 +374,7 @@ $assetsRoot  = Join-Path $projectRoot "assets"
 #   'user+custom' - pass login username then prompt for additional arguments
 $scriptArgPrompts = @{
     'maven.sh'          = 'Maven version to install (leave blank for default 3.9.5)'
+    'python.sh'         = "Python version to install (leave blank for $latestPython)"
     'tomcat.sh'         = @('Tomcat version to install (leave blank for default 10.1.33)', 'Tomcat HTTP port (leave blank for default 8080)')
     'tomcat-remove.sh'  = @('Tomcat version to remove (leave blank for default 10.1.33)', 'Tomcat HTTP port to remove (leave blank for default 8080)')
     'eclipse.sh'        = 'Eclipse release to install (leave blank for default 2026-03)'
@@ -389,7 +395,7 @@ $scriptArgDefs = @{
     'docker.sh'              = 'user'
     'openssl.sh'             = 'user'
     'maven.sh'               = 'custom'
-    'python.sh'              = 'user'
+    'python.sh'              = 'user+custom'
     'httpd.sh'               = 'user'
     'tomcat.sh'              = 'user+custom2'
     'tomcat-remove.sh'       = 'custom2'
@@ -410,30 +416,29 @@ $scriptArgDefs = @{
 }
 
 $scriptDescriptions = @{
-    'java.sh'               = 'Oracle JDK (latest LTS)'
-    'vim.sh'                = 'Vim text editor with plugins'
-    'php.sh'                = 'PHP runtime'
+    'java.sh'               = 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile'
+    'vim.sh'                = 'Vim + Pathogen + Syntastic linting (ShellCheck, pylint, jshint)'
+    'php.sh'                = 'PHP + php-common + php-cli, APC cache disabled'
     'wireshark.sh'          = 'Network packet analyser'
-    'docker.sh'             = 'Docker CE container engine'
-    'openssl.sh'            = 'OpenSSL toolkit (compiled from source)'
-    'maven.sh'              = 'Apache Maven build tool for Java'
-    'python.sh'             = 'Python (compiled from source)'
+    'docker.sh'             = 'Docker CE engine, adds login user to docker group'
+    'openssl.sh'            = 'OpenSSL compiled from source'
+    'maven.sh'              = 'Apache Maven build tool, sets M2_HOME and PATH'
+    'python.sh'             = 'Python from source (latest stable) + venv + pyenv version manager'
     'httpd.sh'              = 'Apache HTTP Server'
-    'tomcat.sh'             = 'Apache Tomcat servlet container (multi-instance)'
+    'tomcat.sh'             = 'Apache Tomcat - multi-instance by port, requires Java'
     'tomcat-remove.sh'      = 'Remove a Tomcat instance by version and port'
-    'aws-cli.sh'            = 'AWS CLI v2'
-    'k8-install.sh'         = 'minikube + kubectl for local Kubernetes'
+    'aws-cli.sh'            = 'AWS CLI v2, creates ~/.aws config directory'
+    'k8-install.sh'         = 'minikube (docker driver) + kubectl + metrics-server addon'
     'git.sh'                = 'Git version control'
-    'chrome.sh'             = 'Google Chrome browser'
-    'mariadb.sh'            = 'MariaDB relational database (MySQL-compatible)'
-    'dbeaver.sh'            = 'DBeaver CE - universal database GUI client'
-    'ecs-cli.sh'            = 'Amazon ECS CLI'
-    'eclipse.sh'            = 'Eclipse IDE for Java'
-    'eclipse-ee.sh'         = 'Eclipse IDE for Java EE (installer edition)'
-    'visualstudiocode.sh'   = 'Visual Studio Code editor'
-    'utilities.sh'          = 'Ansible, gedit, dconf-editor, expect'
-    'postgresql.sh'         = 'PostgreSQL database + pgAdmin 4 desktop'
-
+    'chrome.sh'             = 'Google Chrome stable via fedora-workstation-repositories'
+    'mariadb.sh'            = 'MariaDB server - MySQL-compatible relational database'
+    'dbeaver.sh'            = 'DBeaver CE - GUI client for MariaDB, PostgreSQL and more'
+    'ecs-cli.sh'            = 'Amazon ECS CLI for managing ECS clusters'
+    'eclipse.sh'            = 'Eclipse IDE for Java EE'
+    'eclipse-ee.sh'         = 'Eclipse IDE for Java EE via installer'
+    'visualstudiocode.sh'   = 'Visual Studio Code via Microsoft repository'
+    'utilities.sh'          = 'Ansible automation, gedit editor, dconf-editor, expect'
+    'postgresql.sh'         = 'PostgreSQL + pgAdmin 4 desktop, remote connections enabled'
     'packettracer.sh'       = 'Cisco Packet Tracer network simulator'
 }
 

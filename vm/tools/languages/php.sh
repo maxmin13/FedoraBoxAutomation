@@ -9,32 +9,38 @@
 
 source /tmp/common.sh
 
-if [[ 0 -eq $# ]] 
+if [[ 0 -eq $# ]]
 then
-   log_error 'login user not found.'
-   exit 1
+    log_error 'login user not found.'
+    exit 1
 fi
-
-####
-STEP "php"
-####
 
 LOGIN_USER="${1}"
 
-log_info 'Installing PHP ...'
-dnf install -y php php-common php-cli
-php -v
-log_info 'PHP installed.'
+####
+STEP "PHP"
+####
 
-if grep -Rq 'apc.enabled' /etc/php.ini
+if ! rpm -q php &>/dev/null
 then
-	sed -i '/apc.enabled/d' /etc/php.ini
+    log_info 'Installing PHP ...'
+    dnf install -y php php-common php-cli
+    log_info 'PHP installed.'
+else
+    log_info 'PHP already installed.'
+fi
+
+php -v
+
+if grep -q 'apc.enabled' /etc/php.ini
+then
+    sed -i '/apc.enabled/d' /etc/php.ini
 fi
 
 echo 'apc.enabled=0' >> /etc/php.ini
+log_info 'APC cache disabled.'
 
-log_info 'PHP cache disabled.'
-
-exit 0
-
-
+log_info "Version : php -v"
+log_info "Run     : php <file.php>"
+log_info "REPL    : php -a"
+log_info "Config  : /etc/php.ini"

@@ -41,15 +41,19 @@ else
 
    log_info "Latest Oracle JDK major version: ${LATEST_MAJOR}"
 
-   wget --progress=dot "https://download.oracle.com/java/${LATEST_MAJOR}/latest/jdk-${LATEST_MAJOR}_linux-x64_bin.rpm" \
+   wget "https://download.oracle.com/java/${LATEST_MAJOR}/latest/jdk-${LATEST_MAJOR}_linux-x64_bin.rpm" \
      -O "${WORK_DIR}/jdk.rpm"
-   rpm -Uvh "${WORK_DIR}/jdk.rpm"
+   dnf install -y "${WORK_DIR}/jdk.rpm"
 
    java -version
    alternatives --display java
 
    log_info 'Oracle JDK successfully installed.'
 fi
+
+log_info "Version  : java --version"
+log_info "Compiler : javac --version"
+log_info "JAVA_HOME: echo \$JAVA_HOME"
 
 BASH_PROFILE="${HOME_DIR}/.bash_profile"
 if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
