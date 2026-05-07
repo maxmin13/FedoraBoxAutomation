@@ -358,6 +358,8 @@ while (-not $loginVerified) {
 }
 
 $scriptsRoot = Join-Path $PSScriptRoot "tools"
+$setupRoot   = Join-Path $PSScriptRoot "setup"
+$assetsRoot  = Join-Path $PSScriptRoot "assets"
 
 # Maps each script filename to its argument type:
 #   'user'        - pass the desktop login username
@@ -441,7 +443,7 @@ while (-not $done) {
             $hostname = (Read-Host "Hostname for the VM").Trim()
 
             # Upload background image to /usr/share/backgrounds/ before desktop-config runs
-            $bgLocalPath = Join-Path $scriptsRoot "img\blue-background.png"
+            $bgLocalPath = Join-Path $assetsRoot "blue-background.png"
             $bgFileName  = "blue-background.png"
             $bgGuestDir  = "/usr/share/backgrounds"
 
@@ -465,21 +467,20 @@ while (-not $done) {
             }
 
             $setupSteps = @(
-                @{ Path = "setup\system-prep.sh";    Args = $script:loginUser },
-                @{ Path = "setup\network-config.sh"; Args = $hostname },
-                @{ Path = "setup\selinux-config.sh"; Args = "" },
-                @{ Path = "setup\desktop-config.sh"; Args = "$($script:loginUser) $bgFileName".Trim() },
-                @{ Path = "setup\dev-tools.sh";      Args = "" }
+                @{ Path = Join-Path $setupRoot "system-prep.sh";    Args = $script:loginUser },
+                @{ Path = Join-Path $setupRoot "network-config.sh"; Args = $hostname },
+                @{ Path = Join-Path $setupRoot "selinux-config.sh"; Args = "" },
+                @{ Path = Join-Path $setupRoot "desktop-config.sh"; Args = "$($script:loginUser) $bgFileName".Trim() },
+                @{ Path = Join-Path $setupRoot "dev-tools.sh";      Args = "" }
             )
 
             foreach ($step in $setupSteps) {
-                $fullPath = Join-Path $scriptsRoot $step.Path
-                if (-not (Test-Path $fullPath)) {
+                if (-not (Test-Path $step.Path)) {
                     Write-Host "  SKIPPED (not found): $($step.Path)" -ForegroundColor Yellow
                     continue
                 }
-                Write-Header $step.Path
-                $ok = Invoke-GuestScript -LocalPath $fullPath -ScriptArgs $step.Args
+                Write-Header (Split-Path $step.Path -Leaf)
+                $ok = Invoke-GuestScript -LocalPath $step.Path -ScriptArgs $step.Args
                 if (-not $ok) {
                     $failures.Add($step.Path)
                     if (-not (Read-YesNo "Script failed. Continue with remaining steps?" $false)) {
