@@ -407,7 +407,7 @@ $scriptArgDefs = @{
     'packettracer.sh'        = 'custom'
 }
 
-$commonScript = Join-Path $scriptsRoot "common.sh"
+$commonScript = Join-Path $PSScriptRoot "lib\common.sh"
 if (Test-Path $commonScript) {
     Write-Host "  Uploading common.sh..." -NoNewline
     $uploadArgs = @(
