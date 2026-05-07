@@ -58,26 +58,26 @@ $btnRun.Add_Click({
         if ($chkCleanup.Checked) {
             $lblStatus.Text = "Running cleanup..."
             [System.Windows.Forms.Application]::DoEvents()
-            & powershell -ExecutionPolicy Bypass -File "C:\Projects\virtualbox\cleanup.ps1"
+            & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\host\cleanup.ps1"
         }
 
         if ($chkSanity.Checked) {
             $lblStatus.Text = "Running sanity checks..."
             [System.Windows.Forms.Application]::DoEvents()
-            & powershell -ExecutionPolicy Bypass -File "C:\Projects\virtualbox\virtualbox-sanity-checks.ps1"
+            & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\host\virtualbox-sanity-checks.ps1"
         }
 
         $lblStatus.Text = "Installing VirtualBox..."
         [System.Windows.Forms.Application]::DoEvents()
-        & powershell -ExecutionPolicy Bypass -File "C:\Projects\virtualbox\virtualbox-install.ps1"
+        & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\host\virtualbox-install.ps1"
 
         $lblStatus.Text = "Creating Fedora VM..."
         [System.Windows.Forms.Application]::DoEvents()
-        & powershell -ExecutionPolicy Bypass -File "C:\Projects\virtualbox\create-vm.ps1"
+        & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\host\create-vm.ps1"
 
         $lblStatus.Text = "Provisioning VM with dev tools..."
         [System.Windows.Forms.Application]::DoEvents()
-        & powershell -ExecutionPolicy Bypass -File "C:\Projects\virtualbox\provision-vm.ps1"
+        & powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\host\provision-vm.ps1"
 
         $lblStatus.Text = "Setup complete!"
     }

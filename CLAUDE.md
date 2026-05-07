@@ -16,11 +16,11 @@ powershell -ExecutionPolicy Bypass -File ".\<script-name>.ps1"
 
 Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
 
-1. `virtualbox-sanity-checks.ps1` — validates prerequisites (RAM, disk, CPU virtualization, Hyper-V)
-2. `virtualbox-install.ps1` — downloads and silently installs VirtualBox
-3. `create-vm.ps1` — creates a Fedora VM from ISO with user-specified parameters; prompts to attach Guest Additions ISO
-4. `provision-vm.ps1` — installs dev tools (Claude Code, VS Code, Java, MariaDB) into a running VM (requires Guest Additions)
-5. `cleanup.ps1` — removes failed VMs
+1. `host\virtualbox-sanity-checks.ps1` — validates prerequisites (RAM, disk, CPU virtualization, Hyper-V)
+2. `host\virtualbox-install.ps1` — downloads and silently installs VirtualBox
+3. `host\create-vm.ps1` — creates a Fedora VM from ISO with user-specified parameters; prompts to attach Guest Additions ISO
+4. `host\provision-vm.ps1` — installs dev tools into a running VM (requires Guest Additions)
+5. `host\cleanup.ps1` — removes failed VMs
 6. `run.ps1` — GUI orchestrator that runs the full pipeline with optional cleanup and sanity checks
 
 ## Architecture
