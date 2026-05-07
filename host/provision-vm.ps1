@@ -357,9 +357,10 @@ while (-not $loginVerified) {
     }
 }
 
-$scriptsRoot = Join-Path $PSScriptRoot "tools"
-$setupRoot   = Join-Path $PSScriptRoot "setup"
-$assetsRoot  = Join-Path $PSScriptRoot "assets"
+$projectRoot = Split-Path $PSScriptRoot -Parent
+$scriptsRoot = Join-Path $projectRoot "vm\tools"
+$setupRoot   = Join-Path $projectRoot "vm\setup"
+$assetsRoot  = Join-Path $projectRoot "assets"
 
 # Maps each script filename to its argument type:
 #   'user'        - pass the desktop login username
@@ -407,7 +408,7 @@ $scriptArgDefs = @{
     'packettracer.sh'        = 'custom'
 }
 
-$commonScript = Join-Path $PSScriptRoot "lib\common.sh"
+$commonScript = Join-Path $projectRoot "vm\lib\common.sh"
 if (Test-Path $commonScript) {
     Write-Host "  Uploading common.sh..." -NoNewline
     $uploadArgs = @(
