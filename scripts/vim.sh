@@ -5,6 +5,7 @@
 ##              Syntastic linting for Bash (ShellCheck), Perl (perlcritic),
 ##              Python (pylint), and JavaScript (jshint).
 ## Usage:       sudo ./vim.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh

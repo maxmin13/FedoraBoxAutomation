@@ -4,6 +4,7 @@
 ## Description: Installs PHP and disables the APC opcode cache
 ##              by setting apc.enabled=0 in /etc/php.ini.
 ## Usage:       sudo ./php.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh

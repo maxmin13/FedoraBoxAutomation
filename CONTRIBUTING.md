@@ -127,3 +127,5 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 - `VBoxManage guestcontrol` has no TTY — `sudo` password prompts will fail silently. Always authenticate as `root`.
 - The VM must have a root password set (`sudo passwd root`) before provisioning.
 - `desktop-config.sh` requires `dbus-x11` to be installed (`sudo dnf install -y dbus-x11`) for `dbus-launch` to work.
+- Always use `-y` on every `dnf` command (`install`, `update`, `remove`, `autoremove`, `groupinstall`). Scripts run non-interactively via guestcontrol — any confirmation prompt will hang the session indefinitely.
+- Never use `read` prompts inside scripts — they will hang for the same reason.

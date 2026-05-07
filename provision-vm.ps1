@@ -141,9 +141,9 @@ function Invoke-GuestScript {
     $guestPath = Send-ScriptToGuest -LocalPath $LocalPath
 
     $cmd = if ($script:vmUser -eq 'root') {
-        "$guestPath $ScriptArgs 2>&1 | tee -a /var/log/fedora-box-automation.log".Trim()
+        "$guestPath $ScriptArgs".Trim()
     } else {
-        "sudo $guestPath $ScriptArgs 2>&1 | tee -a /var/log/fedora-box-automation.log".Trim()
+        "sudo $guestPath $ScriptArgs".Trim()
     }
 
     Write-Host "  Running: $cmd" -ForegroundColor DarkGray
@@ -258,6 +258,8 @@ Write-Host "       sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
 Write-Host "  IMPORTANT: Scripts must run as root inside the VM." -ForegroundColor Yellow
 Write-Host "       sudo passwd root" -ForegroundColor White
 Write-Host "       sudo reboot" -ForegroundColor White
+Write-Host "  IMPORTANT: You must be logged into the Fedora desktop before continuing." -ForegroundColor Yellow
+Write-Host "             VBoxService only becomes ready after the desktop session is active." -ForegroundColor White
 Write-Host ""
 Write-Host "  You will be asked for two usernames:" -ForegroundColor Cyan
 Write-Host "    1. Root credentials : used by VBoxManage to connect to the VM remotely (always root)" -ForegroundColor White
@@ -287,7 +289,7 @@ while (-not $credVerified) {
                 (Read-Host "VM root password" -AsSecureString)))
     }
 
-    Write-Host "  Closing any open guest sessions..." -NoNewline
+    Write-Host "  Closing any open guest sessions (stale sessions from a previous provision-vm.ps1 run can block authentication)..." -NoNewline
     try {
         $ErrorActionPreference = 'SilentlyContinue'
         & $script:vbox guestcontrol $script:vmName closesession --all 2>&1 | Out-Null
@@ -307,6 +309,10 @@ while (-not $credVerified) {
         Write-Host "  1. Wrong username or password." -ForegroundColor White
         Write-Host "  2. Guest Additions not installed or SELinux blocking VBoxService." -ForegroundColor White
         Write-Host "  3. Use root: sudo passwd root inside the VM, then enter root here." -ForegroundColor White
+        Write-Host "  4. Kernel/Guest Additions mismatch - verify versions match inside the VM:" -ForegroundColor White
+        Write-Host "       rpm -q kernel-devel-`$(uname -r)" -ForegroundColor White
+        Write-Host "     If not installed, reboot the VM then reinstall Guest Additions." -ForegroundColor White
+        Write-Host "  5. Try restarting the VM and running this script again." -ForegroundColor White
         $credFile = Get-CredentialFile -VmName $script:vmName
         if (Test-Path $credFile) {
             Remove-Item $credFile -Force
@@ -359,15 +365,17 @@ $scriptsRoot = Join-Path $PSScriptRoot "scripts"
 #   'custom'      - prompt the user for all arguments
 #   'user+custom' - pass login username then prompt for additional arguments
 $scriptArgPrompts = @{
-    'maven.sh'        = 'Maven version to install (leave blank for default 3.9.5)'
-    'tomcat.sh'       = @('Tomcat version to install (leave blank for default 10.1.33)', 'Tomcat HTTP port (leave blank for default 8080)')
-    'eclipse.sh'      = 'Eclipse release to install (leave blank for default 2026-03)'
-    'eclipse-ee.sh'   = 'Eclipse release to install (leave blank for default 2026-03)'
-    'packettracer.sh' = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
+    'maven.sh'          = 'Maven version to install (leave blank for default 3.9.5)'
+    'tomcat.sh'         = @('Tomcat version to install (leave blank for default 10.1.33)', 'Tomcat HTTP port (leave blank for default 8080)')
+    'tomcat-remove.sh'  = @('Tomcat version to remove (leave blank for default 10.1.33)', 'Tomcat HTTP port to remove (leave blank for default 8080)')
+    'eclipse.sh'        = 'Eclipse release to install (leave blank for default 2026-03)'
+    'eclipse-ee.sh'     = 'Eclipse release to install (leave blank for default 2026-03)'
+    'packettracer.sh'   = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
 }
 
 $scriptArgDefaults = @{
-    'tomcat.sh' = @('10.1.33', '8080')
+    'tomcat.sh'        = @('10.1.33', '8080')
+    'tomcat-remove.sh' = @('10.1.33', '8080')
 }
 
 $scriptArgDefs = @{
@@ -381,6 +389,7 @@ $scriptArgDefs = @{
     'python.sh'              = 'user'
     'httpd.sh'               = 'user'
     'tomcat.sh'              = 'user+custom2'
+    'tomcat-remove.sh'       = 'custom2'
     'aws-cli.sh'             = 'user'
     'k8-install.sh'          = 'user'
     'git.sh'                 = 'none'
@@ -419,7 +428,7 @@ while (-not $done) {
     Write-Host "  [1] Run full setup  (setup scripts in recommended order)" -ForegroundColor White
     Write-Host "  [2] Run individual script" -ForegroundColor White
     Write-Host "  [Q] Quit" -ForegroundColor White
-    Write-Host ""2
+    Write-Host ""
     $choice = (Read-Host "Choice").Trim().ToUpper()
 
     switch ($choice) {
@@ -521,6 +530,15 @@ while (-not $done) {
                     $v1 = if ($extra1) { $extra1 } else { $defaults[0] }
                     $v2 = if ($extra2) { $extra2 } else { $defaults[1] }
                     "$($script:loginUser) $v1 $v2"
+                }
+                'custom2' {
+                    $prompts  = $scriptArgPrompts[$chosen.Name]
+                    $defaults = $scriptArgDefaults[$chosen.Name]
+                    $extra1 = (Read-Host $prompts[0]).Trim()
+                    $extra2 = (Read-Host $prompts[1]).Trim()
+                    $v1 = if ($extra1) { $extra1 } else { $defaults[0] }
+                    $v2 = if ($extra2) { $extra2 } else { $defaults[1] }
+                    "$v1 $v2"
                 }
                 default       { (Read-Host "Arguments (leave blank if none)").Trim() }
             }

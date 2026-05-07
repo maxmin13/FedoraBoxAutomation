@@ -5,6 +5,7 @@
 ##              Removes unused software (LibreOffice, Firefox, libvirt/QEMU),
 ##              runs a full system update, and prints the running kernel version.
 ## Usage:       sudo ./system-prep.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh
@@ -62,8 +63,7 @@ dnf -y update
 STEP "Kernel"
 ####
 
-# needed to install Virtualbox
-#####dnf install -y kernel-devel-matched
+dnf install -y kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2
 uname -r
 
 log_info 'System configured.'

@@ -5,6 +5,7 @@
 ##              and enables the Docker service, runs a hello-world smoke test,
 ##              and adds the login user to the docker group.
 ## Usage:       sudo ./docker.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh

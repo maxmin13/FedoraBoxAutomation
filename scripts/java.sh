@@ -4,6 +4,7 @@
 ## Description: Installs the latest Oracle JDK via the Foojay API, and sets
 ##              JAVA_HOME in the login user's ~/.bash_profile.
 ## Usage:       sudo ./java.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh

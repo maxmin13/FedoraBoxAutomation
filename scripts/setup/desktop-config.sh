@@ -5,7 +5,9 @@
 ##              Disables Wayland (forces X11), sets background image, silences
 ##              the bell, configures Gedit and Nautilus, sets up the Git prompt,
 ##              applies kernel parameters for minikube, and disables GNOME keyring.
-## Usage:       sudo ./desktop-config.sh <login-user> <background-image-filename>
+## Usage:       sudo ./desktop-config.sh <login-user> [background-image-filename]
+## Parameters:  $1  <login-user>               Non-root desktop username (e.g. maxmin)
+##              $2  [background-image-filename] Image filename in /usr/share/backgrounds/ (optional)
 ##
 
 source /tmp/common.sh

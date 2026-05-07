@@ -13,7 +13,7 @@ STEP "mysql"
 ####
 
 dnf install -y community-mysql-server
-dnf update mysql-server
+dnf update -y mysql-server
 
 systemctl enable mysqld
 systemctl start mysqld

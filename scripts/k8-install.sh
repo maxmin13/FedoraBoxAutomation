@@ -5,6 +5,7 @@
 ##              kubectl (latest stable release) for local Kubernetes development.
 ##              Sets minikube driver config for the login user.
 ## Usage:       sudo ./k8-install.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh

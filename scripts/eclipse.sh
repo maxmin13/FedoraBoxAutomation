@@ -5,6 +5,7 @@
 ##              and registers a GNOME desktop entry. Optionally pass a release as the
 ##              first argument (default: 2026-03).
 ## Usage:       sudo ./eclipse.sh [release]
+## Parameters:  $1  [release]  Eclipse release to install (default: 2026-03)
 ##
 
 source /tmp/common.sh

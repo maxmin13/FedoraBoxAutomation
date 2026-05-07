@@ -5,6 +5,7 @@
 ##              environment in ~/python_venv, and installs pytest, boto3,
 ##              moto, pycodestyle, flake8, and black into it.
 ## Usage:       sudo ./python.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh
@@ -23,7 +24,7 @@ LOGIN_USER="${1}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
 dnf update -y
-dnf install gcc openssl-devel bzip2-devel libffi-devel zlib-devel wget make 
+dnf install -y gcc openssl-devel bzip2-devel libffi-devel zlib-devel wget make
 
 version="$(python3.11 -V)"
 

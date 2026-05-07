@@ -7,6 +7,7 @@
 ##              install the desired Eclipse flavour. Optionally pass a release
 ##              as the first argument (default: 2026-03).
 ## Usage:       sudo ./eclipse-ee.sh [release]
+## Parameters:  $1  [release]  Eclipse release to install (default: 2026-03)
 ##
 
 source /tmp/common.sh

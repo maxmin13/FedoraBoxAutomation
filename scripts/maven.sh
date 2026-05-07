@@ -5,6 +5,7 @@
 ##              configures M2_HOME and PATH system-wide via /etc/profile.d/maven.sh.
 ##              Optionally pass a version as the first argument (default: 3.9.5).
 ## Usage:       sudo ./maven.sh [version]
+## Parameters:  $1  [version]  Maven version to install (default: 3.9.5)
 ##
 
 source /tmp/common.sh
