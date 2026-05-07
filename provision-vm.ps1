@@ -426,7 +426,7 @@ $done = $false
 while (-not $done) {
     Write-Header "Provisioning Menu"
     Write-Host "  [1] Run full setup  (setup scripts in recommended order)" -ForegroundColor White
-    Write-Host "  [2] Run individual script" -ForegroundColor White
+    Write-Host "  [2] Install by category" -ForegroundColor White
     Write-Host "  [Q] Quit" -ForegroundColor White
     Write-Host ""
     $choice = (Read-Host "Choice").Trim().ToUpper()
@@ -493,18 +493,41 @@ while (-not $done) {
         }
 
         '2' {
-            $allScripts = Get-ChildItem -Path $scriptsRoot -Filter "*.sh" -Recurse |
-                Where-Object { $_.FullName -notmatch '\\setup\\' } |
-                Sort-Object FullName
+            $categories = @(
+                @{ Name = 'Languages';    Dir = 'languages'   }
+                @{ Name = 'Build Tools';  Dir = 'build-tools' }
+                @{ Name = 'Web Servers';  Dir = 'web-servers' }
+                @{ Name = 'Databases';    Dir = 'databases'   }
+                @{ Name = 'IDEs';         Dir = 'ides'        }
+                @{ Name = 'Containers';   Dir = 'containers'  }
+                @{ Name = 'Cloud';        Dir = 'cloud'       }
+                @{ Name = 'Security';     Dir = 'security'    }
+                @{ Name = 'Network';      Dir = 'network'     }
+                @{ Name = 'Dev Tools';    Dir = 'dev-tools'   }
+            )
+
+            Write-Host ""
+            for ($i = 0; $i -lt $categories.Count; $i++) {
+                Write-Host ("  [{0,2}] {1}" -f ($i + 1), $categories[$i].Name) -ForegroundColor Cyan
+            }
+            Write-Host ""
+            $catSel = (Read-Host "Category").Trim()
+            if ($catSel -notmatch '^\d+$' -or [int]$catSel -lt 1 -or [int]$catSel -gt $categories.Count) {
+                Write-Host "  Invalid selection." -ForegroundColor Yellow
+                continue
+            }
+
+            $catDir = Join-Path $scriptsRoot $categories[[int]$catSel - 1].Dir
+            $allScripts = Get-ChildItem -Path $catDir -Filter "*.sh" -Recurse | Sort-Object FullName
 
             if (-not $allScripts) {
-                Write-Host "  No scripts found." -ForegroundColor Yellow
+                Write-Host "  No scripts found in this category." -ForegroundColor Yellow
                 continue
             }
 
             Write-Host ""
             for ($i = 0; $i -lt $allScripts.Count; $i++) {
-                $rel = $allScripts[$i].FullName.Substring($scriptsRoot.Length + 1)
+                $rel = $allScripts[$i].FullName.Substring($catDir.Length + 1)
                 Write-Host ("  [{0,2}] {1}" -f ($i + 1), $rel) -ForegroundColor White
             }
             Write-Host ""

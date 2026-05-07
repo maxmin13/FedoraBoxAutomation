@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"c:\\\\Projects\\\\Pipelines\\\\FedoraBoxAutomation\" && mkdir -p scripts/languages scripts/build-tools scripts/web-servers/tomcat scripts/databases scripts/ides scripts/containers scripts/cloud scripts/security scripts/network scripts/dev-tools)"
+    ],
+    "additionalDirectories": [
+      "c:\\Projects\\Pipelines\\FedoraBoxAutomation\\scripts"
+    ]
+  }
+}
