@@ -403,9 +403,9 @@ $scriptArgDefs = @{
     'eclipse.sh'             = 'custom'
     'eclipse-ee.sh'          = 'custom'
     'visualstudiocode.sh'    = 'none'
-    'dev-tools.sh'           = 'none'
+    'utilities.sh'           = 'none'
     'postgresql.sh'          = 'none'
-    'virtualbox-install.sh'  = 'none'
+
     'packettracer.sh'        = 'custom'
 }
 
@@ -431,9 +431,9 @@ $scriptDescriptions = @{
     'eclipse.sh'            = 'Eclipse IDE for Java'
     'eclipse-ee.sh'         = 'Eclipse IDE for Java EE (installer edition)'
     'visualstudiocode.sh'   = 'Visual Studio Code editor'
-    'dev-tools.sh'          = 'Common dev utilities (jq, curl, wget, unzip, ...)'
+    'utilities.sh'          = 'Ansible, gedit, dconf-editor, expect'
     'postgresql.sh'         = 'PostgreSQL database + pgAdmin 4 desktop'
-    'virtualbox-install.sh' = 'VirtualBox guest tools'
+
     'packettracer.sh'       = 'Cisco Packet Tracer network simulator'
 }
 
@@ -467,7 +467,7 @@ while (-not $done) {
 
         '1' {
             Write-Header "Full Setup"
-            Write-Host "  Order: system-prep → network-config → selinux-config → desktop-config → dev-tools" -ForegroundColor DarkGray
+            Write-Host "  Order: system-prep -> network-config -> selinux-config -> desktop-config -> utilities" -ForegroundColor DarkGray
             Write-Host ""
 
             $hostname = (Read-Host "Hostname for the VM").Trim()
@@ -501,7 +501,7 @@ while (-not $done) {
                 @{ Path = Join-Path $setupRoot "network-config.sh"; Args = $hostname },
                 @{ Path = Join-Path $setupRoot "selinux-config.sh"; Args = "" },
                 @{ Path = Join-Path $setupRoot "desktop-config.sh"; Args = "$($script:loginUser) $bgFileName".Trim() },
-                @{ Path = Join-Path $setupRoot "dev-tools.sh";      Args = "" }
+                @{ Path = Join-Path $setupRoot "utilities.sh";      Args = "" }
             )
 
             foreach ($step in $setupSteps) {
@@ -532,9 +532,11 @@ while (-not $done) {
                 @{ Name = 'IDEs';         Dir = 'ides'        }
                 @{ Name = 'Containers';   Dir = 'containers'  }
                 @{ Name = 'Cloud';        Dir = 'cloud'       }
-                @{ Name = 'Security';     Dir = 'security'    }
-                @{ Name = 'Network';      Dir = 'network'     }
-                @{ Name = 'Dev Tools';    Dir = 'dev-tools'   }
+                @{ Name = 'Security';         Dir = 'security'         }
+                @{ Name = 'Network';          Dir = 'network'          }
+                @{ Name = 'Version Control';  Dir = 'version-control'  }
+                @{ Name = 'Editors';          Dir = 'editors'          }
+                @{ Name = 'Browsers';         Dir = 'browsers'         }
             )
 
             Write-Host ""

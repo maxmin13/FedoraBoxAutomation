@@ -10,10 +10,10 @@
 
 source /tmp/common.sh
 
-if [[ 0 -eq $# ]] 
+if [[ 0 -eq $# ]]
 then
-   log_error 'login user not found.'
-   exit 1
+    log_error 'login user not found.'
+    exit 1
 fi
 
 LOGIN_USER="${1}"
@@ -28,27 +28,25 @@ dnf install -y vim
 
 if [[ ! -f .vimrc ]]
 then
-   touch .vimrc
-   chown "${LOGIN_USER}":"${LOGIN_USER}" .vimrc
-fi 
+    touch .vimrc
+    chown "${LOGIN_USER}":"${LOGIN_USER}" .vimrc
+fi
 
 ####
 STEP "Pathogen"
 ####
-
-# pathogen.vim makes it easy to install plugins and runtime files in their own private directories.
 
 mkdir -p .vim/{autoload,bundle}
 chown -R "${LOGIN_USER}":"${LOGIN_USER}" .vim
 
 if [[ ! -d .vim/bundle/vim-pathogen ]]
 then
-   git clone https://github.com/tpope/vim-pathogen.git .vim/bundle/vim-pathogen
+    git clone https://github.com/tpope/vim-pathogen.git .vim/bundle/vim-pathogen
 fi
 
 if [[ ! -f .vim/autoload/pathogen.vim ]]
 then
-   wget https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
+    wget https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
 fi
 
 if [[ -z "$(grep pathogen .vimrc)" ]]
@@ -57,37 +55,23 @@ cat <<-EOT >> .vimrc
 	execute pathogen#infect()
 	syntax on
 	filetype plugin indent on
-	Helptags 
+	Helptags
 EOT
 fi
 
 log_info 'Pathogen installed.'
 
-###############################################################
-# VALIDATORS
-###############################################################
-
 ####
-STEP Syntastic 
+STEP "Syntastic"
 ####
 
 if [[ ! -d .vim/bundle/syntastic ]]
 then
-   git clone https://github.com/vim-syntastic/syntastic.git .vim/bundle/syntastic
+    git clone https://github.com/vim-syntastic/syntastic.git .vim/bundle/syntastic
 fi
 
-#if [[ -z "$(grep SyntasticInfo .vimrc)" ]]
-#then
-#cat <<-EOT >> .vimrc
-#	SyntasticInfo
-#	help syntastic-checkers
-#EOT
-#fi
-
-###############################################################
-
 ####
-STEP Bash shellcheck
+STEP "Bash ShellCheck"
 ####
 
 dnf install -y ShellCheck
@@ -99,12 +83,10 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-log_info 'Bash shellCheck enabled.'
-
-###############################################################
+log_info 'Bash ShellCheck enabled.'
 
 ####
-STEP Perl perlcritic
+STEP "Perl perlcritic"
 ####
 
 dnf install -y perl-Perl-Critic
@@ -119,10 +101,8 @@ fi
 
 log_info 'Perl perlcritic enabled.'
 
-###############################################################
-
 ####
-STEP Python pylint
+STEP "Python pylint"
 ####
 
 dnf install -y pylint
@@ -136,16 +116,15 @@ fi
 
 log_info 'Python pylint enabled.'
 
-###############################################################
-
 ####
-STEP JQuery jshint
+STEP "JavaScript jshint"
 ####
 
 dnf install -y npm
+
 if ! npm list -g jshint > /dev/null 2>&1
 then
-   npm install jshint -g
+    npm install jshint -g
 fi
 
 if [[ -z "$(grep jshint .vimrc)" ]]
@@ -155,4 +134,9 @@ cat <<-EOT >> .vimrc
 EOT
 fi
 
-log_info 'JQuery jshint enabled.'
+log_info 'JavaScript jshint enabled.'
+
+log_info "Open    : vim <file>"
+log_info "Check   : :SyntasticCheck  (run linter manually)"
+log_info "Errors  : :Errors          (open error list)"
+log_info "Config  : ${HOME_DIR}/.vimrc"
