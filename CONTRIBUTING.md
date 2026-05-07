@@ -12,10 +12,14 @@ Every script must start with:
 ##
 ## Description: One or two lines describing what the script does.
 ## Usage:       sudo ./script-name.sh [args]
+## Parameters:  $1  <login-user>   Non-root desktop username (e.g. maxmin)
+##              $2  [version]      Version to install (default: x.y.z)
 ##
 
 source /tmp/common.sh
 ```
+
+Scripts with no parameters must still include `## Parameters:  none`.
 
 ### Error handling
 
@@ -91,6 +95,31 @@ fi
 
 LOGIN_USER="${1}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
+```
+
+### Downloads
+
+- Use `wget --progress=dot` for large file downloads so progress is visible in the log.
+- Use `curl -#` (or `curl -sL` for small text-only fetches like version strings).
+- Always validate version strings fetched via curl before using them in URLs:
+
+```bash
+VERSION=$(curl -sL https://example.com/stable.txt)
+if [[ -z "${VERSION}" ]]; then
+    log_error 'Could not determine latest version.'
+    exit 1
+fi
+```
+
+### Prerequisite checks
+
+If a script depends on another tool being installed, check for it explicitly at the top and exit with a clear message:
+
+```bash
+if ! docker --version > /dev/null 2>&1; then
+    log_error 'Docker is not installed. Run docker.sh first.'
+    exit 1
+fi
 ```
 
 ### Temporary files
