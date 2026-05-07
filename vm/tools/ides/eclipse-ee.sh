@@ -34,7 +34,7 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget --progress=dot "https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+    wget "https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
     log_info "Download complete. Extracting ..."
     tar -xf "${WORK_DIR}/eclipse_ee.tar.gz" --directory /opt
     log_info "Extraction complete."
@@ -54,3 +54,6 @@ else
     log_info 'Eclipse Enterprise installer desktop entry registered.'
     log_info "Eclipse Enterprise installer ${ECLIPSE_RELEASE} successfully downloaded."
 fi
+
+log_info "Launch installer: /opt/eclipse-installer/eclipse-inst"
+log_info "                  or open Applications menu and search for Eclipse Installer"

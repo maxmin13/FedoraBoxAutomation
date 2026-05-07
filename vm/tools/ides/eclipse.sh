@@ -32,7 +32,7 @@ else
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
     log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
-    wget --progress=dot "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz"
+    wget "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz"
     log_info "Download complete. Extracting ..."
     tar -xf "${WORK_DIR}/eclipse.tar.gz" --directory /opt
     mv /opt/eclipse "${ECLIPSE_DIR}"
@@ -54,3 +54,6 @@ else
     log_info 'Eclipse desktop entry registered.'
     log_info "Eclipse ${ECLIPSE_RELEASE} successfully installed."
 fi
+
+log_info "Launch  : eclipse &   or open Applications menu"
+log_info "Install : ${ECLIPSE_DIR}"

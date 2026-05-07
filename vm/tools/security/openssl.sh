@@ -5,6 +5,7 @@
 ##              source to /usr/local/ssl. Adds it to the login user's PATH
 ##              in ~/.bash_profile. Skips the build if already installed.
 ## Usage:       sudo ./openssl.sh <login-user>
+## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
 source /tmp/common.sh
@@ -24,8 +25,7 @@ OPENSSL_DIR="/usr/local/ssl"
 STEP "OpenSSL"
 ####
 
-dnf update -y
-dnf groupinstall "Development Tools" -y
+dnf groupinstall -y "Development Tools"
 dnf install -y perl-core zlib-devel
 
 if [[ -x "${OPENSSL_DIR}/bin/openssl" ]] && \
@@ -40,7 +40,7 @@ else
 
     mkdir -p "${OPENSSL_DIR}"
 
-    wget --progress=dot "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -O "${WORK_DIR}/openssl.tar.gz"
+    wget "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -O "${WORK_DIR}/openssl.tar.gz"
     tar -xf "${WORK_DIR}/openssl.tar.gz" -C "${WORK_DIR}"
     cd "${WORK_DIR}/openssl-${OPENSSL_VERSION}"
 
@@ -64,3 +64,7 @@ else
 
     log_info "OpenSSL ${OPENSSL_VERSION} successfully installed."
 fi
+
+log_info "Version : ${OPENSSL_DIR}/bin/openssl version"
+log_info "Install : ${OPENSSL_DIR}"
+log_info "Config  : ${OPENSSL_DIR}/openssl.cnf"

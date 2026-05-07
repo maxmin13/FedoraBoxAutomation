@@ -23,7 +23,7 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget --progress=dot "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz" -O "${WORK_DIR}/maven.tar.gz"
+    wget "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz" -O "${WORK_DIR}/maven.tar.gz"
     tar -xf "${WORK_DIR}/maven.tar.gz" -C "${WORK_DIR}"
     mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" /opt/maven
 
@@ -38,3 +38,9 @@ else
     /opt/maven/bin/mvn -version
     log_info "Maven ${MVN_VERSION} successfully installed."
 fi
+
+log_info "Version : mvn -version"
+log_info "Build   : mvn clean install"
+log_info "Test    : mvn test"
+log_info "Package : mvn package"
+log_info "Install : /opt/maven"

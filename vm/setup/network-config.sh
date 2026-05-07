@@ -17,7 +17,7 @@ fi
 
 HOSTNAME="${1}"
 
-STEP 'Hostname'
+STEP "Hostname"
 
 current_hostname="$(nmcli general hostname)"
 
@@ -30,16 +30,15 @@ fi
 current_hostname="$(nmcli general hostname)"
 log_info "Hostname: ${current_hostname}"
 
-STEP 'Connections'
+STEP "Connections"
 
 nmcli connection
 
-STEP 'Devices'
+STEP "Devices"
 
 nmcli device
-echo
 ip address
 
-STEP 'Route table'
+STEP "Route table"
 
 ip -r route
