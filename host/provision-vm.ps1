@@ -40,15 +40,15 @@ function Read-YesNo {
 
 function Get-CredentialFile {
     param([string]$VmName)
-    $dir = Join-Path $PSScriptRoot ".credentials"
+    $dir = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     return Join-Path $dir "$VmName.cred"
 }
 
 function Save-VmCredentials {
-    param([string]$VmName, [string]$User, [string]$Pass)
+    param([string]$VmName, [string]$User, [string]$Pass, [string]$LoginUser = '')
     $path = Get-CredentialFile -VmName $VmName
-    "$User`n$Pass" | Set-Content -Path $path -Encoding UTF8
+    "$User`n$Pass`n$LoginUser" | Set-Content -Path $path -Encoding UTF8
     Write-Host "  Credentials saved for future runs." -ForegroundColor DarkGray
 }
 
@@ -57,7 +57,13 @@ function Get-VmCredentials {
     $path = Get-CredentialFile -VmName $VmName
     if (Test-Path $path) {
         $lines = Get-Content $path -Encoding UTF8
-        if ($lines.Count -ge 2) { return @{ User = $lines[0]; Pass = $lines[1] } }
+        if ($lines.Count -ge 2) {
+            return @{
+                User      = $lines[0]
+                Pass      = $lines[1]
+                LoginUser = if ($lines.Count -ge 3) { $lines[2] } else { '' }
+            }
+        }
     }
     return $null
 }
@@ -268,16 +274,20 @@ Write-Host "                         to configure home directory, PATH, and user
 Write-Host ""
 
 $credVerified = $false
-$script:vmUser = $null
-$script:vmPass = $null
+$script:vmUser  = $null
+$script:vmPass  = $null
+$savedLoginUser = ''
 
 $saved = Get-VmCredentials -VmName $script:vmName
 if ($saved) {
-    Write-Host "  Saved credentials found for '$($script:vmName)' (user: $($saved.User))." -ForegroundColor DarkGray
+    $savedDesc = "user: $($saved.User)"
+    if ($saved.LoginUser) { $savedDesc += ", desktop: $($saved.LoginUser)" }
+    Write-Host "  Saved credentials found for '$($script:vmName)' ($savedDesc)." -ForegroundColor DarkGray
     $useSaved = Read-YesNo "Use saved credentials?"
     if ($useSaved) {
-        $script:vmUser = $saved.User
-        $script:vmPass = $saved.Pass
+        $script:vmUser  = $saved.User
+        $script:vmPass  = $saved.Pass
+        $savedLoginUser = $saved.LoginUser
     }
 }
 
@@ -329,7 +339,9 @@ while (-not $loginVerified) {
     Write-Host ""
     Write-Host "  Desktop username : the non-root user whose environment will be configured" -ForegroundColor Cyan
     Write-Host "  (home directory, PATH, JAVA_HOME, .vimrc, .aws, etc.) e.g. maxmin" -ForegroundColor DarkGray
-    $script:loginUser = (Read-Host "Guest desktop username").Trim()
+    $loginPrompt = if ($savedLoginUser) { "Guest desktop username [$savedLoginUser]" } else { "Guest desktop username" }
+    $raw = (Read-Host $loginPrompt).Trim()
+    $script:loginUser = if ($raw) { $raw } elseif ($savedLoginUser) { $savedLoginUser } else { '' }
     if ([string]::IsNullOrWhiteSpace($script:loginUser)) {
         Write-Host "  ERROR: Desktop username cannot be empty." -ForegroundColor Red
         continue
@@ -353,6 +365,7 @@ while (-not $loginVerified) {
         if (-not (Read-YesNo "Try again?" $true)) { exit 1 }
     } else {
         Write-Host " OK" -ForegroundColor Green
+        Save-VmCredentials -VmName $script:vmName -User $script:vmUser -Pass $script:vmPass -LoginUser $script:loginUser
         $loginVerified = $true
     }
 }
@@ -379,7 +392,6 @@ $scriptArgPrompts = @{
     'tomcat-remove.sh'  = @('Tomcat version to remove (leave blank for default 10.1.33)', 'Tomcat HTTP port to remove (leave blank for default 8080)')
     'eclipse.sh'        = 'Eclipse release to install (leave blank for default 2026-03)'
     'eclipse-ee.sh'     = 'Eclipse release to install (leave blank for default 2026-03)'
-    'packettracer.sh'   = 'Enter: <provision-dir> <installer.deb>  NOTE: download the .deb installer manually from https://www.netacad.com/portal/learning before running'
 }
 
 $scriptArgDefaults = @{
@@ -412,7 +424,6 @@ $scriptArgDefs = @{
     'utilities.sh'           = 'none'
     'postgresql.sh'          = 'none'
 
-    'packettracer.sh'        = 'custom'
 }
 
 $scriptDescriptions = @{
@@ -439,7 +450,6 @@ $scriptDescriptions = @{
     'visualstudiocode.sh'   = 'Visual Studio Code via Microsoft repository'
     'utilities.sh'          = 'Ansible automation, gedit editor, dconf-editor, expect'
     'postgresql.sh'         = 'PostgreSQL + pgAdmin 4 desktop, remote connections enabled'
-    'packettracer.sh'       = 'Cisco Packet Tracer network simulator'
 }
 
 $commonScript = Join-Path $projectRoot "vm\lib\common.sh"
@@ -606,11 +616,58 @@ while (-not $done) {
                     $v2 = if ($extra2) { $extra2 } else { $defaults[1] }
                     "$v1 $v2"
                 }
+                'deb-upload' {
+                    $downloadsPath = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
+                    $debFiles = @(Get-ChildItem -Path $downloadsPath -Filter '*.deb' -ErrorAction SilentlyContinue)
+                    $debLocalPath = $null
+                    if ($debFiles.Count -eq 0) {
+                        Write-Host "  No .deb files found in $downloadsPath" -ForegroundColor Yellow
+                        $typed = (Read-Host "  Enter full path to the .deb installer").Trim()
+                        if ($typed -and (Test-Path $typed)) { $debLocalPath = $typed }
+                        else { Write-Host "  File not found: $typed" -ForegroundColor Red }
+                    } elseif ($debFiles.Count -eq 1) {
+                        $debLocalPath = $debFiles[0].FullName
+                        Write-Host "  Found: $($debFiles[0].Name)" -ForegroundColor Cyan
+                    } else {
+                        Write-Host "  Multiple .deb files found in $downloadsPath" -ForegroundColor Cyan
+                        for ($i = 0; $i -lt $debFiles.Count; $i++) {
+                            Write-Host "    [$($i+1)] $($debFiles[$i].Name)"
+                        }
+                        $pick = (Read-Host "  Select [1-$($debFiles.Count)]").Trim()
+                        if ($pick -match '^\d+$' -and [int]$pick -ge 1 -and [int]$pick -le $debFiles.Count) {
+                            $debLocalPath = $debFiles[[int]$pick - 1].FullName
+                        } else {
+                            Write-Host "  Invalid selection." -ForegroundColor Red
+                        }
+                    }
+                    if ($debLocalPath) {
+                        $debFileName  = Split-Path $debLocalPath -Leaf
+                        $guestDebPath = "/tmp/$debFileName"
+                        Write-Host "  Uploading $debFileName to VM..." -NoNewline
+                        $upArgs = @(
+                            'guestcontrol', $script:vmName,
+                            'copyto', $debLocalPath, $guestDebPath,
+                            '--username', $script:vmUser,
+                            '--password', $script:vmPass
+                        )
+                        $upResult = & $script:vbox @upArgs 2>&1
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Host " FAILED" -ForegroundColor Red
+                            Write-Host "  $upResult" -ForegroundColor Red
+                            $null
+                        } else {
+                            Write-Host " OK" -ForegroundColor Green
+                            $guestDebPath
+                        }
+                    } else { $null }
+                }
                 default       { (Read-Host "Arguments (leave blank if none)").Trim() }
             }
             if ($argType -in 'user', 'user+custom') {
                 Write-Host "  Using login user: $script:loginUser" -ForegroundColor DarkGray
             }
+
+            if ($null -eq $scriptArgs) { continue }
 
             Write-Header $chosen.Name
             $ok = Invoke-GuestScript -LocalPath $chosen.FullName -ScriptArgs $scriptArgs

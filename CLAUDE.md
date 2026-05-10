@@ -23,6 +23,7 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
 5. `host\cleanup.ps1` — removes failed VMs
 6. `run.ps1` — GUI orchestrator that runs the full pipeline with optional cleanup and sanity checks
 
+
 ## Architecture
 
 **Host side (PowerShell):** Scripts orchestrate VirtualBox via `VBoxManage.exe`. All PowerShell scripts share common helper patterns:

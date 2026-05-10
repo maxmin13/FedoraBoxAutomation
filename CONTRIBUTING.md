@@ -152,6 +152,13 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
   - **Yellow** — lines matching `warning`
   - Default — everything else
 
+## Credentials (.credentials/)
+
+- Credentials are stored at `.credentials/<vm-name>.cred` at the project root (alongside `.claude`, `.vscode`).
+- The file contains three lines: root username, root password, desktop login username.
+- Reading fewer than three lines is handled gracefully (desktop username defaults to empty). Do not change the line order.
+- `.credentials/*.cred` is gitignored.
+
 ## Guest Control (provision-vm.ps1)
 
 - `VBoxManage guestcontrol` has no TTY — `sudo` password prompts will fail silently. Always authenticate as `root`.

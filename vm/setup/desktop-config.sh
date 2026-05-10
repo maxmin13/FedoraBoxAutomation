@@ -96,15 +96,20 @@ fi
 STEP "Gedit text editor"
 ####
 
-# not possible to change files in shared folder, enabling backup files fix the bug.
-create_backup="$(gsettings_get org.gnome.gedit.preferences.editor create-backup-copy)"
-
-if [[ 'true' == "${create_backup}" ]]
+if ! command -v gedit > /dev/null 2>&1
 then
-   log_info 'Gedit backup files already configured.'
+   log_warn 'Gedit not installed, skipping configuration.'
 else
-   gsettings_set org.gnome.gedit.preferences.editor create-backup-copy true
-   log_info 'Gedit backup files configured.'
+   # not possible to change files in shared folder, enabling backup files fix the bug.
+   create_backup="$(gsettings_get org.gnome.gedit.preferences.editor create-backup-copy)"
+
+   if [[ 'true' == "${create_backup}" ]]
+   then
+      log_info 'Gedit backup files already configured.'
+   else
+      gsettings_set org.gnome.gedit.preferences.editor create-backup-copy true
+      log_info 'Gedit backup files configured.'
+   fi
 fi
 
 ####
