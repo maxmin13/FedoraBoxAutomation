@@ -141,7 +141,7 @@ function Add-VBoxGuestAdditionsIso {
     Write-Host "    1. Complete the Fedora OS installation and log in." -ForegroundColor Cyan
     Write-Host "    2. Open a terminal and run:" -ForegroundColor Cyan
     Write-Host "         sudo dnf update -y" -ForegroundColor White
-    Write-Host "         sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
+    Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor White
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
@@ -174,8 +174,8 @@ $existingVms = & $script:vbox list vms 2>$null | ForEach-Object { if ($_ -match 
 if ($existingVms -contains $vmName) {
     Write-Host "  WARNING: A VM named '$vmName' already exists." -ForegroundColor Yellow
     Write-Host "  If you want to provision it, run provision-vm.ps1 instead." -ForegroundColor Cyan
-    $confirm = Read-Host "  Unregister and recreate it from scratch? [y/N]"
-    if ($confirm -notmatch '^[Yy]$') {
+    $confirm = Read-Host "  Unregister and recreate it from scratch? [Y/n]"
+    if ($confirm -match '^[Nn]$') {
         Write-Host "  Aborted." -ForegroundColor Red
         exit 1
     }
@@ -253,7 +253,7 @@ try {
     Invoke-VBox "createvm", "--name", $vmName, "--ostype", "Fedora_64", "--register", "--basefolder", $vmFolder
     Invoke-VBox "modifyvm", $vmName, "--memory", $ramMB, "--cpus", $cpus, "--vram", $vramMB, "--graphicscontroller", "vmsvga"
     Invoke-VBox "modifyvm", $vmName, "--clipboard", "bidirectional", "--draganddrop", "bidirectional"
-    Invoke-VBox "modifyvm", $vmName, "--rtcuseutc", "on", "--paravirtprovider", "kvm", "--accelerate3d", "on"
+    Invoke-VBox "modifyvm", $vmName, "--rtcuseutc", "on", "--paravirtprovider", "kvm", "--accelerate3d", "off"
     if ($nicType -ne "none") {
         Invoke-VBox "modifyvm", $vmName, "--nic1", $nicType
     }
@@ -267,7 +267,9 @@ try {
     try { & $script:vbox closemedium disk $diskPath --delete 2>&1 | Out-Null } catch {}
     if (Test-Path $diskPath) { Remove-Item $diskPath -Force }
 
+    Write-Host "  Creating virtual disk ($diskMB MB, $diskType) ..." -ForegroundColor Cyan
     Invoke-VBox "createmedium", "disk", "--filename", $diskPath, "--size", $diskMB, "--format", $diskType, "--variant", "Standard"
+    Write-Host "  Disk created." -ForegroundColor Green
     Invoke-VBox "storagectl", $vmName, "--name", "SATA Controller", "--add", "sata", "--controller", "IntelAhci"
     Invoke-VBox "storageattach", $vmName, "--storagectl", "SATA Controller", "--port", 0, "--device", 0, "--type", "hdd", "--medium", $diskPath
     Invoke-VBox "storagectl", $vmName, "--name", "IDE Controller", "--add", "ide"
@@ -291,7 +293,7 @@ try {
 
     $startNow = Read-YesNo "Start the VM now?"
     if ($startNow) {
-        Invoke-VBox "startvm", $vmName
+        Invoke-VBox "startvm", $vmName, "--type", "gui"
         Write-Host "VM started." -ForegroundColor Green
     }
 
@@ -302,7 +304,7 @@ try {
     Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
     Write-Host "    2. Install Guest Additions and disable SELinux:" -ForegroundColor White
     Write-Host "         sudo dnf update -y" -ForegroundColor DarkGray
-    Write-Host "         sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
+    Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
     Write-Host "         sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor DarkGray
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray

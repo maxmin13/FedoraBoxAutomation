@@ -67,7 +67,7 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
 2. After OS installation, open a terminal and run:
    ```bash
    sudo dnf update -y
-   sudo dnf install -y kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2
+   sudo dnf install -y dkms kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2
    sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
    sudo reboot
    ```
@@ -79,6 +79,15 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
    ```
 4. Reboot again; Guest Additions and SELinux changes will then be active (shared clipboard, drag-and-drop, better resolution, guest control)
 5. Without Guest Additions, remote script execution via `provision-vm.ps1` will not work
+
+**Keeping Guest Additions in sync with the kernel:**
+Guest Additions compile kernel modules for the kernel running at install time. Installing `dkms` (step 2 above) ensures modules are automatically recompiled whenever a new kernel boots after `dnf update`. Without DKMS, Guest Additions will break after every kernel upgrade and must be reinstalled manually:
+   ```bash
+   sudo dnf install -y kernel-devel-$(uname -r)
+   sudo /mnt/ga/VBoxLinuxAdditions.run
+   sudo reboot
+   ```
+`$(uname -r)` is essential — it pins `kernel-devel` to the exact running kernel version.
 
 ## Troubleshooting
 

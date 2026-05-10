@@ -236,7 +236,7 @@ while (-not $vmVerified) {
         Write-Host "  Guest Additions are not installed or not running." -ForegroundColor Red
         Write-Host "  Inside the VM run:" -ForegroundColor Yellow
         Write-Host "    sudo dnf update -y" -ForegroundColor White
-        Write-Host "    sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
+        Write-Host "    sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
         Write-Host "    sudo mkdir -p /mnt/ga" -ForegroundColor White
         Write-Host "    sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
         Write-Host "    sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
@@ -250,7 +250,7 @@ while (-not $vmVerified) {
 Write-Host ""
 Write-Host "  IMPORTANT: If you have not done so, complete these steps inside the VM before continuing:" -ForegroundColor Yellow
 Write-Host "       sudo dnf update -y" -ForegroundColor White
-Write-Host "       sudo dnf install -y kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
+Write-Host "       sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
 Write-Host "       sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor White
 Write-Host "       sudo mkdir -p /mnt/ga" -ForegroundColor White
 Write-Host "       sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White

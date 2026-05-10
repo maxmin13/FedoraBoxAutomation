@@ -36,9 +36,14 @@ if ($osArch -like "*64*") {
 
 # ── 2. RAM ───────────────────────────────────────────────────
 Write-Host "`n[2] RAM (Memory)"
-$ramBytes = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
-$ramGB    = [math]::Round($ramBytes / 1GB, 2)
+$ramBytes   = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+$ramGB      = [math]::Round($ramBytes / 1GB, 2)
+$os         = Get-CimInstance Win32_OperatingSystem
+$freeRamMB  = [math]::Round($os.FreePhysicalMemory / 1024)
+$totalRamMB = [math]::Round($os.TotalVisibleMemorySize / 1024)
+$usedPct    = [math]::Round((($totalRamMB - $freeRamMB) / $totalRamMB) * 100)
 Write-Host "    Total RAM : $ramGB GB"
+Write-Host "    Free RAM  : $freeRamMB MB ($usedPct% in use)"
 
 if ($ramGB -ge 8) {
     Write-Host "    $pass Sufficient RAM (8 GB+ recommended)"
@@ -46,6 +51,15 @@ if ($ramGB -ge 8) {
     Write-Host "    $warn RAM is $ramGB GB. VirtualBox works but 8 GB+ is recommended."
 } else {
     Write-Host "    $fail Only $ramGB GB RAM. Minimum 4 GB required; 8 GB+ recommended."
+}
+
+if ($freeRamMB -lt 3072) {
+    Write-Host "    $fail Only $freeRamMB MB free. A VM needs at least 3 GB free to start reliably."
+    Write-Host "         Close other applications or the running VM before starting a new one."
+} elseif ($freeRamMB -lt 5120) {
+    Write-Host "    $warn $freeRamMB MB free. Consider setting VM RAM to 3072 MB or closing apps first."
+} else {
+    Write-Host "    $pass $freeRamMB MB free - enough headroom for a new VM."
 }
 
 # ── 3. DISK SPACE ────────────────────────────────────────────
