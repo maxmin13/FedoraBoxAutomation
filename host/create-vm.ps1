@@ -275,6 +275,7 @@ try {
     Invoke-VBox "storagectl", $vmName, "--name", "IDE Controller", "--add", "ide"
     Invoke-VBox "storageattach", $vmName, "--storagectl", "IDE Controller", "--port", 0, "--device", 0, "--type", "dvddrive", "--medium", $isoPath
     Invoke-VBox "modifyvm", $vmName, "--boot1", "dvd", "--boot2", "disk", "--boot3", "none", "--boot4", "none"
+    Invoke-VBox "setextradata", $vmName, "GUI/ScaleFactor", "1"
 
     Write-Host "VM '$vmName' created successfully!" -ForegroundColor Green
     Write-Host "You can now start the VM to begin Fedora installation." -ForegroundColor Cyan
