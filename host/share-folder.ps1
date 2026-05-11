@@ -2,9 +2,22 @@
 <#
 .SYNOPSIS
     Creates a permanent VirtualBox shared folder and adds the desktop user to the vboxsf group.
+.PARAMETER VmName
+    Name of the registered VirtualBox VM. When supplied the interactive prompt is skipped.
+.PARAMETER HostPath
+    Windows path of the host folder to share (e.g. C:\Temp\shared). When supplied the interactive prompt is skipped.
+.PARAMETER MountPoint
+    Absolute Linux path where the share will be mounted inside the VM (e.g. /home/maxmin/shared). When supplied the interactive prompt is skipped.
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File ".\shared-folder.ps1"
+    powershell -ExecutionPolicy Bypass -File ".\share-folder.ps1"
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File ".\share-folder.ps1" -VmName "FedoraVM" -HostPath "C:\Shared" -MountPoint "/home/maxmin/shared"
 #>
+param(
+    [string]$VmName     = '',
+    [string]$HostPath   = '',
+    [string]$MountPoint = ''
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -92,45 +105,88 @@ if ($registeredVms) {
     $registeredVms | ForEach-Object { Write-Host "    - $_" -ForegroundColor DarkGray }
 }
 
-$vmName = ''
-while ($true) {
-    Write-Host ""
-    $vmName = (Read-Host "VM name").Trim()
-    if ([string]::IsNullOrWhiteSpace($vmName))      { Write-Host "  VM name cannot be empty." -ForegroundColor Yellow; continue }
-    if ($registeredVms -notcontains $vmName)         { Write-Host "  No VM named '$vmName' found." -ForegroundColor Yellow; continue }
-    break
+if ([string]::IsNullOrWhiteSpace($VmName)) {
+    $vmName = ''
+    while ($true) {
+        Write-Host ""
+        $vmName = (Read-Host "VM name").Trim()
+        if ([string]::IsNullOrWhiteSpace($vmName))  { Write-Host "  VM name cannot be empty." -ForegroundColor Yellow; continue }
+        if ($registeredVms -notcontains $vmName)     { Write-Host "  No VM named '$vmName' found." -ForegroundColor Yellow; continue }
+        break
+    }
+} else {
+    $vmName = $VmName.Trim()
+    if ($registeredVms -notcontains $vmName) { Write-Host "  ERROR: No VM named '$vmName' found." -ForegroundColor Red; exit 1 }
+    Write-Host "  VM name: $vmName" -ForegroundColor DarkGray
 }
 
-$hostPath = ''
-while ($true) {
-    Write-Host ""
-    $hostPath = (Read-Host "Host folder path to share").Trim()
-    if ([string]::IsNullOrWhiteSpace($hostPath)) { Write-Host "  Host path cannot be empty." -ForegroundColor Yellow; continue }
-    if ($hostPath -notmatch '^[A-Za-z]:\\') {
-        Write-Host "  Enter a Windows path starting with a drive letter (e.g. C:\Temp\shared)." -ForegroundColor Yellow
-        continue
+if ([string]::IsNullOrWhiteSpace($HostPath)) {
+    $hostPath = ''
+    while ($true) {
+        Write-Host ""
+        $hostPath = (Read-Host "Host folder path to share").Trim()
+        if ([string]::IsNullOrWhiteSpace($hostPath)) { Write-Host "  Host path cannot be empty." -ForegroundColor Yellow; continue }
+        if ($hostPath -notmatch '^[A-Za-z]:\\') {
+            Write-Host "  Enter a Windows path starting with a drive letter (e.g. C:\Temp\shared)." -ForegroundColor Yellow
+            continue
+        }
+        if (-not (Test-Path $hostPath -PathType Container)) {
+            Write-Host "  Folder does not exist. Creating it..." -ForegroundColor Yellow
+            New-Item -ItemType Directory -Force -Path $hostPath | Out-Null
+            Write-Host "  Created: $hostPath" -ForegroundColor Green
+        }
+        break
     }
+} else {
+    $hostPath = $HostPath.Trim()
+    if ($hostPath -notmatch '^[A-Za-z]:\\') { Write-Host "  ERROR: -HostPath must be a Windows path starting with a drive letter." -ForegroundColor Red; exit 1 }
     if (-not (Test-Path $hostPath -PathType Container)) {
-        Write-Host "  Folder does not exist. Creating it..." -ForegroundColor Yellow
+        Write-Host "  Host folder does not exist. Creating it..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Force -Path $hostPath | Out-Null
         Write-Host "  Created: $hostPath" -ForegroundColor Green
     }
-    break
+    Write-Host "  Host path : $hostPath" -ForegroundColor DarkGray
 }
 
 $shareName = (Split-Path $hostPath -Leaf) -replace '\s+', '_'
 
-$mountPoint = ''
-while ($true) {
-    Write-Host ""
-    $mountPoint = (Read-Host "Mount point inside VM").Trim()
-    if ([string]::IsNullOrWhiteSpace($mountPoint)) { Write-Host "  Mount point cannot be empty." -ForegroundColor Yellow; continue }
-    if ($mountPoint -notmatch '^/[^\\ ]*$') {
-        Write-Host "  Enter an absolute Linux path starting with / (e.g. /home/maxmin/shared)." -ForegroundColor Yellow
-        $mountPoint = ''
-        continue
+if ([string]::IsNullOrWhiteSpace($MountPoint)) {
+    $mountPoint = ''
+    while ($true) {
+        Write-Host ""
+        $mountPoint = (Read-Host "Mount point inside VM").Trim()
+        if ([string]::IsNullOrWhiteSpace($mountPoint)) { Write-Host "  Mount point cannot be empty." -ForegroundColor Yellow; continue }
+        if ($mountPoint -notmatch '^/[^\\ ]*$') {
+            Write-Host "  Enter an absolute Linux path starting with / (e.g. /home/maxmin/shared)." -ForegroundColor Yellow
+            $mountPoint = ''
+            continue
+        }
+        break
     }
-    break
+} else {
+    $mountPoint = $MountPoint.Trim()
+    if ($mountPoint -notmatch '^/[^\\ ]*$') { Write-Host "  ERROR: -MountPoint must be an absolute Linux path starting with /." -ForegroundColor Red; exit 1 }
+    Write-Host "  Mount point: $mountPoint" -ForegroundColor DarkGray
+}
+
+# Skip everything if the share is already configured correctly.
+$vmInfo = & $script:vbox showvminfo $vmName --machinereadable 2>$null
+$shareAlreadyCorrect = $false
+foreach ($line in $vmInfo) {
+    if ($line -match "^SharedFolderNameMachineMapping(\d+)=""$([regex]::Escape($shareName))""$") {
+        $idx     = $Matches[1]
+        $pathOk  = $vmInfo -contains "SharedFolderPathMachineMapping${idx}=""$hostPath"""
+        $mountOk = $vmInfo -contains "SharedFolderAutoMountPointMachineMapping${idx}=""$mountPoint"""
+        $shareAlreadyCorrect = $pathOk -and $mountOk
+        break
+    }
+}
+if ($shareAlreadyCorrect) {
+    Write-Host ""
+    Write-Host "  Share '$shareName' is already configured correctly. Nothing to do." -ForegroundColor Green
+    Write-Host "  Host path  : $hostPath" -ForegroundColor Cyan
+    Write-Host "  Mount point: $mountPoint" -ForegroundColor Cyan
+    exit 0
 }
 
 # Permanent shares require a write lock — block if VM is running.
@@ -168,12 +224,6 @@ try {
     Write-Host "  Shared folder registered." -ForegroundColor Green
     Write-Host "  Host path  : $hostPath" -ForegroundColor Cyan
     Write-Host "  Mount point: $mountPoint (available after VM starts)" -ForegroundColor Cyan
-
-    Write-Host ""
-    if (-not (Read-YesNo "Start the VM and add your user to the vboxsf group?")) {
-        Write-Host "  Run manually inside the VM: sudo usermod -aG vboxsf <username>" -ForegroundColor Cyan
-        exit 0
-    }
 
     $saved     = Get-VmCredentials -VmName $vmName
     $vmUser    = $null
