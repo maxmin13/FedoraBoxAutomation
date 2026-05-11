@@ -198,12 +198,19 @@ if ($runningVms -contains $vmName) {
     Write-Host "  Sending ACPI shutdown..." -ForegroundColor Cyan
     Invoke-VBox @('controlvm', $vmName, 'acpipowerbutton')
     Write-Host "  Waiting for VM to stop..." -ForegroundColor Cyan
-    $deadline = (Get-Date).AddSeconds(60)
+    $deadline = (Get-Date).AddSeconds(120)
     $vmStopped = $false
     while ((Get-Date) -lt $deadline) {
-        Start-Sleep -Seconds 2
-        $state = & $script:vbox showvminfo $vmName --machinereadable 2>$null | Where-Object { $_ -match '^VMState=' }
-        if ($state -match '"(poweroff|saved|aborted)"') { $vmStopped = $true; break }
+        Start-Sleep -Seconds 3
+        $ErrorActionPreference = 'SilentlyContinue'
+        $info = & $script:vbox showvminfo $vmName --machinereadable
+        $ErrorActionPreference = 'Stop'
+        $vmState = ($info | Where-Object { $_ -match '^VMState=' }) -replace '.*="(.+)".*','$1'
+        Write-Host "  ...VMState=$vmState" -ForegroundColor DarkGray
+        if ($vmState -in 'poweroff','saved','aborted') {
+            $vmStopped = $true
+            break
+        }
     }
     if (-not $vmStopped) { Write-Host "  ERROR: VM did not stop in time. Shut it down manually and re-run." -ForegroundColor Red; exit 1 }
     Write-Host "  VM stopped." -ForegroundColor Green
@@ -214,11 +221,54 @@ try {
         Select-String "SharedFolderNameMachineMapping\d+=""$([regex]::Escape($shareName))"""
     if ($existing) {
         Write-Host "  Removing existing share '$shareName'..." -ForegroundColor Yellow
-        Invoke-VBox @('sharedfolder', 'remove', $vmName, '--name', $shareName)
+        $rmDeadline = (Get-Date).AddSeconds(30)
+        $removed    = $false
+        while ((Get-Date) -lt $rmDeadline) {
+            $ErrorActionPreference = 'SilentlyContinue'
+            & $script:vbox sharedfolder remove $vmName --name $shareName
+            $exitCode = $LASTEXITCODE
+            $ErrorActionPreference = 'Stop'
+            if ($exitCode -eq 0) { $removed = $true; break }
+            Write-Host "  ...waiting for lock to release" -ForegroundColor DarkGray
+            Start-Sleep -Seconds 2
+        }
+        if (-not $removed) {
+            Write-Host ""
+            Write-Host "  The VirtualBox GUI window for '$vmName' is holding the session lock." -ForegroundColor Yellow
+            Write-Host "  Close the VirtualBox window for '$vmName', then press Enter to retry." -ForegroundColor Yellow
+            Read-Host | Out-Null
+            $ErrorActionPreference = 'SilentlyContinue'
+            & $script:vbox sharedfolder remove $vmName --name $shareName
+            $exitCode = $LASTEXITCODE
+            $ErrorActionPreference = 'Stop'
+            if ($exitCode -ne 0) { throw "sharedfolder remove failed: session lock still held" }
+        }
     }
 
-    $addArgs = @('sharedfolder', 'add', $vmName, '--name', $shareName, '--hostpath', $hostPath, '--automount', "--auto-mount-point=$mountPoint")
-    Invoke-VBox $addArgs
+    $addArgs    = @('sharedfolder', 'add', $vmName, '--name', $shareName, '--hostpath', $hostPath, '--automount', "--auto-mount-point=$mountPoint")
+    $addDeadline = (Get-Date).AddSeconds(30)
+    $added       = $false
+    while ((Get-Date) -lt $addDeadline) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox @addArgs
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($exitCode -eq 0) { $added = $true; break }
+        Write-Host "  ...waiting for lock to release" -ForegroundColor DarkGray
+        Start-Sleep -Seconds 2
+    }
+    if (-not $added) {
+        Write-Host ""
+        Write-Host "  The VirtualBox GUI window for '$vmName' is holding the session lock." -ForegroundColor Yellow
+        Write-Host "  Close the VirtualBox window for '$vmName', then press Enter to retry." -ForegroundColor Yellow
+        Read-Host | Out-Null
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox @addArgs
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($exitCode -ne 0) { throw "sharedfolder add failed: session lock still held" }
+        $added = $true
+    }
 
     Write-Host ""
     Write-Host "  Shared folder registered." -ForegroundColor Green
