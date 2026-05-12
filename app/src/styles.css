@@ -1,0 +1,11 @@
+/* Import Tailwind's base styles, component classes, and utility classes */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Set the default background and text colour for the whole app */
+body {
+  @apply bg-zinc-900 text-zinc-100;
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+}

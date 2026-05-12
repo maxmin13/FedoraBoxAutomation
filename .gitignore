@@ -1,0 +1,22 @@
+# Node / Electron
+app/node_modules/
+app/dist/
+app/out/
+app/.vite/
+
+# Credentials — never commit these
+.credentials/*.cred
+
+# Environment variable files — may contain secrets
+.env
+.env.local
+
+# Log files
+*.log
+
+# Windows OS files
+Thumbs.db
+desktop.ini
+
+# macOS OS files
+.DS_Store

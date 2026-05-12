@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a PowerShell automation project for VirtualBox. A PowerShell automation toolkit for creating and provisioning Fedora Linux VMs in VirtualBox on Windows 11 Home. Scripts are run directly — there is no build step, test framework, or linting toolchain.
+This is a PowerShell automation project for VirtualBox. A PowerShell automation toolkit for creating and provisioning Fedora Linux VMs in VirtualBox on Windows 11 Home, with an Electron + React GUI to orchestrate the pipeline.
+
+**Test frameworks in use:**
+- PowerShell scripts — Pester v5 (`host/virtualbox-sanity-checks.Tests.ps1`)
+- Bash scripts — bats-core (`vm/tests/*.bats`; run on Linux / WSL)
+- React components — Vitest + React Testing Library (`app/src/__tests__/*.test.tsx`; run via `npm test` in `app/`)
 
 Always use error handling in scripts.
 

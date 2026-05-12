@@ -12,7 +12,8 @@ $ErrorActionPreference = 'Stop'
 function Write-Header {
     param([string]$Text)
     $line = "-" * 60
-    Write-Host ""; Write-Host $line -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host $line -ForegroundColor Cyan
     Write-Host "  $Text" -ForegroundColor Cyan
     Write-Host $line -ForegroundColor Cyan
 }
@@ -26,7 +27,11 @@ function Find-VBoxManage {
     return $null
 }
 
-function Get-CredentialFile { return Join-Path (Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials") "$($args[0]).cred" }
+function Get-CredentialFile {
+    param([string]$VmName)
+    $dir = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
+    return Join-Path $dir "$VmName.cred"
+}
 
 function Get-VmCredentials {
     param([string]$VmName)

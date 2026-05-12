@@ -193,8 +193,6 @@ function Invoke-GuestScript {
 
 # --- Init ---------------------------------------------------------------------
 
-try {
-
 Write-Header "Fedora VM Provisioner"
 
 $script:vbox = Find-VBoxManage
@@ -690,7 +688,3 @@ while (-not $done) {
     }
 }
 
-} catch {
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
-}

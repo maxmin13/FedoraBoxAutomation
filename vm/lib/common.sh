@@ -18,7 +18,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
     exit 1
 fi
 
-exec > >(tee -a /var/log/fedora-box-automation.log) 2>&1
+LOG_FILE="${FEDORA_BOX_LOG:-/var/log/fedora-box-automation.log}"
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 SCRIPT_NAME="$(basename "${BASH_SOURCE[1]:-$0}")"
 
