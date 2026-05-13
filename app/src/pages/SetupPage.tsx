@@ -165,7 +165,17 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Disable Hyper-V"
-          description="Run this command in PowerShell as Administrator, then reboot:"
+          description={<>
+            <p>
+              <strong className="text-zinc-300">What is Hyper-V?</strong><br />
+              Hyper-V is Microsoft's built-in hypervisor — the same type of software as VirtualBox, but
+              made by Windows. When active, it takes exclusive control of your CPU's virtualisation hardware,
+              leaving VirtualBox unable to access it. This causes VMs to fail to start or run very slowly.
+            </p>
+            <p>
+              You do not need Hyper-V to use VirtualBox. Disabling it frees the hardware for VirtualBox.
+            </p>
+          </>}
           command="Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All"
         />
       )
@@ -174,7 +184,18 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Disable Windows Hypervisor Platform"
-          description="Run this command in PowerShell as Administrator, then reboot:"
+          description={<>
+            <p>
+              <strong className="text-zinc-300">What is Windows Hypervisor Platform?</strong><br />
+              It is a Windows feature that exposes Hyper-V virtualisation APIs to third-party applications
+              such as Android emulators or WSL2. Like Hyper-V itself, it competes with VirtualBox for
+              control of the CPU's virtualisation hardware.
+            </p>
+            <p>
+              VirtualBox 7+ can coexist with it, but older versions cannot. If you are on VirtualBox 6.x
+              or experiencing VM startup failures, disabling it is the safest fix.
+            </p>
+          </>}
           command="Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform"
         />
       )
@@ -183,7 +204,18 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Disable Virtual Machine Platform"
-          description="Run this command in PowerShell as Administrator, then reboot:"
+          description={<>
+            <p>
+              <strong className="text-zinc-300">What is Virtual Machine Platform?</strong><br />
+              It is a Windows feature that provides the underlying infrastructure for WSL2 (Windows Subsystem
+              for Linux) and other virtualisation-based tools. Like Hyper-V, it uses the CPU's virtualisation
+              hardware and can interfere with VirtualBox on older versions.
+            </p>
+            <p>
+              VirtualBox 7+ tolerates it, but if you are on an older version or seeing VM startup issues,
+              disabling it is the safest option. Note: disabling this will also disable WSL2.
+            </p>
+          </>}
           command="Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform"
         />
       )
@@ -192,7 +224,28 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Enable CPU Virtualisation in BIOS"
-          description="Restart your PC and enter the BIOS/UEFI settings. Look for Intel VT-x or AMD-V and enable it. The exact steps depend on your motherboard."
+          description={<>
+            <p>
+              <strong className="text-zinc-300">What is CPU Virtualisation?</strong><br />
+              It is a hardware feature (Intel VT-x or AMD-V) built into your processor that lets your PC
+              run virtual machines — isolated environments where a separate operating system like Fedora
+              Linux runs safely inside Windows without affecting your main system. VirtualBox requires it.
+            </p>
+            <p className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
+              <strong>Note:</strong> Windows does not always detect this setting correctly — it may report
+              it as disabled even when it is on. Try starting a VM first. If it works, no action is needed.
+            </p>
+            <p>
+              <strong className="text-zinc-300">How to enable it:</strong>
+            </p>
+            <ol className="list-decimal list-inside space-y-1 pl-1">
+              <li>Restart your PC.</li>
+              <li>Press <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F2</kbd>, <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F10</kbd>, <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F12</kbd>, or <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">Delete</kbd> during startup to enter BIOS/UEFI.</li>
+              <li>Look for a setting named <em>Intel VT-x</em>, <em>AMD-V</em>, <em>SVM</em>, or <em>Virtualisation Technology</em>.</li>
+              <li>Set it to <strong>Enabled</strong>, save and reboot.</li>
+            </ol>
+            <p className="text-zinc-500">The exact location depends on your motherboard manufacturer.</p>
+          </>}
         />
       )
 
@@ -200,15 +253,41 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Secure Boot"
-          description="VirtualBox 7+ supports Secure Boot — no action needed if you are on VirtualBox 7 or later."
+          description={<>
+            <p>
+              <strong className="text-zinc-300">What is Secure Boot?</strong><br />
+              Secure Boot is a UEFI security feature that prevents unsigned or untrusted software from
+              loading during startup. It is designed to protect against rootkits and bootkits.
+            </p>
+            <p>
+              VirtualBox 7+ is signed and fully supports Secure Boot — no action is needed if you are on
+              VirtualBox 7 or later. If you are on an older version and experiencing driver signing errors
+              on startup, you may need to disable Secure Boot in your BIOS/UEFI settings.
+            </p>
+          </>}
         />
       )
 
     case 'ram':
       return (
         <FixInstructions
-          title="Free up RAM"
-          description="Close other applications to free up memory before starting a VM."
+          title="RAM (Memory)"
+          description={<>
+            <p>
+              <strong className="text-zinc-300">Total RAM</strong> is the physical memory installed in
+              your PC. VirtualBox needs at least 4 GB to run a VM, and 8 GB or more is recommended so
+              both Windows and the VM have enough to work with.
+            </p>
+            <p>
+              <strong className="text-zinc-300">Free RAM</strong> is how much memory is available right
+              now. Even if your PC has plenty of RAM installed, running too many applications at once can
+              leave too little free for a VM. At least 3 GB free is required to start one.
+            </p>
+            <p>
+              Close unused applications (browsers, games, editors) before starting your VM to free up
+              memory. If your total RAM is less than 4 GB, consider upgrading your hardware.
+            </p>
+          </>}
         />
       )
 
@@ -271,7 +350,7 @@ function InstallVirtualBoxAction() {
 
 interface FixInstructionsProps {
   title: string
-  description: string
+  description: React.ReactNode
   command?: string
 }
 
@@ -289,8 +368,7 @@ function FixInstructions({ title, description, command }: FixInstructionsProps) 
 
   return (
     <div className="space-y-2">
-      <p className="text-zinc-200 text-sm font-medium">{title}</p>
-      <p className="text-zinc-400 text-sm">{description}</p>
+      <p className="text-zinc-200 text-sm font-bold">{title}</p>
 
       {command && (
         <div className="flex items-center gap-2 mt-1">
@@ -305,6 +383,8 @@ function FixInstructions({ title, description, command }: FixInstructionsProps) 
           </button>
         </div>
       )}
+
+      <div className="text-zinc-400 text-sm space-y-2">{description}</div>
     </div>
   )
 }

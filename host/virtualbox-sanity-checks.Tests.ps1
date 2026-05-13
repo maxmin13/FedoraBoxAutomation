@@ -126,8 +126,8 @@ Describe 'OS Check' -Tag 'OsCheck' {
 
 Describe 'RAM Check' -Tag 'RamCheck' {
 
-    It 'returns pass when total RAM is 8 GB or more' {
-        # Default mock has 16 GB — should pass
+    It 'returns pass when total RAM >= 8 GB and free RAM >= 5120 MB' {
+        # Default mock: 16 GB total, 8 GB free
         $result = Get-CheckResult -Id 'ram'
         $result.status | Should -Be 'pass'
     }
@@ -139,7 +139,7 @@ Describe 'RAM Check' -Tag 'RamCheck' {
                     return [PSCustomObject]@{
                         Caption = 'Windows 11 Home'; BuildNumber = '26200'
                         OSArchitecture = '64-bit'
-                        FreePhysicalMemory = 4194304; TotalVisibleMemorySize = 6291456
+                        FreePhysicalMemory = 6291456; TotalVisibleMemorySize = 6291456  # 6 GB free
                     }
                 }
                 'Win32_ComputerSystem' {
@@ -164,7 +164,7 @@ Describe 'RAM Check' -Tag 'RamCheck' {
                     return [PSCustomObject]@{
                         Caption = 'Windows 11 Home'; BuildNumber = '26200'
                         OSArchitecture = '64-bit'
-                        FreePhysicalMemory = 1048576; TotalVisibleMemorySize = 3145728
+                        FreePhysicalMemory = 3145728; TotalVisibleMemorySize = 3145728
                     }
                 }
                 'Win32_ComputerSystem' {
@@ -181,45 +181,8 @@ Describe 'RAM Check' -Tag 'RamCheck' {
         $result = Get-CheckResult -Id 'ram'
         $result.status | Should -Be 'fail'
     }
-}
 
-# ── 3. FREE RAM CHECK ─────────────────────────────────────────────────────────
-
-Describe 'Free RAM Check' -Tag 'RamCheck' {
-
-    It 'returns pass when free RAM is 5120 MB or more' {
-        # Default mock has 8 GB free — should pass
-        $result = Get-CheckResult -Id 'ram-free'
-        $result.status | Should -Be 'pass'
-    }
-
-    It 'returns warn when free RAM is between 3072 MB and 5120 MB' {
-        Mock Get-CimInstance {
-            switch ($ClassName) {
-                'Win32_OperatingSystem' {
-                    return [PSCustomObject]@{
-                        Caption = 'Windows 11 Home'; BuildNumber = '26200'
-                        OSArchitecture = '64-bit'
-                        FreePhysicalMemory = 4096000    # ~4 GB free in KB
-                        TotalVisibleMemorySize = 16777216
-                    }
-                }
-                'Win32_ComputerSystem' {
-                    return [PSCustomObject]@{ TotalPhysicalMemory = 17179869184 }
-                }
-                'Win32_Processor' {
-                    return [PSCustomObject]@{
-                        Name = 'Intel Core i7'; NumberOfCores = 8
-                        NumberOfLogicalProcessors = 16; VirtualizationFirmwareEnabled = $true
-                    }
-                }
-            }
-        }
-        $result = Get-CheckResult -Id 'ram-free'
-        $result.status | Should -Be 'warn'
-    }
-
-    It 'returns fail when free RAM is less than 3072 MB' {
+    It 'returns fail when free RAM is less than 3072 MB even if total RAM is sufficient' {
         Mock Get-CimInstance {
             switch ($ClassName) {
                 'Win32_OperatingSystem' {
@@ -231,7 +194,7 @@ Describe 'Free RAM Check' -Tag 'RamCheck' {
                     }
                 }
                 'Win32_ComputerSystem' {
-                    return [PSCustomObject]@{ TotalPhysicalMemory = 17179869184 }
+                    return [PSCustomObject]@{ TotalPhysicalMemory = 17179869184 }  # 16 GB
                 }
                 'Win32_Processor' {
                     return [PSCustomObject]@{
@@ -241,8 +204,34 @@ Describe 'Free RAM Check' -Tag 'RamCheck' {
                 }
             }
         }
-        $result = Get-CheckResult -Id 'ram-free'
+        $result = Get-CheckResult -Id 'ram'
         $result.status | Should -Be 'fail'
+    }
+
+    It 'returns warn when free RAM is between 3072 MB and 5120 MB even if total RAM is sufficient' {
+        Mock Get-CimInstance {
+            switch ($ClassName) {
+                'Win32_OperatingSystem' {
+                    return [PSCustomObject]@{
+                        Caption = 'Windows 11 Home'; BuildNumber = '26200'
+                        OSArchitecture = '64-bit'
+                        FreePhysicalMemory = 4096000    # ~4 GB free in KB
+                        TotalVisibleMemorySize = 16777216
+                    }
+                }
+                'Win32_ComputerSystem' {
+                    return [PSCustomObject]@{ TotalPhysicalMemory = 17179869184 }  # 16 GB
+                }
+                'Win32_Processor' {
+                    return [PSCustomObject]@{
+                        Name = 'Intel Core i7'; NumberOfCores = 8
+                        NumberOfLogicalProcessors = 16; VirtualizationFirmwareEnabled = $true
+                    }
+                }
+            }
+        }
+        $result = Get-CheckResult -Id 'ram'
+        $result.status | Should -Be 'warn'
     }
 }
 
@@ -318,7 +307,7 @@ Describe 'CPU Virtualisation Check' -Tag 'CpuCheck' {
         $result.status | Should -Be 'pass'
     }
 
-    It 'returns fail when both WMI and systeminfo report virtualisation disabled' {
+    It 'returns warn when both WMI and systeminfo report virtualisation disabled' {
         Mock Get-CimInstance {
             switch ($ClassName) {
                 'Win32_OperatingSystem' {
@@ -343,7 +332,7 @@ Describe 'CPU Virtualisation Check' -Tag 'CpuCheck' {
         Mock systeminfo { return 'Virtualization Enabled In Firmware: No' }
 
         $result = Get-CheckResult -Id 'cpu'
-        $result.status | Should -Be 'fail'
+        $result.status | Should -Be 'warn'
     }
 }
 

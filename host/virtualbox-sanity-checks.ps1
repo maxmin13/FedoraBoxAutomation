@@ -100,33 +100,17 @@ try {
         Write-Host "    Free  : $freeRamMB MB ($usedPct% in use)"
     }
 
-    if ($ramGB -ge 8) {
-        Write-Check 'pass' "Sufficient RAM ($ramGB GB)"
-        Add-Result -Id 'ram' -Label 'RAM (Memory)' -Status 'pass' `
-            -Detail "$ramGB GB total, $freeRamMB MB free ($usedPct% in use)"
-    } elseif ($ramGB -ge 4) {
-        Write-Check 'warn' "$ramGB GB RAM. 8 GB+ is recommended."
-        Add-Result -Id 'ram' -Label 'RAM (Memory)' -Status 'warn' `
-            -Detail "$ramGB GB total. 8 GB+ recommended. $freeRamMB MB currently free."
-    } else {
-        Write-Check 'fail' "Only $ramGB GB RAM. Minimum 4 GB required."
-        Add-Result -Id 'ram' -Label 'RAM (Memory)' -Status 'fail' `
-            -Detail "Only $ramGB GB total. Minimum 4 GB required, 8 GB+ recommended."
-    }
+    $ramStatus  = if ($ramGB -ge 8)        { 'pass' } elseif ($ramGB -ge 4)        { 'warn' } else { 'fail' }
+    $freeStatus = if ($freeRamMB -ge 5120) { 'pass' } elseif ($freeRamMB -ge 3072) { 'warn' } else { 'fail' }
+    $order      = @{ pass = 0; warn = 1; fail = 2 }
+    $status     = if ($order[$freeStatus] -ge $order[$ramStatus]) { $freeStatus } else { $ramStatus }
 
-    if ($freeRamMB -lt 3072) {
-        Write-Check 'fail' "Only $freeRamMB MB free. A VM needs at least 3 GB free to start."
-        Add-Result -Id 'ram-free' -Label 'Free RAM' -Status 'fail' `
-            -Detail "Only $freeRamMB MB free. Close other apps before starting a VM."
-    } elseif ($freeRamMB -lt 5120) {
-        Write-Check 'warn' "$freeRamMB MB free. Consider closing apps before starting a VM."
-        Add-Result -Id 'ram-free' -Label 'Free RAM' -Status 'warn' `
-            -Detail "$freeRamMB MB free. Consider setting VM RAM to 3072 MB or closing apps first."
-    } else {
-        Write-Check 'pass' "$freeRamMB MB free - enough headroom for a new VM."
-        Add-Result -Id 'ram-free' -Label 'Free RAM' -Status 'pass' `
-            -Detail "$freeRamMB MB free - enough headroom for a VM."
-    }
+    $detail = "$ramGB GB total, $freeRamMB MB free ($usedPct% in use)."
+    if ($ramGB -lt 8)        { $detail += " 8 GB+ recommended." }
+    if ($freeRamMB -lt 5120) { $detail += " Close other apps to free memory before starting a VM." }
+
+    Write-Check $status "RAM: $ramGB GB total, $freeRamMB MB free"
+    Add-Result -Id 'ram' -Label 'RAM (Memory)' -Status $status -Detail $detail
 } catch {
     Add-Result -Id 'ram' -Label 'RAM (Memory)' -Status 'fail' -Detail "Check failed: $_"
 }
@@ -183,9 +167,9 @@ try {
         Add-Result -Id 'cpu' -Label 'CPU Virtualisation' -Status 'pass' `
             -Detail "$($cpu.Name) - $($cpu.NumberOfCores) cores, VT-x/AMD-V enabled"
     } else {
-        Write-Check 'fail' "Hardware Virtualisation is DISABLED. Enable Intel VT-x or AMD-V in BIOS."
-        Add-Result -Id 'cpu' -Label 'CPU Virtualisation' -Status 'fail' `
-            -Detail "VT-x/AMD-V is disabled in BIOS/UEFI. Enable it to run VMs."
+        Write-Check 'warn' "Hardware Virtualisation appears DISABLED - but this check is not always reliable."
+        Add-Result -Id 'cpu' -Label 'CPU Virtualisation' -Status 'warn' `
+            -Detail "VT-x/AMD-V not detected, but the check may give false negatives. Verify the setting in BIOS/UEFI before concluding it is disabled."
     }
 } catch {
     Add-Result -Id 'cpu' -Label 'CPU Virtualisation' -Status 'fail' -Detail "Check failed: $_"
