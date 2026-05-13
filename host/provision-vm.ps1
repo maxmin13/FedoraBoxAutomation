@@ -410,7 +410,8 @@ $scriptArgDefs = @{
     'tomcat.sh'              = 'user+custom2'
     'tomcat-remove.sh'       = 'custom2'
     'aws-cli.sh'             = 'user'
-    'k8-install.sh'          = 'user'
+    'minikube.sh'            = 'user'
+    'k3s.sh'                 = 'user'
     'git.sh'                 = 'none'
     'chrome.sh'              = 'none'
     'mariadb.sh'             = 'none'
@@ -420,6 +421,7 @@ $scriptArgDefs = @{
     'eclipse-ee.sh'          = 'custom'
     'visualstudiocode.sh'    = 'none'
     'utilities.sh'           = 'none'
+    'ansible.sh'             = 'none'
     'postgresql.sh'          = 'none'
 
 }
@@ -437,7 +439,8 @@ $scriptDescriptions = @{
     'tomcat.sh'             = 'Apache Tomcat - multi-instance by port, requires Java'
     'tomcat-remove.sh'      = 'Remove a Tomcat instance by version and port'
     'aws-cli.sh'            = 'AWS CLI v2, creates ~/.aws config directory'
-    'k8-install.sh'         = 'minikube (docker driver) + kubectl + metrics-server addon'
+    'minikube.sh'           = 'minikube (docker driver) + kubectl + metrics-server addon'
+    'k3s.sh'                = 'k3s lightweight real Kubernetes -- same API as production clusters'
     'git.sh'                = 'Git version control'
     'chrome.sh'             = 'Google Chrome stable via fedora-workstation-repositories'
     'mariadb.sh'            = 'MariaDB server - MySQL-compatible relational database'
@@ -446,7 +449,8 @@ $scriptDescriptions = @{
     'eclipse.sh'            = 'Eclipse IDE for Java EE'
     'eclipse-ee.sh'         = 'Eclipse IDE for Java EE via installer'
     'visualstudiocode.sh'   = 'Visual Studio Code via Microsoft repository'
-    'utilities.sh'          = 'Ansible automation, gedit editor, dconf-editor, expect'
+    'utilities.sh'          = 'Desktop utilities: gedit editor, dconf-editor, expect'
+    'ansible.sh'            = 'Ansible automation and configuration management'
     'postgresql.sh'         = 'PostgreSQL + pgAdmin 4 desktop, remote connections enabled'
 }
 
@@ -550,6 +554,7 @@ while (-not $done) {
                 @{ Name = 'Version Control';  Dir = 'version-control'  }
                 @{ Name = 'Editors';          Dir = 'editors'          }
                 @{ Name = 'Browsers';         Dir = 'browsers'         }
+                @{ Name = 'Automation';       Dir = 'automation'       }
             )
 
             Write-Host ""

@@ -21,7 +21,7 @@ then
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    RPM_URL=$(curl -sL https://api.github.com/repos/dbeaver/dbeaver/releases/latest | grep '"browser_download_url"' | grep 'x86_64\.rpm' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
+    RPM_URL=$(curl -sL https://api.github.com/repos/dbeaver/dbeaver/releases/latest | grep '"browser_download_url"' | grep 'x86_64\.rpm' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/' || true)
     if [[ -z "${RPM_URL}" ]]; then
         log_error 'Could not determine DBeaver RPM download URL.'
         exit 1

@@ -82,6 +82,12 @@ teardown() {
     grep -q "^dnf " "$CALLS_FILE"
 }
 
+@test "installs the correct packages when audit is not installed" {
+    _stub rpm 1   # exit 1 = package not found, triggers dnf
+    run bash "$SCRIPT"
+    grep -q "^dnf install -y audit setools setroubleshoot setroubleshoot-server policycoreutils-python-utils" "$CALLS_FILE"
+}
+
 @test "always runs sestatus" {
     run bash "$SCRIPT"
     grep -q "^sestatus" "$CALLS_FILE"

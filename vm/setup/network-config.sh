@@ -20,25 +20,32 @@ HOSTNAME="${1}"
 STEP "Hostname"
 
 current_hostname="$(nmcli general hostname)"
+log_info "Current hostname : ${current_hostname}"
+log_info "Requested hostname: ${HOSTNAME}"
 
-if [[ "${HOSTNAME}" != "${current_hostname}" ]]
+if [[ "${HOSTNAME}" == "${current_hostname}" ]]
 then
+   log_info 'Hostname already set, skipping.'
+else
    nmcli general hostname "${HOSTNAME}"
-   log_info 'Hostname set.'
+   current_hostname="$(nmcli general hostname)"
+   log_info "Hostname changed to: ${current_hostname}"
 fi
-
-current_hostname="$(nmcli general hostname)"
-log_info "Hostname: ${current_hostname}"
 
 STEP "Connections"
 
+log_info "Active network connections:"
 nmcli connection
 
 STEP "Devices"
 
+log_info "Network devices:"
 nmcli device
+
+log_info "IP addresses:"
 ip address
 
 STEP "Route table"
 
+log_info "Routing table:"
 ip -r route

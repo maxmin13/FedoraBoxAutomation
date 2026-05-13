@@ -43,6 +43,19 @@ teardown() {
 
 # ── 2. log_info ────────────────────────────────────────────────────────────────
 
+@test "log_info includes the calling script name in the output" {
+    # Write a real script file so BASH_SOURCE[1] has an actual filename to report.
+    # A heredoc has no filename, so it would fall back to 'bash' — too generic to assert.
+    cat > "$TEST_TMPDIR/test-script.sh" << SCRIPT
+export PATH="$TEST_TMPDIR/bin:\$PATH"
+export FEDORA_BOX_LOG="$FEDORA_BOX_LOG"
+source "$COMMON_SH"
+log_info "check script name"
+SCRIPT
+    run bash "$TEST_TMPDIR/test-script.sh"
+    [[ "$output" == *"test-script.sh"* ]]
+}
+
 @test "log_info line contains INFO and the message" {
     run bash << EOF
 export PATH="$TEST_TMPDIR/bin:\$PATH"

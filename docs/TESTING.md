@@ -161,15 +161,17 @@ Windows files under `/mnt/c/`:
 
 ```bash
 cd /mnt/c/Projects/Pipelines/FedoraBoxAutomation
-bats vm/tests/
+sudo bats vm/tests/
 ```
 
 ### Run all Bash tests
 
-Navigate to the project root first, then run:
+The tests create and modify system directories (`/opt/maven`, `/usr/local/ssl`,
+`/var/lib/pgsql/data/`, etc.) in the same way the provisioning scripts do, so
+they must run as root:
 
 ```bash
-bats vm/tests/
+sudo bats vm/tests/
 ```
 
 A passing run looks like:
@@ -188,7 +190,7 @@ selinux-config.bats
  ok exits 0 when audit tools are already installed
  ...
 
-14 tests, 0 failures
+143 tests, 0 failures
 ```
 
 ### Run a single test file

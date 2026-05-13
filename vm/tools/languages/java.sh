@@ -3,8 +3,11 @@
 ##
 ## Description: Installs the latest Oracle JDK via the Foojay API, and sets
 ##              JAVA_HOME in the login user's ~/.bash_profile.
-## Usage:       sudo ./java.sh <login-user>
-## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
+## Usage:       sudo ./java.sh <login-user> [major-version]
+## Parameters:  $1  <login-user>     Non-root desktop username (e.g. maxmin)
+##              $2  [major-version]  Optional JDK major version (e.g. 21).
+##                                   Defaults to the latest GA version from
+##                                   the Foojay API when omitted.
 ##
 
 source /tmp/common.sh
@@ -31,12 +34,15 @@ else
    WORK_DIR=$(mktemp -d)
    trap 'rm -rf "${WORK_DIR}"' EXIT
 
-   LATEST_MAJOR=$(curl -s 'https://api.foojay.io/disco/v3.0/major_versions?ea=false&ga=true' \
-     | python3 -c "import sys,json; versions=json.load(sys.stdin)['result']; print(max(v['major_version'] for v in versions))")
-
-   if [[ -z "${LATEST_MAJOR}" ]]; then
-      log_error 'Could not determine latest JDK version from Foojay API.'
-      exit 1
+   if [[ -n "${2:-}" ]]; then
+      LATEST_MAJOR="${2}"
+   else
+      LATEST_MAJOR=$(curl -s 'https://api.foojay.io/disco/v3.0/major_versions?ea=false&ga=true' \
+        | python3 -c "import sys,json; versions=json.load(sys.stdin)['result']; print(max(v['major_version'] for v in versions))" || true)
+      if [[ -z "${LATEST_MAJOR}" ]]; then
+         log_error 'Could not determine latest JDK version from Foojay API.'
+         exit 1
+      fi
    fi
 
    log_info "Latest Oracle JDK major version: ${LATEST_MAJOR}"

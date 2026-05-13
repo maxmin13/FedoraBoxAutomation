@@ -1,11 +1,15 @@
 #!/bin/bash
 
 ##
-## Description: Installs minikube (configured to use Docker as the driver) and
-##              kubectl (latest stable release) for local Kubernetes development.
-##              Sets minikube driver config and enables the metrics-server addon
-##              for the login user.
-## Usage:       sudo ./k8-install.sh <login-user>
+## Description: Installs minikube and kubectl for local Kubernetes development.
+##              minikube lets you run Kubernetes on your own machine -- it creates
+##              a local cluster that behaves like a production environment so you
+##              can develop and test container workloads without needing cloud
+##              access or incurring costs. kubectl is the command-line client used to control
+##              any Kubernetes cluster, local or production.
+##              Configures minikube to use Docker as the driver and enables the
+##              metrics-server addon for the login user.
+## Usage:       sudo ./minikube.sh <login-user>
 ## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
 
