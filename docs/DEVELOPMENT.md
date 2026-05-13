@@ -126,14 +126,19 @@ Three debug configurations are available in `.vscode/launch.json`.
 
 ```
 app/
+  __mocks__/
+    electron.js       <- stubs ipcMain so Electron files can be required in tests
   electron/           <- Node.js main process (runs on the OS)
+    __tests__/        <- Vitest pure-logic tests (node environment)
+      ipc-handlers.test.js
+      script-runner.test.js
     main.js           <- window creation, close warning dialog
     preload.js        <- contextBridge API exposed to React
     ipc-handlers.js   <- handles requests from the renderer
     script-runner.js  <- spawns and kills PowerShell scripts
     scripts.js        <- central registry of .ps1 paths
   src/                <- React renderer (runs in Chromium)
-    __tests__/        <- Vitest + React Testing Library tests
+    __tests__/        <- Vitest + React Testing Library tests (jsdom environment)
       setup.ts        <- loads @testing-library/jest-dom matchers
       CheckCard.test.tsx
       SetupPage.test.tsx
@@ -141,7 +146,8 @@ app/
     components/       <- reusable UI components
   package.json
   vite.config.ts
-  vitest.config.ts    <- Vitest configuration (jsdom, globals, setupFiles)
+  vitest.config.ts    <- Vitest base config (jsdom, globals, setupFiles)
+  vitest.workspace.ts <- workspace: react project (jsdom) + electron project (node)
 
 vm/
   lib/common.sh       <- shared helpers sourced by all provisioning scripts

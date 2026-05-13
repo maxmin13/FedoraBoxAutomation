@@ -34,6 +34,9 @@ export default function SetupPage() {
     // Subscribe to live log lines while the script runs.
     // onScriptLine returns a cleanup function — we call it after the script finishes.
     const unsubscribeLine = window.electronAPI.onScriptLine((line) => {
+      // We pass a function to setLogLines so React gives us the latest list (prev).
+      // Using logLines directly here would capture a stale snapshot from when
+      // runAnalysis started, causing earlier lines to be lost.
       setLogLines((prev) => [...prev, line.text])
     })
 

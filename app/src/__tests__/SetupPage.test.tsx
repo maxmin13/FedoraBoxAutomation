@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import SetupPage from '../pages/SetupPage'
 import type { CheckResult } from '../electron.d'
 
@@ -107,6 +107,26 @@ describe('SetupPage', () => {
     })
   })
 
+  describe('live log stream', () => {
+    it('renders emitted log lines in the running panel', async () => {
+      let capturedCallback: ((line: { text: string; source: 'stdout' | 'stderr' }) => void) | null = null
+      window.electronAPI.onScriptLine = vi.fn().mockImplementation((cb) => {
+        capturedCallback = cb
+        return () => {}
+      })
+      window.electronAPI.runSanityChecks = vi.fn().mockReturnValue(new Promise(() => {}))
+
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+      await waitFor(() => expect(screen.getByText('Analysing host...')).toBeInTheDocument())
+
+      act(() => { capturedCallback!({ text: 'Checking RAM...', source: 'stdout' }) })
+
+      expect(screen.getByText('Checking RAM...')).toBeInTheDocument()
+    })
+  })
+
   describe('error state', () => {
     it('shows the error message when the script fails to run', async () => {
       window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({
@@ -120,6 +140,57 @@ describe('SetupPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('VBoxManage not found')).toBeInTheDocument()
+      })
+    })
+
+    it('shows fallback message when result.ok is false with no error field', async () => {
+      window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: false, checks: [] })
+
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+      // Both the section heading and the detail <p> render "Analysis failed"
+      // when error is undefined — two matches confirms the fallback propagated correctly
+      await waitFor(() => {
+        expect(screen.getAllByText('Analysis failed')).toHaveLength(2)
+      })
+    })
+  })
+
+  describe('InstallVirtualBox action', () => {
+    // Runs analysis (returns the default SAMPLE_CHECKS with vboxinst failing)
+    // and opens the "How to fix" panel on the VirtualBox card.
+    async function openVboxFixPanel() {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('VirtualBox')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: 'How to fix' }))
+    }
+
+    it('shows the Install VirtualBox button inside the fix panel', async () => {
+      await openVboxFixPanel()
+      expect(screen.getByRole('button', { name: 'Install VirtualBox' })).toBeInTheDocument()
+    })
+
+    it('disables the button and shows Installing... while install is in progress', async () => {
+      window.electronAPI.installVirtualBox = vi.fn().mockReturnValue(new Promise(() => {}))
+      await openVboxFixPanel()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Install VirtualBox' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Installing...' })).toBeDisabled()
+      })
+    })
+
+    it('shows the success message after install completes', async () => {
+      window.electronAPI.installVirtualBox = vi.fn().mockResolvedValue({ ok: true })
+      await openVboxFixPanel()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Install VirtualBox' }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/VirtualBox installed/i)).toBeInTheDocument()
       })
     })
   })

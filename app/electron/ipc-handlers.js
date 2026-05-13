@@ -126,28 +126,8 @@ function registerIpcHandlers(win) {
           if (stderrLines.length) console.log('[run-sanity-checks] stderr:\n' + stderrLines.join('\n'))
         }
 
-        // The script outputs a JSON array on stdout. Find it by looking for the
-        // line that begins the array ('[') and the final closing (']').
-        // Using lastIndexOf for ']' handles any stray brackets in earlier output.
-        const fullOutput = stdoutLines.join('\n')
-
         try {
-          const jsonStart = fullOutput.indexOf('[')
-          const jsonEnd = fullOutput.lastIndexOf(']')
-
-          if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) {
-            const stdoutSnippet = fullOutput.slice(0, 300) || '(empty)'
-            const stderrSnippet = stderrLines.slice(0, 10).join('\n') || '(empty)'
-            throw new Error(
-              `No JSON array found in script output.\nstdout: ${stdoutSnippet}\nstderr: ${stderrSnippet}`
-            )
-          }
-
-          const jsonString = fullOutput.slice(jsonStart, jsonEnd + 1)
-          const parsed = JSON.parse(jsonString)
-          // ConvertTo-Json returns an object (not array) when there is exactly 1 result
-          const checks = Array.isArray(parsed) ? parsed : [parsed]
-
+          const checks = parseChecksOutput(stdoutLines, stderrLines)
           resolve({ ok: true, checks })
         } catch (parseError) {
           resolve({ ok: false, error: 'Could not parse check results: ' + parseError.message, checks: [] })
@@ -177,6 +157,36 @@ function registerIpcHandlers(win) {
 }
 
 /**
+ * Finds and parses the JSON array written by the sanity-check script.
+ * Handles noise lines before the array (e.g. DISM progress output) and the
+ * PowerShell ConvertTo-Json quirk where a single result is emitted as an
+ * object rather than a one-element array.
+ *
+ * @param {string[]} stdoutLines - Collected stdout lines from the script
+ * @param {string[]} stderrLines - Collected stderr lines (used in error messages only)
+ * @returns {object[]} parsed checks array
+ * @throws {Error} if no JSON array is found or the JSON is invalid
+ */
+function parseChecksOutput(stdoutLines, stderrLines = []) {
+  const fullOutput = stdoutLines.join('\n')
+  const jsonStart = fullOutput.indexOf('[')
+  const jsonEnd = fullOutput.lastIndexOf(']')
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) {
+    const stdoutSnippet = fullOutput.slice(0, 300) || '(empty)'
+    const stderrSnippet = stderrLines.slice(0, 10).join('\n') || '(empty)'
+    throw new Error(
+      `No JSON array found in script output.\nstdout: ${stdoutSnippet}\nstderr: ${stderrSnippet}`
+    )
+  }
+
+  const jsonString = fullOutput.slice(jsonStart, jsonEnd + 1)
+  const parsed = JSON.parse(jsonString)
+  // ConvertTo-Json returns an object (not array) when there is exactly 1 result
+  return Array.isArray(parsed) ? parsed : [parsed]
+}
+
+/**
  * Parses the output of 'VBoxManage list vms' into an array of objects.
  * Each line looks like: "My VM Name" {550e8400-e29b-41d4-a716-446655440000}
  *
@@ -187,7 +197,8 @@ function parseVmList(output) {
   const vms = []
 
   for (const line of output.split('\n')) {
-    // Match the quoted name and the uuid in braces
+    // Each line looks like: "My VM Name" {550e8400-e29b-41d4-a716-446655440000}
+    // The regex captures:  (.+) = name between quotes,  ([^}]+) = uuid inside braces
     const match = line.match(/^"(.+)"\s+\{([^}]+)\}/)
 
     if (match) {
@@ -198,4 +209,4 @@ function parseVmList(output) {
   return vms
 }
 
-module.exports = { registerIpcHandlers }
+module.exports = { registerIpcHandlers, parseVmList, parseChecksOutput }

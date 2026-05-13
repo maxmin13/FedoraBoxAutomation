@@ -94,7 +94,30 @@ export default function DocsPage() {
           // prose classes from Tailwind Typography give markdown sensible styling.
           // invert makes it work on a dark background.
           <div className="prose prose-invert prose-sm max-w-none">
-            <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Custom link handler: if the href is a known doc filename,
+                // switch the sidebar selection instead of following a URL.
+                a({ href, children }) {
+                  const docFile = DOC_FILES.find((d) => d.filename === href)
+                  if (docFile) {
+                    return (
+                      <button
+                        onClick={() => setSelectedFile(docFile.filename)}
+                        className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                      >
+                        {children}
+                      </button>
+                    )
+                  }
+                  // Non-doc links are rendered as plain text — no navigation inside Electron
+                  return <span className="text-blue-400 underline">{children}</span>
+                },
+              }}
+            >
+              {content}
+            </Markdown>
           </div>
         )}
       </main>

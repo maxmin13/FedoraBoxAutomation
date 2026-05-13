@@ -2,13 +2,14 @@
 
 ## Test suites
 
-There are three independent test suites in the project:
+There are four independent test suites in the project:
 
 | Suite | Framework | Where to run |
 |-------|-----------|--------------|
 | PowerShell sanity checks | Pester v5 | Windows (PowerShell) |
 | Bash provisioning helpers | bats-core | Linux or WSL |
-| React components | Vitest + RTL | Windows or Linux (Node.js) |
+| React components | Vitest + RTL (jsdom) | Windows or Linux (Node.js) |
+| Electron pure-logic | Vitest (node) | Windows or Linux (Node.js) |
 
 ---
 
@@ -219,19 +220,26 @@ copy the `_stub` helper and the `setup`/`teardown` blocks, then write
 
 ---
 
-## React Tests (Vitest)
+## React and Electron Tests (Vitest)
 
-The React components and pages are tested with
-[Vitest](https://vitest.dev/) and
-[React Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
-These tests run on Windows (or any OS with Node.js).
+Both the React components and the Electron main-process logic are tested with
+[Vitest](https://vitest.dev/). These tests run on Windows (or any OS with Node.js).
+
+`app/vitest.workspace.ts` defines two projects that run together under `npm test`:
+
+| Project | Environment | Files |
+|---------|-------------|-------|
+| `react` | jsdom | `app/src/__tests__/**/*.test.{ts,tsx}` |
+| `electron` | node | `app/electron/__tests__/**/*.test.js` |
 
 ### Run the tests
 
 ```powershell
 cd app
-npm test          # run once and exit (good for CI)
-npm run test:watch   # re-run on file change (good during development)
+npm test                          # run all suites once and exit
+npm test -- --project react       # React only
+npm test -- --project electron    # Electron only
+npm test -- --watch               # re-run on file change (good during development)
 ```
 
 A passing run looks like:
@@ -239,19 +247,23 @@ A passing run looks like:
 ```
 RUN  v2.x
 
- checkmark  src/__tests__/CheckCard.test.tsx   (13 tests)
- checkmark  src/__tests__/SetupPage.test.tsx   (10 tests)
+ checkmark  src/__tests__/CheckCard.test.tsx        (15 tests)
+ checkmark  src/__tests__/SetupPage.test.tsx        (15 tests)
+ checkmark  electron/__tests__/ipc-handlers.test.js (13 tests)
+ checkmark  electron/__tests__/script-runner.test.js (7 tests)
 
-Test Files  2 passed (2)
-     Tests  23 passed (23)
+Test Files  4 passed (4)
+     Tests  50 passed (50)
 ```
 
 ### What is tested
 
 | Test file | What it covers |
 |-----------|---------------|
-| `CheckCard.test.tsx` | Status badges (OK/!!/XX), label and detail text, "How to fix" toggle open/close behaviour |
-| `SetupPage.test.tsx` | Idle state, button disable during run, check cards rendered, summary counts, error message display |
+| `src/__tests__/CheckCard.test.tsx` | Status badges (OK/!!/XX), label and detail text, "How to fix" toggle open/close and warn toggle full lifecycle |
+| `src/__tests__/SetupPage.test.tsx` | Idle state, button disable during run, check cards rendered, summary counts, error messages, live log stream, InstallVirtualBox action states |
+| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` (single/multiple/spaces/empty/malformed), `parseChecksOutput` (clean JSON, noise lines, single-item guard, error paths) |
+| `electron/__tests__/script-runner.test.js` | `splitChunk` (LF, CRLF, empty lines, whitespace, source tag, blank chunk, Buffer input) |
 
 ### How the React tests work
 
@@ -268,10 +280,34 @@ window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({
 
 The `@testing-library/jest-dom` matchers (`toBeInTheDocument`, `toBeDisabled`,
 etc.) are loaded via `src/__tests__/setup.ts` which Vitest runs before every
-test file.
+React test file.
+
+### How the Electron tests work
+
+Logic is extracted out of `ipcMain.handle()` callbacks into named exported
+functions (e.g. `parseVmList`, `parseChecksOutput`, `splitChunk`) so it can be
+tested in plain Node without a running Electron process.
+
+`app/__mocks__/electron.js` stubs `ipcMain` so Electron handler files can be
+`require`d safely in tests:
+
+```js
+// app/__mocks__/electron.js
+module.exports = { ipcMain: { handle: () => {} } }
+```
+
+Test files activate the stub with `vi.mock('electron')` at the top.
 
 ### Adding a new React test
 
 Create a file in `app/src/__tests__/` with the `.test.tsx` extension.
 Import the component, mock `window.electronAPI` in `beforeEach`, then use
 `render`, `screen`, `fireEvent`, and `waitFor` from `@testing-library/react`.
+
+### Adding a new Electron test
+
+1. Extract the logic you want to test into a named exported function in the
+   relevant `app/electron/*.js` file.
+2. Create a file in `app/electron/__tests__/` with the `.test.js` extension.
+3. Add `vi.mock('electron')` at the top if the file imports Electron modules.
+4. Import the extracted function and write `describe`/`it` blocks as normal.

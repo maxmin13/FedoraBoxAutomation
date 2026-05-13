@@ -37,6 +37,21 @@ function killActiveScript() {
 }
 
 /**
+ * Converts a raw stdout/stderr Buffer chunk into an array of non-empty ScriptLine objects.
+ * Handles both CRLF and LF line endings and skips whitespace-only lines.
+ *
+ * @param {Buffer|string} chunk
+ * @param {'stdout'|'stderr'} source
+ * @returns {{ text: string, source: 'stdout'|'stderr' }[]}
+ */
+function splitChunk(chunk, source) {
+  const text = chunk.toString()                              // Buffer or string → plain string
+  const lines = text.split(/\r?\n/)                         // split on LF or CRLF line endings
+  const nonEmpty = lines.filter((line) => line.trim() !== '') // drop blank/whitespace-only lines
+  return nonEmpty.map((text) => ({ text, source }))         // tag each line with its source
+}
+
+/**
  * Runs a PowerShell script and streams its output line by line.
  *
  * @param {string}   scriptPath - Absolute path to the .ps1 file
@@ -64,27 +79,12 @@ function runScript(scriptPath, args, onLine, onDone) {
 
   // stdout: normal output lines from the script (Write-Host, Write-Output)
   activeChild.stdout.on('data', (chunk) => {
-    // chunk is a Buffer; convert to string and split on newlines.
-    // A single chunk can contain multiple lines.
-    const lines = chunk.toString().split(/\r?\n/)
-
-    for (const line of lines) {
-      // Skip empty lines that come from splitting
-      if (line.trim() !== '') {
-        onLine({ text: line, source: 'stdout' })
-      }
-    }
+    for (const line of splitChunk(chunk, 'stdout')) onLine(line)
   })
 
   // stderr: error output — PowerShell writes some warnings here too
   activeChild.stderr.on('data', (chunk) => {
-    const lines = chunk.toString().split(/\r?\n/)
-
-    for (const line of lines) {
-      if (line.trim() !== '') {
-        onLine({ text: line, source: 'stderr' })
-      }
-    }
+    for (const line of splitChunk(chunk, 'stderr')) onLine(line)
   })
 
   // 'close' fires when the process has exited and all streams are flushed.
@@ -104,4 +104,4 @@ function runScript(scriptPath, args, onLine, onDone) {
   })
 }
 
-module.exports = { runScript, killActiveScript, hasActiveScript }
+module.exports = { runScript, killActiveScript, hasActiveScript, splitChunk }

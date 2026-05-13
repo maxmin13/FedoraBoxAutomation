@@ -95,7 +95,20 @@ describe('CheckCard', () => {
       expect(screen.queryByText('Fix action content')).not.toBeInTheDocument()
     })
 
-    it('shows nothing when no action is provided for a failing check', () => {
+    it('reveals the action panel after clicking "How to fix" on a warning check', () => {
+      render(<CheckCard check={warnCheck} action={<span>Warn action content</span>} />)
+      fireEvent.click(screen.getByText('How to fix'))
+      expect(screen.getByText('Warn action content')).toBeInTheDocument()
+    })
+
+    it('hides the action panel again after clicking "Hide fix" on a warning check', () => {
+      render(<CheckCard check={warnCheck} action={<span>Warn action content</span>} />)
+      fireEvent.click(screen.getByText('How to fix'))
+      fireEvent.click(screen.getByText('Hide fix'))
+      expect(screen.queryByText('Warn action content')).not.toBeInTheDocument()
+    })
+
+    it('does not show the fix button when no action prop is passed', () => {
       render(<CheckCard check={failCheck} />)
       expect(screen.queryByText('How to fix')).not.toBeInTheDocument()
     })
