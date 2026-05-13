@@ -16,6 +16,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Returns a list of all registered VMs with their running state
   listVms: () => ipcRenderer.invoke('list-vms'),
 
+  // ── VM control ───────────────────────────────────────────
+  // Starts a stopped VM (headless mode)
+  startVm: (name) => ipcRenderer.invoke('start-vm', name),
+
+  // Sends an ACPI shutdown signal to a running VM
+  stopVm: (name) => ipcRenderer.invoke('stop-vm', name),
+
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results
   runSanityChecks: () => ipcRenderer.invoke('run-sanity-checks'),

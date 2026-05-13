@@ -116,9 +116,31 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
 
 interface VmCardProps {
   vm: Vm
+  onRefresh: () => void
 }
 
-function VmCard({ vm }: VmCardProps) {
+function VmCard({ vm, onRefresh }: VmCardProps) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleStart() {
+    setBusy(true)
+    setError(null)
+    const result = await window.electronAPI.startVm(vm.name)
+    if (!result.ok) setError(result.error ?? 'Failed to start VM')
+    setBusy(false)
+    onRefresh()
+  }
+
+  async function handleStop() {
+    setBusy(true)
+    setError(null)
+    const result = await window.electronAPI.stopVm(vm.name)
+    if (!result.ok) setError(result.error ?? 'Failed to stop VM')
+    setBusy(false)
+    onRefresh()
+  }
+
   return (
     <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
       {/* VM name and running badge */}
@@ -139,31 +161,28 @@ function VmCard({ vm }: VmCardProps) {
       {/* UUID in small muted text */}
       <p className="text-zinc-500 text-xs font-mono truncate">{vm.uuid}</p>
 
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+
       {/* Action buttons */}
       <div className="flex gap-2 mt-auto">
         {vm.running ? (
-          <span className="text-zinc-500 text-xs">
-            Open VirtualBox to manage this VM
-          </span>
+          <button
+            onClick={handleStop}
+            disabled={busy}
+            className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-sm disabled:opacity-50"
+          >
+            {busy ? 'Stopping...' : 'Stop'}
+          </button>
         ) : (
           <button
-            onClick={() => startVm(vm.name)}
-            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm"
+            onClick={handleStart}
+            disabled={busy}
+            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50"
           >
-            Start
+            {busy ? 'Starting...' : 'Start'}
           </button>
         )}
       </div>
     </div>
   )
-}
-
-/**
- * Sends the VBoxManage startvm command via the main process.
- * TODO: wire this up to an IPC handler in ipc-handlers.js
- * @param {string} name - The VM name to start
- */
-function startVm(name: string) {
-  // Placeholder — will be connected to an IPC handler in a future step
-  console.log('Start VM:', name)
 }

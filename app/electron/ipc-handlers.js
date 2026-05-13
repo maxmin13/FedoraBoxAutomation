@@ -100,6 +100,28 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── start-vm ──────────────────────────────────────────────
+  // Starts a stopped VM headlessly.
+  handleIpc('start-vm', async (_event, name) => {
+    try {
+      execSync(`VBoxManage startvm "${name}" --type headless`, { encoding: 'utf8' })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error.message }
+    }
+  })
+
+  // ── stop-vm ───────────────────────────────────────────────
+  // Sends an ACPI shutdown signal to a running VM.
+  handleIpc('stop-vm', async (_event, name) => {
+    try {
+      execSync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error.message }
+    }
+  })
+
   // ── run-sanity-checks ─────────────────────────────────────
   // Runs the sanity check script with -Json flag and returns structured results.
   // The script writes a JSON array to stdout; we collect all lines then parse.

@@ -24,6 +24,8 @@ declare global {
   interface Window {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
+      startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
+      stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       runSanityChecks: () => Promise<{ ok: boolean; checks: CheckResult[]; error?: string }>
       installVirtualBox: () => Promise<{ ok: boolean }>
       onScriptLine: (callback: (line: ScriptLine) => void) => () => void
