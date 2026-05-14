@@ -45,6 +45,7 @@ app/
     pages/
       LandingPage.tsx            <- lists all registered VMs
       SetupPage.tsx              <- environment analysis and fix actions
+      DocsPage.tsx               <- renders markdown docs from docs/ inside the app
     components/
       NavBar.tsx                 <- My VMs / Setup navigation
       CheckCard.tsx              <- pass/warn/fail result card
@@ -62,7 +63,7 @@ app/
   - `read-doc` — reads a markdown file from `docs/` and returns its content
   - `list-vms` — returns all registered VMs with running/stopped state
   - `start-vm` — starts a stopped VM (GUI window); idempotent if already running
-  - `stop-vm` — sends ACPI shutdown signal to a running VM; idempotent if already stopped
+  - `stop-vm` — sends ACPI shutdown to a running VM; polls every 1 s for 60 s; falls back to hard poweroff if the VM does not respond; idempotent if already stopped
   - `run-sanity-checks` — runs `virtualbox-sanity-checks.ps1 -Json` and returns structured results
   - `install-virtualbox` — runs `virtualbox-install.ps1` and streams output
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
@@ -268,10 +269,9 @@ easy to read and learn, no separate CSS files to maintain.
 
 ### Layout
 
-- Fixed top navigation bar showing the 5 pipeline steps
-- Active step highlighted, completed steps marked with a checkmark
+- Fixed top navigation bar with 3 tabs (My VMs, Setup, Docs); active tab highlighted
 - Main content area scrollable
-- Streaming log panel fixed at the bottom of each page, auto-scrolls as lines arrive
+- Streaming log panel on the Setup page, auto-scrolls as lines arrive
 
 ---
 
@@ -400,10 +400,11 @@ function buildPowerShellArgs(scriptPath) {
 // Avoid implicit or hidden returns
 ```
 
-### Use JSDoc on every function
+### Use JSDoc on exported functions
 
-Documents what each function does, what it expects, and what it returns.
+Documents what each exported function does, what it expects, and what it returns.
 VS Code uses this to provide autocomplete and inline hints.
+Internal helpers that are only called within the same file do not need JSDoc.
 
 ```js
 /**
@@ -476,11 +477,11 @@ A simple wrapper makes the data flow visible in the terminal:
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (isDev) {
-      console.log(`[IPC] received: ${channel}`, args)
+      console.log(`[${ts()}][IPC] received: ${channel} ${JSON.stringify(args, null, 2)}`)
     }
     const result = await handler(event, ...args)
     if (isDev) {
-      console.log(`[IPC] replied: ${channel}`, result)
+      console.log(`[${ts()}][IPC] replied: ${channel} ${JSON.stringify(result, null, 2)}`)
     }
     return result
   })
