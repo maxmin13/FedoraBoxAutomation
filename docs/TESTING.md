@@ -238,21 +238,30 @@ Both the React components and the Electron main-process logic are tested with
 
 ```powershell
 cd app
-npm test                          # run all suites once and exit
-npm test -- --project react       # React only
-npm test -- --project electron    # Electron only
-npm test -- --watch               # re-run on file change (good during development)
+npm test                           # run all suites once and exit
+npm run test:watch                 # re-run on every file save (good during development)
+npm test -- --project react        # React component tests only
+npm test -- --project electron     # Electron pure-logic tests only
+```
+
+#### Filter to a specific file or test name
+
+```powershell
+# Run one file
+npm test -- src/__tests__/CheckCard.test.tsx
+
+# Run tests whose name matches a pattern (case-insensitive substring)
+npm test -- -t "shows OK badge"
+npm test -- -t "parseVmList"
 ```
 
 A passing run looks like:
 
 ```
-RUN  v2.x
-
- checkmark  src/__tests__/CheckCard.test.tsx        (15 tests)
- checkmark  src/__tests__/SetupPage.test.tsx        (15 tests)
- checkmark  electron/__tests__/ipc-handlers.test.js (13 tests)
- checkmark  electron/__tests__/script-runner.test.js (7 tests)
+ ✓ src/__tests__/CheckCard.test.tsx        (15 tests)
+ ✓ src/__tests__/SetupPage.test.tsx        (15 tests)
+ ✓ electron/__tests__/ipc-handlers.test.js (13 tests)
+ ✓ electron/__tests__/script-runner.test.js (7 tests)
 
 Test Files  4 passed (4)
      Tests  50 passed (50)
@@ -260,12 +269,29 @@ Test Files  4 passed (4)
 
 ### What is tested
 
-| Test file | What it covers |
-|-----------|---------------|
-| `src/__tests__/CheckCard.test.tsx` | Status badges (OK/!!/XX), label and detail text, "How to fix" toggle open/close and warn toggle full lifecycle |
-| `src/__tests__/SetupPage.test.tsx` | Idle state, button disable during run, check cards rendered, summary counts, error messages, live log stream, InstallVirtualBox action states |
-| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` (single/multiple/spaces/empty/malformed), `parseChecksOutput` (clean JSON, noise lines, single-item guard, error paths) |
-| `electron/__tests__/script-runner.test.js` | `splitChunk` (LF, CRLF, empty lines, whitespace, source tag, blank chunk, Buffer input) |
+| Test file | Describe groups | Count |
+|-----------|----------------|-------|
+| `src/__tests__/CheckCard.test.tsx` | `status badges` — OK/!!/XX badges; `content` — label and detail text; `"How to fix" toggle` — hidden for pass, shown for fail/warn, open/close lifecycle | 15 |
+| `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — cards rendered, summary counts, pass/fail message; `live log stream` — emitted lines appear; `error state` — script failure message; `InstallVirtualBox action` — button states and success message | 15 |
+| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item guard, error paths with stdout/stderr snippets | 13 |
+| `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input | 7 |
+
+### Debugging a failing test in VS Code
+
+1. Open the failing test file in VS Code.
+2. Set a breakpoint on the line you want to inspect.
+3. Open the **Run and Debug** panel (`Ctrl+Shift+D`).
+4. Select **Vitest** from the dropdown (if no Vitest config exists, the [Vitest VS Code extension](https://marketplace.visualstudio.com/items?itemName=vitest.explorer) adds one automatically).
+5. Press **F5** — Vitest will run in debug mode and pause at your breakpoint.
+
+Alternatively, run tests from the command line with Node's inspector flag and attach VS Code to the process:
+
+```powershell
+cd app
+node --inspect-brk ./node_modules/.bin/vitest run
+```
+
+Then in VS Code open the **Run and Debug** panel and choose **Attach to Node Process**.
 
 ### How the React tests work
 

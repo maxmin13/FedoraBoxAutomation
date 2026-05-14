@@ -145,16 +145,18 @@ FedoraBoxAutomation/
       security/                  <- OpenSSL (compiled from source)
 
   app/                  <- Electron + React desktop GUI
-    main.js                      <- Electron main process
-    preload.js                   <- contextBridge API
-    scripts.js                   <- central registry of .ps1 paths
-    script-runner.js             <- spawn, stream, kill PowerShell processes
-    ipc-handlers.js              <- IPC request handlers
+    electron/
+      main.js                    <- Electron main process
+      preload.js                 <- contextBridge API
+      scripts.js                 <- central registry of .ps1 paths
+      script-runner.js           <- spawn, stream, kill PowerShell processes
+      ipc-handlers.js            <- IPC request handlers
     src/
       App.tsx                    <- top-level router and nav bar
       pages/
-        LandingPage.tsx          <- lists all registered VMs
+        LandingPage.tsx          <- lists all registered VMs with start/stop controls
         SetupPage.tsx            <- environment analysis and fix actions
+        DocsPage.tsx             <- renders markdown docs from docs/ inside the app
       components/
         NavBar.tsx
         CheckCard.tsx            <- pass/warn/fail result card

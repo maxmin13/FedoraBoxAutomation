@@ -57,11 +57,17 @@ app/
 
 - **Main process** (`main.js`): Node.js running inside Electron. Uses `child_process.spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', script])` to run each `.ps1`. Streams `stdout`/`stderr` line-by-line over IPC to the renderer.
 - **Renderer**: React + TypeScript, bundled by Vite. Each pipeline step is a page component managed by React state.
-- **IPC channels**:
-  - `run-script` — trigger a script with optional args
-  - `script-line` — streaming output (line, source: stdout|stderr)
+- **IPC channels** (request/response via `ipcMain.handle` / `ipcRenderer.invoke`):
+  - `is-dev` — returns true when running via `npm run dev`
+  - `read-doc` — reads a markdown file from `docs/` and returns its content
+  - `list-vms` — returns all registered VMs with running/stopped state
+  - `start-vm` — starts a stopped VM (GUI window); idempotent if already running
+  - `stop-vm` — sends ACPI shutdown signal to a running VM; idempotent if already stopped
+  - `run-sanity-checks` — runs `virtualbox-sanity-checks.ps1 -Json` and returns structured results
+  - `install-virtualbox` — runs `virtualbox-install.ps1` and streams output
+- **Streaming channels** (push from main to renderer via `win.webContents.send`):
+  - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
   - `script-done` — exit code when the script finishes
-  - `read-doc` — reads a markdown file from docs/ and returns its content as a string
 
 ---
 
@@ -69,12 +75,11 @@ app/
 
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
-| 1 | **My VMs** | none | Lists all registered VMs with running/stopped state |
+| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop buttons per VM |
 | 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions |
 | 3 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
 
-A top navigation bar shows which step is active. Steps 2-5 are only enabled
-after step 1 passes (or the user explicitly overrides warnings).
+A top navigation bar shows which page is active.
 
 ---
 
@@ -286,39 +291,46 @@ Intercept the window close event and warn the user if a script is running.
 
 ### Close interception (main.js)
 
+`hasActiveScript()` (from `script-runner.js`) returns true if a child process is running.
+The close handler is `async` so it can `await` the dialog without a `.then()` chain.
+
 ```js
-let activeChild = null
-let scriptRunning = false
+win.on('close', async (event) => {
+  if (!hasActiveScript()) {
+    return
+  }
 
-win.on('close', (e) => {
-  if (!scriptRunning) return
+  event.preventDefault()
 
-  e.preventDefault()
-
-  dialog.showMessageBox(win, {
+  const response = await dialog.showMessageBox(win, {
     type: 'warning',
     buttons: ['Keep waiting', 'Force quit'],
     defaultId: 0,
     title: 'Script still running',
-    message: 'A script is still running. Force quitting may leave your VM in an incomplete state.'
-  }).then(({ response }) => {
-    if (response === 1) {
-      killActiveScript()
-      app.exit(0)
-    }
+    message: 'A script is still running.',
+    detail: 'Force quitting now may leave your VM in an incomplete state.',
   })
+
+  if (response.response === 1) {
+    killActiveScript()
+    app.exit(0)
+  }
 })
 ```
 
 ### Killing the process tree on Windows
 
 `child.kill()` only kills `powershell.exe` — child processes (VBoxManage, installers)
-keep running. Use `taskkill` to kill the full tree:
+keep running. Use `taskkill /T` to kill the full tree:
 
 ```js
 function killActiveScript() {
-  if (!activeChild) return
-  spawn('taskkill', ['/PID', activeChild.pid.toString(), '/T', '/F'])
+  if (!activeChild) {
+    return
+  }
+  const pid = activeChild.pid.toString()
+  spawn('taskkill', ['/PID', pid, '/T', '/F'])
+  activeChild = null
 }
 ```
 
@@ -495,12 +507,3 @@ if (isDev) {
 
 Each file does one thing and can be read top to bottom without jumping around.
 
----
-
-## Implementation Order
-
-1. **Refactor** `host/virtualbox-sanity-checks.ps1` — add `-Json` switch, extract each check into its own function returning a result object
-2. **Write** `host/virtualbox-sanity-checks.Tests.ps1` — Pester mocks and assertions for all thresholds above
-3. **Scaffold** `app/` — `package.json`, `main.js`, `preload.js`, Vite + React + TypeScript setup
-4. **Wire step 1** end-to-end: GUI calls the script with `-Json`, parses the array, renders cards
-5. **Add remaining steps** in pipeline order: install, create VM, provision, cleanup

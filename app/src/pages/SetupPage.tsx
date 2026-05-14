@@ -314,11 +314,12 @@ function InstallVirtualBoxAction() {
 
   async function handleInstall() {
     setInstalling(true)
-
-    const result = await window.electronAPI.installVirtualBox()
-
-    setInstalling(false)
-    setDone(result.ok)
+    try {
+      const result = await window.electronAPI.installVirtualBox()
+      setDone(result.ok)
+    } finally {
+      setInstalling(false)
+    }
   }
 
   if (done) {

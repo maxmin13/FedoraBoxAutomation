@@ -25,6 +25,13 @@ const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 // This makes it easy to see what data is flowing between processes.
 const isDev = process.env.NODE_ENV !== 'production'
 
+// Channels too trivial to log (polled on every page load)
+const SILENT_CHANNELS = new Set(['is-dev'])
+
+function ts() {
+  return new Date().toTimeString().slice(0, 8)
+}
+
 /**
  * Wraps ipcMain.handle with development logging.
  * Use this instead of ipcMain.handle() everywhere in this file.
@@ -34,14 +41,14 @@ const isDev = process.env.NODE_ENV !== 'production'
  */
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
-    if (isDev) {
-      console.log(`[IPC] received: ${channel}`, args)
+    if (isDev && !SILENT_CHANNELS.has(channel)) {
+      console.log(`[${ts()}][IPC] received: ${channel}`, args)
     }
 
     const result = await handler(event, ...args)
 
-    if (isDev) {
-      console.log(`[IPC] replied: ${channel}`, result)
+    if (isDev && !SILENT_CHANNELS.has(channel)) {
+      console.log(`[${ts()}][IPC] replied: ${channel}`, result)
     }
 
     return result
@@ -93,6 +100,11 @@ function registerIpcHandlers(win) {
         running: runningNames.includes(vm.name),
       }))
 
+      if (isDev) {
+        const summary = vms.map((v) => `"${v.name}" [${v.running ? 'running' : 'stopped'}]`).join(', ')
+        console.log(`[${ts()}][list-vms] ${summary || 'no VMs registered'}`)
+      }
+
       return { ok: true, vms }
     } catch (error) {
       // VBoxManage not found or not installed
@@ -110,15 +122,24 @@ function registerIpcHandlers(win) {
       )
 
       if (/^VMState="running"/m.test(info)) {
+        if (isDev) {
+          console.log(`[${ts()}][start-vm] "${name}" is already running — skipping`)
+        }
         return { ok: true }
       }
 
+      if (isDev) {
+        console.log(`[${ts()}][start-vm] Starting VM "${name}"...`)
+      }
       execSync(
         `VBoxManage startvm "${name}" --type gui`,
         { encoding: 'utf8' }
       )
       return { ok: true }
     } catch (error) {
+      if (isDev) {
+        console.error(`[${ts()}][start-vm] error:`, error.message)
+      }
       return { ok: false, error: error.message }
     }
   })
@@ -133,15 +154,24 @@ function registerIpcHandlers(win) {
       )
 
       if (!/^VMState="running"/m.test(info)) {
+        if (isDev) {
+          console.log(`[${ts()}][stop-vm] "${name}" is already stopped — skipping`)
+        }
         return { ok: true }
       }
 
+      if (isDev) {
+        console.log(`[${ts()}][stop-vm] Sending ACPI shutdown signal to "${name}"...`)
+      }
       execSync(
         `VBoxManage controlvm "${name}" acpipowerbutton`,
         { encoding: 'utf8' }
       )
       return { ok: true }
     } catch (error) {
+      if (isDev) {
+        console.error(`[${ts()}][stop-vm] error:`, error.message)
+      }
       return { ok: false, error: error.message }
     }
   })
@@ -167,10 +197,10 @@ function registerIpcHandlers(win) {
         win.webContents.send('script-done', exitCode)
 
         if (isDev) {
-          console.log('[run-sanity-checks] stdout lines:', stdoutLines.length)
-          console.log('[run-sanity-checks] stderr lines:', stderrLines.length)
+          console.log(`[${ts()}][run-sanity-checks] stdout lines:`, stdoutLines.length)
+          console.log(`[${ts()}][run-sanity-checks] stderr lines:`, stderrLines.length)
           if (stderrLines.length) {
-            console.log('[run-sanity-checks] stderr:\n' + stderrLines.join('\n'))
+            console.log(`[${ts()}][run-sanity-checks] stderr:\n` + stderrLines.join('\n'))
           }
         }
 
@@ -186,6 +216,9 @@ function registerIpcHandlers(win) {
         }
       }
 
+      if (isDev) {
+        console.log(`[${ts()}][run-sanity-checks] Launching sanity checks script...`)
+      }
       runScript(SCRIPTS.sanityChecks, ['-Json'], onLine, onDone)
     })
   })
@@ -203,6 +236,9 @@ function registerIpcHandlers(win) {
         resolve({ ok: exitCode === 0 })
       }
 
+      if (isDev) {
+        console.log(`[${ts()}][install-virtualbox] Launching VirtualBox installer script...`)
+      }
       runScript(SCRIPTS.installVirtualBox, [], onLine, onDone)
     })
   })

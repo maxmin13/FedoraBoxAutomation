@@ -30,95 +30,110 @@ See [docs/TESTING.md](TESTING.md) for install instructions, run commands, and gu
 
 ## Debugging in VS Code
 
-Debugging this app means debugging two separate processes at the same time.
-Each needs its own debugger.
+### Why this app is different to debug
 
-### The two processes
+This app has **two separate programs** running at the same time. You cannot debug them with a single debugger.
 
-| Process | What runs there | How to debug |
-|---------|----------------|--------------|
-| **Main process** | `app/electron/*.js` — Node.js code that spawns PowerShell, handles IPC, creates the window | VS Code Node.js debugger |
-| **Renderer process** | `app/src/**/*.tsx` — React code that draws the UI | VS Code Chrome debugger |
+| Program | What it is | Files | Where logs appear |
+|---------|-----------|-------|-------------------|
+| **Main process** | Node.js — the backend. Spawns PowerShell, talks to VirtualBox, handles button requests. | `app/electron/*.js` | VS Code **Debug Console** tab |
+| **Renderer process** | React — the frontend. Draws the window. | `app/src/**/*.tsx` | Electron **DevTools** (`Ctrl+Shift+I` inside the app) |
 
-They are completely separate. A `console.log` in `main.js` appears in the VS Code
-Debug Console, while a `console.log` in a React component appears in the Electron
-DevTools window inside the app.
+Think of them like a restaurant: the renderer is the dining room (what you see), the main process is the kitchen (where the work happens). They talk through a hatch called IPC. A `console.log` in the kitchen **only appears in the kitchen** — looking in the dining room won't show it.
 
 ---
 
-### How breakpoints work
+### What a breakpoint does
 
-Click the red dot to the left of a line number in VS Code. When the code hits
-that line, execution pauses and you can inspect every variable at that moment.
+A breakpoint is a marker you place on a line of code that tells the debugger: "pause here and let me look around."
 
-**Main process breakpoints** — set them in `main.js`, `ipc-handlers.js`, `script-runner.js`. Useful for:
-- Seeing what data arrives from the renderer via IPC
-- Checking why a PowerShell script is not launching
-- Inspecting the exit code when a script finishes
-
-**Renderer breakpoints** — set them in `.tsx` files. Useful for:
-- Checking what state a React component holds
-- Seeing what data came back from an IPC call
-- Tracing why a button click is not doing what you expect
+To set one: click in the **gutter** — the narrow strip to the left of the line numbers. A red dot appears. When the program reaches that line it freezes, and VS Code shows you the value of every variable at that exact moment. Click the red dot again to remove it.
 
 ---
 
-### The data flow — where to put breakpoints
+### Starting the debugger (step by step)
+
+You must do this in order. Vite must be running before Electron starts.
+
+**Step 1 — Start Vite**
+
+Open a terminal and run:
+
+```powershell
+cd app
+npx vite
+```
+
+Leave this terminal open. Wait until you see `Local: http://localhost:5173` before moving on.
+
+**Step 2 — Open the Run and Debug panel**
+
+Press `Ctrl+Shift+D` in VS Code. A panel appears on the left side of the window.
+
+**Step 3 — Select the debug configuration**
+
+At the top of that panel there is a dropdown. Click it and choose **Electron: Full Debug**.
+
+> **Important:** do not press F5 before doing this. If a `.js` or `.ps1` file is open in the editor, VS Code will launch the wrong debugger.
+
+**Step 4 — Press F5**
+
+Press **F5** or click the green ▶ button. The app window opens. Any breakpoints you have set will now pause execution when reached.
+
+**Step 5 — Stop when done**
+
+Press **Shift+F5** (or the red ■ stop button in the floating toolbar) to end the debug session. Then press `Ctrl+C` in the Vite terminal to stop Vite.
+
+---
+
+### Where to look for logs
+
+| You want to see... | Look here |
+|--------------------|-----------|
+| Logs from `ipc-handlers.js`, `main.js`, `script-runner.js` | VS Code **Debug Console** tab (bottom panel — switch from Terminal to Debug Console) |
+| Logs from React components (`.tsx` files) | Electron **DevTools** — press `Ctrl+Shift+I` inside the app window, then open the **Console** tab |
+| The `[IPC]` lines that trace data flowing between processes | VS Code **Debug Console** tab |
+
+---
+
+### Where to put breakpoints
 
 ```
 User clicks "Run Analysis"
         |
 React (SetupPage.tsx)
-  -> window.electronAPI.runSanityChecks()   <- breakpoint here to check the call
+  -> window.electronAPI.runSanityChecks()   <- (renderer) is the call being made?
         |
-preload.js
-  -> ipcRenderer.invoke('run-sanity-checks')
+preload.js                                  <- bridge; rarely needs a breakpoint
         |
-ipc-handlers.js                             <- breakpoint here to check it arrived
+ipc-handlers.js                             <- (main) did it arrive? what are the args?
   -> runScript(SCRIPTS.sanityChecks, ...)
         |
-script-runner.js                            <- breakpoint here to check spawn args
+script-runner.js                            <- (main) what command is being spawned?
   -> spawn('powershell', [...])
         |
 PowerShell script runs
         |
-ipc-handlers.js onDone()                    <- breakpoint here to check the result
+ipc-handlers.js onDone()                    <- (main) what exit code and parsed result?
   -> resolve({ ok, checks })
         |
-React (SetupPage.tsx)                       <- breakpoint here to check what React received
+React (SetupPage.tsx)                       <- (renderer) what did React receive?
   -> setChecks(result.checks)
 ```
 
-Place a breakpoint at any step in that chain to see exactly where something goes wrong.
+**Tip:** start at the bottom. Put a breakpoint on `setChecks(result.checks)` and check whether `result` looks right. If it does not, work backwards up the chain until you find where the data went wrong.
 
 ---
 
-### VS Code configurations
+### Which VS Code configuration to use
 
-Three debug configurations are available in `.vscode/launch.json`.
+Three configurations are available in `.vscode/launch.json`.
 
-| Configuration | What it debugs | Breakpoints in |
-|--------------|---------------|----------------|
-| **Electron: Main Process** | Node.js code | `app/electron/*.js` |
-| **Electron: Renderer (React)** | React code | `app/src/**/*.tsx` |
-| **Electron: Full Debug** | Both at once | All of the above |
-
-### Steps
-
-1. Start Vite in a terminal:
-   ```powershell
-   cd app
-   npx vite
-   ```
-2. Press `F5` in VS Code
-3. Select **Electron: Full Debug** from the dropdown
-4. Set breakpoints in any `.js` or `.tsx` file — they will be hit when the code runs
-
-### Tips
-
-- **Main process logs** appear in the VS Code Debug Console
-- **Renderer logs** (`console.log` in React) appear in the Electron DevTools — press `Ctrl+Shift+I` inside the app window to open them
-- The `[IPC]` log lines in the Debug Console show every message passing between the main process and React — useful for tracing data flow
+| Configuration | Use it when... |
+|--------------|----------------|
+| **Electron: Full Debug** | Default choice — debugs both processes at once |
+| **Electron: Main Process** | You only want breakpoints in `app/electron/*.js` |
+| **Electron: Renderer (React)** | You only want breakpoints in `app/src/**/*.tsx` |
 
 ---
 
@@ -143,6 +158,9 @@ app/
       CheckCard.test.tsx
       SetupPage.test.tsx
     pages/            <- one component per page
+      LandingPage.tsx <- lists all registered VMs with start/stop controls
+      SetupPage.tsx   <- environment analysis and fix actions
+      DocsPage.tsx    <- renders markdown docs from docs/ inside the app
     components/       <- reusable UI components
   package.json
   vite.config.ts
