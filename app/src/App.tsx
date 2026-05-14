@@ -1,7 +1,7 @@
 // Top-level component. Manages which page is currently shown
 // and renders the navigation bar at the top.
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import NavBar from './components/NavBar'
 import LandingPage from './pages/LandingPage'
 import SetupPage from './pages/SetupPage'
@@ -26,8 +26,8 @@ export default function App() {
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-y-auto p-6">
         {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
-        {currentPage === 'setup'   && <SetupPage />}
-        {currentPage === 'docs'    && <DocsPage />}
+        {currentPage === 'setup' && <SetupPage />}
+        {currentPage === 'docs' && <DocsPage />}
       </main>
     </div>
   )

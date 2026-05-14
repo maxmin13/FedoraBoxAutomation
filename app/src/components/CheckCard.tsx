@@ -3,7 +3,7 @@
 // An optional action (button or instructions) is shown when the check
 // is not passing and the user needs to do something to fix it.
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { CheckResult } from '../electron.d'
 
 interface CheckCardProps {
@@ -17,19 +17,19 @@ interface CheckCardProps {
 // Tailwind classes for each status — background, border, and text
 const STATUS_STYLES: Record<CheckResult['status'], { card: string; badge: string; icon: string }> = {
   pass: {
-    card:  'bg-green-900 border-green-700',
+    card: 'bg-green-900 border-green-700',
     badge: 'bg-green-700 text-green-100',
-    icon:  'OK',
+    icon: 'OK',
   },
   warn: {
-    card:  'bg-yellow-900 border-yellow-700',
+    card: 'bg-yellow-900 border-yellow-700',
     badge: 'bg-yellow-700 text-yellow-100',
-    icon:  '!!',
+    icon: '!!',
   },
   fail: {
-    card:  'bg-red-900 border-red-700',
+    card: 'bg-red-900 border-red-700',
     badge: 'bg-red-700 text-red-100',
-    icon:  'XX',
+    icon: 'XX',
   },
 }
 

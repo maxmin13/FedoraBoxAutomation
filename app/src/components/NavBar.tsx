@@ -1,7 +1,6 @@
 // Navigation bar shown at the top of every page.
 // Highlights the active page and lets the user switch between pages.
 
-import React from 'react'
 import type { Page } from '../App'
 
 interface NavBarProps {
@@ -12,8 +11,8 @@ interface NavBarProps {
 
 const NAV_ITEMS: { page: Page; label: string; devOnly?: boolean }[] = [
   { page: 'landing', label: 'My VMs' },
-  { page: 'setup',   label: 'Setup'  },
-  { page: 'docs',    label: 'Docs',   devOnly: true },
+  { page: 'setup', label: 'Setup' },
+  { page: 'docs', label: 'Docs', devOnly: true },
 ]
 
 export default function NavBar({ currentPage, onNavigate, isDev }: NavBarProps) {

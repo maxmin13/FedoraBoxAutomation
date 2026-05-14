@@ -6,7 +6,7 @@
 //   2. Sanity check script runs; results appear as CheckCards
 //   3. Failing/warning cards show inline fix actions
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import CheckCard from '../components/CheckCard'
 import type { CheckResult } from '../electron.d'
 
@@ -154,7 +154,9 @@ export default function SetupPage() {
  * @param {CheckResult} check
  */
 function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
-  if (check.status === 'pass') return undefined
+  if (check.status === 'pass') {
+    return undefined
+  }
 
   switch (check.id) {
 

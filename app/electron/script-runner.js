@@ -29,7 +29,9 @@ function hasActiveScript() {
  * taskkill /T kills the whole tree, /F forces it if it does not exit cleanly.
  */
 function killActiveScript() {
-  if (!activeChild) return
+  if (!activeChild) {
+    return
+  }
 
   const pid = activeChild.pid.toString()
   spawn('taskkill', ['/PID', pid, '/T', '/F'])
@@ -45,19 +47,19 @@ function killActiveScript() {
  * @returns {{ text: string, source: 'stdout'|'stderr' }[]}
  */
 function splitChunk(chunk, source) {
-  const text = chunk.toString()                              // Buffer or string → plain string
-  const lines = text.split(/\r?\n/)                         // split on LF or CRLF line endings
-  const nonEmpty = lines.filter((line) => line.trim() !== '') // drop blank/whitespace-only lines
-  return nonEmpty.map((text) => ({ text, source }))         // tag each line with its source
+  const text = chunk.toString()
+  const lines = text.split(/\r?\n/)
+  const nonEmpty = lines.filter((line) => line.trim() !== '')
+  return nonEmpty.map((line) => ({ text: line, source }))
 }
 
 /**
  * Runs a PowerShell script and streams its output line by line.
  *
  * @param {string}   scriptPath - Absolute path to the .ps1 file
- * @param {string[]} args       - Arguments to pass after the script path
- * @param {function} onLine     - Called with each output line as it arrives
- * @param {function} onDone     - Called with the exit code when the script finishes
+ * @param {string[]} args - Arguments to pass after the script path
+ * @param {function} onLine - Called with each output line as it arrives
+ * @param {function} onDone - Called with the exit code when the script finishes
  */
 function runScript(scriptPath, args, onLine, onDone) {
   // Build the full argument list for PowerShell.
@@ -79,12 +81,16 @@ function runScript(scriptPath, args, onLine, onDone) {
 
   // stdout: normal output lines from the script (Write-Host, Write-Output)
   activeChild.stdout.on('data', (chunk) => {
-    for (const line of splitChunk(chunk, 'stdout')) onLine(line)
+    for (const line of splitChunk(chunk, 'stdout')) {
+      onLine(line)
+    }
   })
 
   // stderr: error output — PowerShell writes some warnings here too
   activeChild.stderr.on('data', (chunk) => {
-    for (const line of splitChunk(chunk, 'stderr')) onLine(line)
+    for (const line of splitChunk(chunk, 'stderr')) {
+      onLine(line)
+    }
   })
 
   // 'close' fires when the process has exited and all streams are flushed.

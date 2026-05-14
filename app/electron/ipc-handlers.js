@@ -101,10 +101,22 @@ function registerIpcHandlers(win) {
   })
 
   // ── start-vm ──────────────────────────────────────────────
-  // Starts a stopped VM headlessly.
+  // Starts a stopped VM with a GUI window. Idempotent: returns ok if already running.
   handleIpc('start-vm', async (_event, name) => {
     try {
-      execSync(`VBoxManage startvm "${name}" --type headless`, { encoding: 'utf8' })
+      const info = execSync(
+        `VBoxManage showvminfo "${name}" --machinereadable`,
+        { encoding: 'utf8' }
+      )
+
+      if (/^VMState="running"/m.test(info)) {
+        return { ok: true }
+      }
+
+      execSync(
+        `VBoxManage startvm "${name}" --type gui`,
+        { encoding: 'utf8' }
+      )
       return { ok: true }
     } catch (error) {
       return { ok: false, error: error.message }
@@ -112,10 +124,22 @@ function registerIpcHandlers(win) {
   })
 
   // ── stop-vm ───────────────────────────────────────────────
-  // Sends an ACPI shutdown signal to a running VM.
+  // Sends an ACPI shutdown signal to a running VM. Idempotent: returns ok if already stopped.
   handleIpc('stop-vm', async (_event, name) => {
     try {
-      execSync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
+      const info = execSync(
+        `VBoxManage showvminfo "${name}" --machinereadable`,
+        { encoding: 'utf8' }
+      )
+
+      if (!/^VMState="running"/m.test(info)) {
+        return { ok: true }
+      }
+
+      execSync(
+        `VBoxManage controlvm "${name}" acpipowerbutton`,
+        { encoding: 'utf8' }
+      )
       return { ok: true }
     } catch (error) {
       return { ok: false, error: error.message }
@@ -145,14 +169,20 @@ function registerIpcHandlers(win) {
         if (isDev) {
           console.log('[run-sanity-checks] stdout lines:', stdoutLines.length)
           console.log('[run-sanity-checks] stderr lines:', stderrLines.length)
-          if (stderrLines.length) console.log('[run-sanity-checks] stderr:\n' + stderrLines.join('\n'))
+          if (stderrLines.length) {
+            console.log('[run-sanity-checks] stderr:\n' + stderrLines.join('\n'))
+          }
         }
 
         try {
           const checks = parseChecksOutput(stdoutLines, stderrLines)
           resolve({ ok: true, checks })
         } catch (parseError) {
-          resolve({ ok: false, error: 'Could not parse check results: ' + parseError.message, checks: [] })
+          resolve({
+            ok: false,
+            error: 'Could not parse check results: ' + parseError.message,
+            checks: [],
+          })
         }
       }
 

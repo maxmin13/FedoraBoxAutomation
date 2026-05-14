@@ -1,7 +1,7 @@
 // Landing page — shows all registered VirtualBox VMs.
 // Loads the VM list on mount and refreshes on demand.
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
 
@@ -103,7 +103,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
       {!loading && vms.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {vms.map((vm) => (
-            <VmCard key={vm.uuid} vm={vm} />
+            <VmCard key={vm.uuid} vm={vm} onRefresh={loadVms} />
           ))}
         </div>
       )}
@@ -126,19 +126,29 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
   async function handleStart() {
     setBusy(true)
     setError(null)
-    const result = await window.electronAPI.startVm(vm.name)
-    if (!result.ok) setError(result.error ?? 'Failed to start VM')
-    setBusy(false)
-    onRefresh()
+    try {
+      const result = await window.electronAPI.startVm(vm.name)
+      if (!result.ok) {
+        setError(result.error ?? 'Failed to start VM')
+      }
+    } finally {
+      setBusy(false)
+      onRefresh()
+    }
   }
 
   async function handleStop() {
     setBusy(true)
     setError(null)
-    const result = await window.electronAPI.stopVm(vm.name)
-    if (!result.ok) setError(result.error ?? 'Failed to stop VM')
-    setBusy(false)
-    onRefresh()
+    try {
+      const result = await window.electronAPI.stopVm(vm.name)
+      if (!result.ok) {
+        setError(result.error ?? 'Failed to stop VM')
+      }
+    } finally {
+      setBusy(false)
+      onRefresh()
+    }
   }
 
   return (

@@ -40,7 +40,6 @@ function createWindow() {
   if (isDev) {
     // In development, Vite serves the renderer on localhost
     win.loadURL('http://localhost:5173')
-
   } else {
     // In production, load the built HTML file from the dist folder
     // __dirname is electron-gui/electron/ so we go up one level to find dist/

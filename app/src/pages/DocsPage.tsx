@@ -2,7 +2,7 @@
 // The user picks a document from the sidebar; the content is
 // read from disk via IPC and rendered with react-markdown.
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
