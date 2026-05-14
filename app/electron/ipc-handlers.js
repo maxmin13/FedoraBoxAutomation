@@ -42,13 +42,13 @@ function ts() {
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (isDev && !SILENT_CHANNELS.has(channel)) {
-      console.log(`[${ts()}][IPC] received: ${channel}`, args)
+      console.log(`[${ts()}][IPC] received: ${channel} ${JSON.stringify(args, null, 2)}`)
     }
 
     const result = await handler(event, ...args)
 
     if (isDev && !SILENT_CHANNELS.has(channel)) {
-      console.log(`[${ts()}][IPC] replied: ${channel}`, result)
+      console.log(`[${ts()}][IPC] replied: ${channel} ${JSON.stringify(result, null, 2)}`)
     }
 
     return result
@@ -145,15 +145,23 @@ function registerIpcHandlers(win) {
   })
 
   // ── stop-vm ───────────────────────────────────────────────
-  // Sends an ACPI shutdown signal to a running VM. Idempotent: returns ok if already stopped.
+  // Tries graceful ACPI shutdown first; falls back to hard poweroff if VM is still
+  // running after 60 s.
   handleIpc('stop-vm', async (_event, name) => {
-    try {
-      const info = execSync(
-        `VBoxManage showvminfo "${name}" --machinereadable`,
-        { encoding: 'utf8' }
-      )
+    function vmRunning() {
+      try {
+        const info = execSync(
+          `VBoxManage showvminfo "${name}" --machinereadable`,
+          { encoding: 'utf8' }
+        )
+        return /^VMState="running"/m.test(info)
+      } catch {
+        return false
+      }
+    }
 
-      if (!/^VMState="running"/m.test(info)) {
+    try {
+      if (!vmRunning()) {
         if (isDev) {
           console.log(`[${ts()}][stop-vm] "${name}" is already stopped — skipping`)
         }
@@ -163,10 +171,22 @@ function registerIpcHandlers(win) {
       if (isDev) {
         console.log(`[${ts()}][stop-vm] Sending ACPI shutdown signal to "${name}"...`)
       }
-      execSync(
-        `VBoxManage controlvm "${name}" acpipowerbutton`,
-        { encoding: 'utf8' }
-      )
+      execSync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
+
+      const deadline = Date.now() + 60_000
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 1000))
+        if (!vmRunning()) {
+          if (isDev) console.log(`[${ts()}][stop-vm] "${name}" stopped (ACPI)`)
+          return { ok: true }
+        }
+      }
+
+      if (isDev) {
+        console.log(`[${ts()}][stop-vm] ACPI timeout — forcing poweroff for "${name}"...`)
+      }
+      execSync(`VBoxManage controlvm "${name}" poweroff`, { encoding: 'utf8' })
+      if (isDev) console.log(`[${ts()}][stop-vm] "${name}" stopped (forced)`)
       return { ok: true }
     } catch (error) {
       if (isDev) {
