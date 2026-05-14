@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sends an ACPI shutdown signal to a running VM
   stopVm: (name) => ipcRenderer.invoke('stop-vm', name),
 
+  // ── Create VM ─────────────────────────────────────────────
+  // Runs create-vm.ps1 with the supplied parameters; streams output to the renderer
+  createVm: (params) => ipcRenderer.invoke('create-vm', params),
+
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results
   runSanityChecks: () => ipcRenderer.invoke('run-sanity-checks'),

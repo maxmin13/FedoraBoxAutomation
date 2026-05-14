@@ -13,13 +13,17 @@ const SAMPLE_CHECKS: CheckResult[] = [
 // Individual tests can override specific methods via vi.fn().mockResolvedValue(...)
 beforeEach(() => {
   window.electronAPI = {
-    runSanityChecks:  vi.fn().mockResolvedValue({ ok: true, checks: SAMPLE_CHECKS }),
+    runSanityChecks:   vi.fn().mockResolvedValue({ ok: true, checks: SAMPLE_CHECKS }),
     installVirtualBox: vi.fn().mockResolvedValue({ ok: true }),
-    listVms:          vi.fn().mockResolvedValue({ ok: true, vms: [] }),
-    readDoc:          vi.fn().mockResolvedValue({ ok: true, content: '' }),
-    onScriptLine:     vi.fn().mockReturnValue(() => {}),
-    onScriptDone:     vi.fn().mockReturnValue(() => {}),
-  }
+    listVms:           vi.fn().mockResolvedValue({ ok: true, vms: [] }),
+    createVm:          vi.fn().mockResolvedValue({ ok: true }),
+    startVm:           vi.fn().mockResolvedValue({ ok: true }),
+    stopVm:            vi.fn().mockResolvedValue({ ok: true }),
+    readDoc:           vi.fn().mockResolvedValue({ ok: true, content: '' }),
+    onScriptLine:      vi.fn().mockReturnValue(() => {}),
+    onScriptDone:      vi.fn().mockReturnValue(() => {}),
+    isDev:             vi.fn().mockResolvedValue(false),
+  } as unknown as typeof window.electronAPI
 })
 
 describe('SetupPage', () => {
@@ -82,6 +86,21 @@ describe('SetupPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('1 failed')).toBeInTheDocument()
+      })
+    })
+
+    it('shows the correct warn count in the summary bar', async () => {
+      const withWarn = [
+        ...SAMPLE_CHECKS,
+        { id: 'cpu', label: 'CPU Virtualization', status: 'warn' as const, detail: 'Enabled (check BIOS)' },
+      ]
+      window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: true, checks: withWarn })
+
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('1 warnings')).toBeInTheDocument()
       })
     })
 
@@ -149,10 +168,12 @@ describe('SetupPage', () => {
       render(<SetupPage />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
-      // Both the section heading and the detail <p> render "Analysis failed"
-      // when error is undefined — two matches confirms the fallback propagated correctly
       await waitFor(() => {
-        expect(screen.getAllByText('Analysis failed')).toHaveLength(2)
+        // The title <p> (font-medium) and detail <p> both render "Analysis failed"
+        // when error is undefined — two distinct elements confirms the fallback reached both render sites
+        const matches = screen.getAllByText('Analysis failed')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].className).not.toBe(matches[1].className)
       })
     })
   })

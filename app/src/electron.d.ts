@@ -2,6 +2,21 @@
 // This file tells TypeScript what window.electronAPI looks like
 // so you get autocomplete and type checking in all React components.
 
+export interface CreateVmParams {
+  vmName: string
+  vmFolder: string
+  isoPath: string
+  ramMB: number
+  cpus: number
+  diskMB: number
+  diskType: string
+  vramMB: number
+  nicType: string
+  attachGuestAdditions: boolean
+  startVm: boolean
+  forceRecreate: boolean
+}
+
 export interface CheckResult {
   id: string
   label: string
@@ -24,6 +39,7 @@ declare global {
   interface Window {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
+      createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       runSanityChecks: () => Promise<{ ok: boolean; checks: CheckResult[]; error?: string }>

@@ -67,19 +67,29 @@ describe('parseChecksOutput', () => {
     expect(parseChecksOutput(lines)).toEqual(sampleChecks)
   })
 
-  it('wraps a single object in an array (ConvertTo-Json single-item guard)', () => {
-    // ConvertTo-Json without @() outputs an object, not an array.
-    // The guard at the end of parseChecksOutput handles this.
+  it('returns a single-element array when the script outputs a one-item JSON array', () => {
     const single = sampleChecks[0]
-    // Embed the object inside an array literal so the bracket-finder succeeds,
-    // then replace the outer array with just the object to exercise the guard.
     const lines = [`[${JSON.stringify(single)}]`]
     const result = parseChecksOutput(lines)
-    // A single-element JSON array still parses as an array — Array.isArray is true.
-    // The guard matters when the script produces a bare object; here we confirm
-    // the function returns an array either way.
     expect(Array.isArray(result)).toBe(true)
     expect(result).toEqual([single])
+  })
+
+  it('wraps a bare object in an array (Array.isArray guard)', () => {
+    // Defensive guard: if somehow JSON.parse returns an object instead of an
+    // array, the function wraps it so callers always receive an array.
+    // Simulate by injecting a one-element array as the bracket content so the
+    // bracket-finder passes, but patch JSON.parse to return a plain object.
+    const single = sampleChecks[0]
+    const original = JSON.parse
+    JSON.parse = () => single
+    try {
+      const result = parseChecksOutput([`[placeholder]`])
+      expect(Array.isArray(result)).toBe(true)
+      expect(result).toEqual([single])
+    } finally {
+      JSON.parse = original
+    }
   })
 
   it('throws when stdout contains no JSON array', () => {
@@ -93,7 +103,8 @@ describe('parseChecksOutput', () => {
   })
 
   it('throws when the JSON between the brackets is malformed', () => {
-    expect(() => parseChecksOutput(['[not valid json}'])).toThrow()
+    // '[' and ']' are both present so the bracket-finder passes; JSON.parse fails.
+    expect(() => parseChecksOutput(['[not valid json]'])).toThrow()
   })
 
   it('includes stderr lines in the error message when available', () => {

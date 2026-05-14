@@ -243,6 +243,45 @@ function registerIpcHandlers(win) {
     })
   })
 
+  // ── create-vm ─────────────────────────────────────────────
+  // Creates a new Fedora VM from the supplied parameters.
+  // Streams output to the renderer; returns ok when the script exits 0.
+  handleIpc('create-vm', (_event, params) => {
+    return new Promise((resolve) => {
+      function onLine(line) {
+        win.webContents.send('script-line', line)
+      }
+
+      function onDone(exitCode) {
+        win.webContents.send('script-done', exitCode)
+        resolve({ ok: exitCode === 0 })
+      }
+
+      const psArgs = [
+        '-vmName', params.vmName,
+        '-isoPath', params.isoPath,
+        '-ramMB', String(params.ramMB),
+        '-cpus', String(params.cpus),
+        '-diskMB', String(params.diskMB),
+        '-diskType', params.diskType,
+        '-vramMB', String(params.vramMB),
+        '-nicType', params.nicType,
+        '-attachGuestAdditions', params.attachGuestAdditions ? 'yes' : 'no',
+        '-startVm', params.startVm ? 'yes' : 'no',
+        '-forceRecreate', params.forceRecreate ? 'yes' : 'no',
+        '-NonInteractive',
+      ]
+      if (params.vmFolder) {
+        psArgs.push('-vmFolder', params.vmFolder)
+      }
+
+      if (isDev) {
+        console.log(`[${ts()}][create-vm] vmName="${params.vmName}"`)
+      }
+      runScript(SCRIPTS.createVm, psArgs, onLine, onDone)
+    })
+  })
+
   // ── install-virtualbox ────────────────────────────────────
   // Runs the VirtualBox installer script and streams output to the renderer.
   handleIpc('install-virtualbox', () => {

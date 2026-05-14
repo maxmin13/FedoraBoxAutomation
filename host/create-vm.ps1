@@ -38,6 +38,22 @@
     powershell -ExecutionPolicy Bypass -File ".\create-vm.ps1"
 #>
 
+param(
+    [string]$vmName               = '',
+    [string]$vmFolder             = '',
+    [string]$isoPath              = '',
+    [string]$ramMB                = '',
+    [string]$cpus                 = '',
+    [string]$diskMB               = '',
+    [string]$diskType             = '',
+    [string]$vramMB               = '',
+    [string]$nicType              = '',
+    [string]$attachGuestAdditions = '',
+    [string]$startVm              = '',
+    [string]$forceRecreate        = '',
+    [switch]$NonInteractive
+)
+
 $ErrorActionPreference = 'Stop'
 
 function Write-Header {
@@ -165,7 +181,9 @@ if (-not $defaultVmFolder) {
 Write-Host "  Default VM folder: $defaultVmFolder" -ForegroundColor DarkGray
 
 Write-Host ""
-$vmName = (Read-Host "VM name").Trim()
+if ([string]::IsNullOrWhiteSpace($vmName)) {
+    $vmName = (Read-Host "VM name").Trim()
+}
 if ([string]::IsNullOrWhiteSpace($vmName)) {
     Write-Host "  ERROR: VM name cannot be empty." -ForegroundColor Red
     exit 1
@@ -174,8 +192,13 @@ $existingVms = & $script:vbox list vms 2>$null | ForEach-Object { if ($_ -match 
 if ($existingVms -contains $vmName) {
     Write-Host "  WARNING: A VM named '$vmName' already exists." -ForegroundColor Yellow
     Write-Host "  If you want to provision it, run provision-vm.ps1 instead." -ForegroundColor Cyan
-    $confirm = Read-Host "  Unregister and recreate it from scratch? [Y/n]"
-    if ($confirm -match '^[Nn]$') {
+    if ([string]::IsNullOrWhiteSpace($forceRecreate)) {
+        $confirm = Read-Host "  Unregister and recreate it from scratch? [Y/n]"
+        if ($confirm -match '^[Nn]$') {
+            Write-Host "  Aborted." -ForegroundColor Red
+            exit 1
+        }
+    } elseif ($forceRecreate -notin 'y','yes','true','1') {
         Write-Host "  Aborted." -ForegroundColor Red
         exit 1
     }
@@ -193,8 +216,14 @@ if ($existingVms -contains $vmName) {
 }
 
 Write-Host ""
-$vmFolder = Read-Host "VM folder [$defaultVmFolder]"
-if ([string]::IsNullOrWhiteSpace($vmFolder)) { $vmFolder = $defaultVmFolder }
+if ([string]::IsNullOrWhiteSpace($vmFolder)) {
+    if ($NonInteractive) {
+        $vmFolder = $defaultVmFolder
+    } else {
+        $vmFolder = Read-Host "VM folder [$defaultVmFolder]"
+        if ([string]::IsNullOrWhiteSpace($vmFolder)) { $vmFolder = $defaultVmFolder }
+    }
+}
 
 $downloadsDir = "$env:USERPROFILE\Downloads"
 $suggestedIso = $null
@@ -206,11 +235,13 @@ if (Test-Path $downloadsDir) {
 }
 
 Write-Host ""
-if ($suggestedIso) {
-    $isoPath = Read-Host "Path to Fedora ISO file [$suggestedIso]"
-    if ([string]::IsNullOrWhiteSpace($isoPath)) { $isoPath = $suggestedIso }
-} else {
-    $isoPath = Read-Host "Path to Fedora ISO file"
+if ([string]::IsNullOrWhiteSpace($isoPath)) {
+    if ($suggestedIso) {
+        $isoPath = Read-Host "Path to Fedora ISO file [$suggestedIso]"
+        if ([string]::IsNullOrWhiteSpace($isoPath)) { $isoPath = $suggestedIso }
+    } else {
+        $isoPath = Read-Host "Path to Fedora ISO file"
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($isoPath) -or -not (Test-Path $isoPath)) {
@@ -219,28 +250,52 @@ if ([string]::IsNullOrWhiteSpace($isoPath) -or -not (Test-Path $isoPath)) {
 }
 
 Write-Host ""
-$ramMB = Read-Host "RAM in MB [4096]"
-if ([string]::IsNullOrWhiteSpace($ramMB)) { $ramMB = 4096 } else { $ramMB = [int]$ramMB }
+if ([string]::IsNullOrWhiteSpace($ramMB)) {
+    $ramMB = Read-Host "RAM in MB [4096]"
+    if ([string]::IsNullOrWhiteSpace($ramMB)) { $ramMB = 4096 } else { $ramMB = [int]$ramMB }
+} else {
+    $ramMB = [int]$ramMB
+}
 
 Write-Host ""
-$cpus = Read-Host "Number of CPUs [4]"
-if ([string]::IsNullOrWhiteSpace($cpus)) { $cpus = 4 } else { $cpus = [int]$cpus }
+if ([string]::IsNullOrWhiteSpace($cpus)) {
+    $cpus = Read-Host "Number of CPUs [4]"
+    if ([string]::IsNullOrWhiteSpace($cpus)) { $cpus = 4 } else { $cpus = [int]$cpus }
+} else {
+    $cpus = [int]$cpus
+}
 
 Write-Host ""
-$diskMB = Read-Host "Disk size in MB [40000]"
-if ([string]::IsNullOrWhiteSpace($diskMB)) { $diskMB = 40000 } else { $diskMB = [int]$diskMB }
+if ([string]::IsNullOrWhiteSpace($diskMB)) {
+    $diskMB = Read-Host "Disk size in MB [40000]"
+    if ([string]::IsNullOrWhiteSpace($diskMB)) { $diskMB = 40000 } else { $diskMB = [int]$diskMB }
+} else {
+    $diskMB = [int]$diskMB
+}
 
 Write-Host ""
-$diskType = Read-Host "Disk type [VDI*|VMDK|VHD]"
-if ([string]::IsNullOrWhiteSpace($diskType)) { $diskType = "VDI" } else { $diskType = $diskType.ToUpper() }
+if ([string]::IsNullOrWhiteSpace($diskType)) {
+    $diskType = Read-Host "Disk type [VDI*|VMDK|VHD]"
+    if ([string]::IsNullOrWhiteSpace($diskType)) { $diskType = "VDI" } else { $diskType = $diskType.ToUpper() }
+} else {
+    $diskType = $diskType.ToUpper()
+}
 
 Write-Host ""
-$vramMB = Read-Host "Video RAM in MB [128]"
-if ([string]::IsNullOrWhiteSpace($vramMB)) { $vramMB = 128 } else { $vramMB = [int]$vramMB }
+if ([string]::IsNullOrWhiteSpace($vramMB)) {
+    $vramMB = Read-Host "Video RAM in MB [128]"
+    if ([string]::IsNullOrWhiteSpace($vramMB)) { $vramMB = 128 } else { $vramMB = [int]$vramMB }
+} else {
+    $vramMB = [int]$vramMB
+}
 
 Write-Host ""
-$nicType = Read-Host "Network adapter type [NAT*|bridged|host-only|none]"
-if ([string]::IsNullOrWhiteSpace($nicType)) { $nicType = "nat" } else { $nicType = $nicType.ToLower() }
+if ([string]::IsNullOrWhiteSpace($nicType)) {
+    $nicType = Read-Host "Network adapter type [NAT*|bridged|host-only|none]"
+    if ([string]::IsNullOrWhiteSpace($nicType)) { $nicType = "nat" } else { $nicType = $nicType.ToLower() }
+} else {
+    $nicType = $nicType.ToLower()
+}
 
 Write-Host ""
 Write-Host "Creating VM '$vmName'..." -ForegroundColor Green
@@ -280,7 +335,11 @@ try {
     Write-Host "VM '$vmName' created successfully!" -ForegroundColor Green
     Write-Host "You can now start the VM to begin Fedora installation." -ForegroundColor Cyan
 
-    $attachGA = Read-YesNo "Do you want to attach the VirtualBox Guest Additions ISO now so it is ready for later installation?"
+    if ([string]::IsNullOrWhiteSpace($attachGuestAdditions)) {
+        $attachGA = Read-YesNo "Do you want to attach the VirtualBox Guest Additions ISO now so it is ready for later installation?"
+    } else {
+        $attachGA = $attachGuestAdditions -in 'y','yes','true','1'
+    }
     if ($attachGA) {
         $gaIso = Get-VBoxGuestAdditionsIso
         if ($gaIso) {
@@ -292,7 +351,11 @@ try {
         Write-Host "  You can attach Guest Additions later by rerunning create-vm.ps1 or using VBoxManage." -ForegroundColor Cyan
     }
 
-    $startNow = Read-YesNo "Start the VM now?"
+    if ([string]::IsNullOrWhiteSpace($startVm)) {
+        $startNow = Read-YesNo "Start the VM now?"
+    } else {
+        $startNow = $startVm -in 'y','yes','true','1'
+    }
     if ($startNow) {
         Invoke-VBox "startvm", $vmName, "--type", "gui"
         Write-Host "VM started." -ForegroundColor Green
