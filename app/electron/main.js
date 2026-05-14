@@ -9,9 +9,9 @@ const path = require('path')
 const { registerIpcHandlers } = require('./ipc-handlers')
 const { killActiveScript, hasActiveScript } = require('./script-runner')
 
-// app.isPackaged is false when running via `npm run dev`.
-// We use this flag to switch between dev and prod behaviour.
-const isDev = !app.isPackaged
+// isDev is true when running via `npm run dev` (Vite dev server).
+// We check NODE_ENV first so `npm start` (build + electron .) works too.
+const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
 
 /**
  * Creates the main browser window and loads the renderer.

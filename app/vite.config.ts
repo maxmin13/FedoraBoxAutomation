@@ -13,6 +13,9 @@ export default defineConfig({
     emptyOutDir: true,
   },
 
+  // Relative asset paths so Electron can load dist/index.html via file://
+  base: './',
+
   server: {
     // Vite dev server port — main.js points Electron here during development
     port: 5173,

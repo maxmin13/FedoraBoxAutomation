@@ -45,9 +45,10 @@ app/
     pages/
       LandingPage.tsx            <- lists all registered VMs
       SetupPage.tsx              <- environment analysis and fix actions
+      CreateVmPage.tsx           <- form to configure and create a new Fedora VM
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
     components/
-      NavBar.tsx                 <- My VMs / Setup navigation
+      NavBar.tsx                 <- My VMs / Setup / Create VM / Docs navigation
       CheckCard.tsx              <- pass/warn/fail result card
   package.json                   <- main: "electron/main.js"
   vite.config.ts                 <- Vite bundles the React renderer
@@ -66,6 +67,7 @@ app/
   - `stop-vm` — sends ACPI shutdown to a running VM; polls every 1 s for 60 s; falls back to hard poweroff if the VM does not respond; idempotent if already stopped
   - `run-sanity-checks` — runs `virtualbox-sanity-checks.ps1 -Json` and returns structured results
   - `install-virtualbox` — runs `virtualbox-install.ps1` and streams output
+  - `create-vm` — runs `create-vm.ps1` with all VM parameters; streams output; returns `{ ok: boolean }`
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
   - `script-done` — exit code when the script finishes
@@ -78,7 +80,8 @@ app/
 |---|--------|--------|------------|
 | 1 | **My VMs** | none | Lists all registered VMs; Start/Stop buttons per VM |
 | 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions |
-| 3 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
+| 3 | **Create VM** | `host/create-vm.ps1` | VM name, ISO path, RAM/CPU/disk/network options; streams live output; shows "What to do next" on success |
+| 4 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
 
 A top navigation bar shows which page is active.
 
@@ -231,6 +234,7 @@ npm test
 |-----------|-----------|----------------------|
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, cards rendered, summary counts, "Ready"/"Fix" banners, error message |
+| `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, name conflict warning + "Recreate VM" label, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
 
 ---
 
@@ -494,9 +498,9 @@ Things that help during development (logs, DevTools) should never appear
 in a packaged release. One flag at the top of main.js controls everything:
 
 ```js
-// app.isPackaged is false when running via `npm run dev`, true after packaging.
+// isDev is true in `npm run dev` and false in `npm start` (NODE_ENV=production).
 // All development-only behaviour is gated behind this flag.
-const isDev = !app.isPackaged
+const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
 
 if (isDev) {
   // Opens the browser DevTools panel so you can inspect the React renderer

@@ -258,13 +258,14 @@ npm test -- -t "parseVmList"
 A passing run looks like:
 
 ```
- ✓ src/__tests__/CheckCard.test.tsx        (15 tests)
- ✓ src/__tests__/SetupPage.test.tsx        (15 tests)
- ✓ electron/__tests__/ipc-handlers.test.js (13 tests)
- ✓ electron/__tests__/script-runner.test.js (7 tests)
+ ✓ src/__tests__/CheckCard.test.tsx         (15 tests)
+ ✓ src/__tests__/SetupPage.test.tsx         (12 tests)
+ ✓ src/__tests__/CreateVmPage.test.tsx      (18 tests)
+ ✓ electron/__tests__/ipc-handlers.test.js  (14 tests)
+ ✓ electron/__tests__/script-runner.test.js  (7 tests)
 
-Test Files  4 passed (4)
-     Tests  50 passed (50)
+Test Files  5 passed (5)
+     Tests  70 passed (70)
 ```
 
 ### What is tested
@@ -272,8 +273,9 @@ Test Files  4 passed (4)
 | Test file | Describe groups | Count |
 |-----------|----------------|-------|
 | `src/__tests__/CheckCard.test.tsx` | `status badges` — OK/!!/XX badges; `content` — label and detail text; `"How to fix" toggle` — hidden for pass, shown for fail/warn, open/close lifecycle | 15 |
-| `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — cards rendered, summary counts, pass/fail message; `live log stream` — emitted lines appear; `error state` — script failure message; `InstallVirtualBox action` — button states and success message | 15 |
-| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item guard, error paths with stdout/stderr snippets | 13 |
+| `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — cards rendered, summary counts (pass/warn/fail), pass/fail message; `live log stream` — emitted lines appear; `error state` — script failure message; `InstallVirtualBox action` — button states and success message | 12 |
+| `src/__tests__/CreateVmPage.test.tsx` | `submit button` — disabled when fields empty/partial, enabled when both filled; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating..." + disabled, correct args passed, live log lines; `success state` — green banner, "What to do next"; `failure state` — red banner, log toggle; `log toggle` — hidden by default, Show/Hide lifecycle | 18 |
+| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item array, bare-object Array.isArray guard, error paths with stdout/stderr snippets | 14 |
 | `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input | 7 |
 
 ### Debugging a failing test in VS Code

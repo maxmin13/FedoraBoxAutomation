@@ -20,9 +20,11 @@ app/
       setup.ts        <- loads @testing-library/jest-dom matchers
       CheckCard.test.tsx
       SetupPage.test.tsx
+      CreateVmPage.test.tsx
     pages/            <- one component per page
       LandingPage.tsx <- lists all registered VMs with start/stop controls
       SetupPage.tsx   <- environment analysis and fix actions
+      CreateVmPage.tsx <- form to configure and create a new Fedora VM
       DocsPage.tsx    <- renders markdown docs from docs/ inside the app
     components/       <- reusable UI components
   package.json
@@ -46,7 +48,8 @@ vm/
 ```powershell
 cd app
 npm install   # downloads all dependencies into app/node_modules/
-npm run dev   # starts Vite + Electron
+npm run dev   # starts Vite + Electron (development mode)
+npm start     # builds React then launches Electron (production mode)
 ```
 
 A desktop window opens. No browser needed — Electron has Chromium built in.
