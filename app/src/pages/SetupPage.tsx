@@ -105,7 +105,7 @@ export default function SetupPage() {
       {pageState === 'done' && checks.length > 0 && (
         <div className="flex items-center gap-4 mb-5 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3">
           <span className="text-green-400 text-sm font-medium">{passCount} passed</span>
-          <span className="text-yellow-400 text-sm font-medium">{warnCount} warnings</span>
+          <span className="text-yellow-400 text-sm font-medium">{warnCount} {warnCount === 1 ? 'warning' : 'warnings'}</span>
           <span className="text-red-400 text-sm font-medium">{failCount} failed</span>
 
           <div className="ml-auto">

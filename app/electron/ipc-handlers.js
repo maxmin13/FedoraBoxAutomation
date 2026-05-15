@@ -11,7 +11,7 @@
 //  events to the renderer as the script produces lines.
 // ============================================================
 
-const { ipcMain } = require('electron')
+const { ipcMain, app } = require('electron')
 const { execSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
@@ -63,6 +63,9 @@ function registerIpcHandlers(win) {
 
   // ── is-dev ────────────────────────────────────────────────
   handleIpc('is-dev', async () => isDev)
+
+  // ── get-downloads-path ────────────────────────────────────
+  handleIpc('get-downloads-path', async () => ({ path: app.getPath('downloads') }))
 
   // ── read-doc ──────────────────────────────────────────────
   // Reads a markdown file from the docs/ folder and returns its contents.

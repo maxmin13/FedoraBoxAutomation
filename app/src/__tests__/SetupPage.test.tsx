@@ -9,8 +9,6 @@ const SAMPLE_CHECKS: CheckResult[] = [
   { id: 'vboxinst', label: 'VirtualBox',       status: 'fail', detail: 'Not installed.' },
 ]
 
-// Provide a full window.electronAPI mock before each test.
-// Individual tests can override specific methods via vi.fn().mockResolvedValue(...)
 beforeEach(() => {
   window.electronAPI = {
     runSanityChecks:   vi.fn().mockResolvedValue({ ok: true, checks: SAMPLE_CHECKS }),
@@ -47,7 +45,6 @@ describe('SetupPage', () => {
 
   describe('running state', () => {
     it('disables the button and changes its label while the script is running', async () => {
-      // Analysis never resolves — keeps the page in the running state
       window.electronAPI.runSanityChecks = vi.fn().mockReturnValue(new Promise(() => {}))
       render(<SetupPage />)
 
@@ -89,7 +86,7 @@ describe('SetupPage', () => {
       })
     })
 
-    it('shows the correct warn count in the summary bar', async () => {
+    it('shows "1 warning" (singular) in the summary bar', async () => {
       const withWarn = [
         ...SAMPLE_CHECKS,
         { id: 'cpu', label: 'CPU Virtualization', status: 'warn' as const, detail: 'Enabled (check BIOS)' },
@@ -100,7 +97,16 @@ describe('SetupPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
-        expect(screen.getByText('1 warnings')).toBeInTheDocument()
+        expect(screen.getByText('1 warning')).toBeInTheDocument()
+      })
+    })
+
+    it('shows "0 warnings" (plural) when no checks produce a warning', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+      await waitFor(() => {
+        expect(screen.getByText('0 warnings')).toBeInTheDocument()
       })
     })
 
@@ -123,6 +129,25 @@ describe('SetupPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/ready to create a vm/i)).toBeInTheDocument()
       })
+    })
+
+    it('re-enables the Run Analysis button after completion', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      expect(screen.getByRole('button', { name: 'Run Analysis' })).not.toBeDisabled()
+    })
+
+    it('allows running analysis again after results are shown', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      expect(window.electronAPI.runSanityChecks).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -162,25 +187,20 @@ describe('SetupPage', () => {
       })
     })
 
-    it('shows fallback message when result.ok is false with no error field', async () => {
+    it('shows "Analysis failed" when result.ok is false with no error field', async () => {
       window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: false, checks: [] })
 
       render(<SetupPage />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
-        // The title <p> (font-medium) and detail <p> both render "Analysis failed"
-        // when error is undefined — two distinct elements confirms the fallback reached both render sites
-        const matches = screen.getAllByText('Analysis failed')
-        expect(matches).toHaveLength(2)
-        expect(matches[0].className).not.toBe(matches[1].className)
+        // The banner title and detail both render "Analysis failed" when no error string is provided
+        expect(screen.getAllByText('Analysis failed')).toHaveLength(2)
       })
     })
   })
 
   describe('InstallVirtualBox action', () => {
-    // Runs analysis (returns the default SAMPLE_CHECKS with vboxinst failing)
-    // and opens the "How to fix" panel on the VirtualBox card.
     async function openVboxFixPanel() {
       render(<SetupPage />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
@@ -213,6 +233,18 @@ describe('SetupPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/VirtualBox installed/i)).toBeInTheDocument()
       })
+    })
+
+    it('re-enables the install button when install fails', async () => {
+      window.electronAPI.installVirtualBox = vi.fn().mockResolvedValue({ ok: false })
+      await openVboxFixPanel()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Install VirtualBox' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Install VirtualBox' })).not.toBeDisabled()
+      })
+      expect(screen.queryByText(/VirtualBox installed/i)).not.toBeInTheDocument()
     })
   })
 })

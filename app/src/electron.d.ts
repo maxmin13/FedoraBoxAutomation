@@ -48,6 +48,7 @@ declare global {
       onScriptDone: (callback: (exitCode: number) => void) => () => void
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>
       isDev: () => Promise<boolean>
+      getDownloadsPath: () => Promise<{ path: string }>
     }
   }
 }

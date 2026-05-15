@@ -20,8 +20,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1100,
     height: 750,
-    minWidth: 800,
-    minHeight: 600,
+    resizable: false,
     backgroundColor: '#18181b', // zinc-900 — prevents white flash on load
     webPreferences: {
       // preload.js runs before the renderer and safely exposes Node APIs

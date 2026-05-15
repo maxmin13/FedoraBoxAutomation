@@ -1,4 +1,6 @@
-const { splitChunk } = require('../script-runner')
+const { splitChunk, hasActiveScript, killActiveScript } = require('../script-runner')
+
+// ── splitChunk ───────────────────────────────────────────────────────────────
 
 describe('splitChunk', () => {
   it('splits LF-delimited lines', () => {
@@ -35,6 +37,15 @@ describe('splitChunk', () => {
     ])
   })
 
+  it('does not produce a spurious empty line from a trailing newline', () => {
+    // PS1 scripts always end their output with \n — the last split segment must be dropped.
+    const result = splitChunk('line one\nline two\n', 'stdout')
+    expect(result).toEqual([
+      { text: 'line one', source: 'stdout' },
+      { text: 'line two', source: 'stdout' },
+    ])
+  })
+
   it('tags each line with the given source', () => {
     const result = splitChunk('an error line', 'stderr')
     expect(result).toEqual([{ text: 'an error line', source: 'stderr' }])
@@ -48,5 +59,26 @@ describe('splitChunk', () => {
   it('accepts a Buffer as well as a string', () => {
     const result = splitChunk(Buffer.from('buffered line'), 'stdout')
     expect(result).toEqual([{ text: 'buffered line', source: 'stdout' }])
+  })
+})
+
+// ── hasActiveScript ──────────────────────────────────────────────────────────
+
+describe('hasActiveScript', () => {
+  it('returns false when no script has been started', () => {
+    expect(hasActiveScript()).toBe(false)
+  })
+})
+
+// ── killActiveScript ─────────────────────────────────────────────────────────
+
+describe('killActiveScript', () => {
+  it('does not throw when called with no active script', () => {
+    expect(() => killActiveScript()).not.toThrow()
+  })
+
+  it('leaves hasActiveScript false after a no-op kill', () => {
+    killActiveScript()
+    expect(hasActiveScript()).toBe(false)
   })
 })

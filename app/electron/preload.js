@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // True when running via `npm run dev`, false in a packaged build
   isDev: () => ipcRenderer.invoke('is-dev'),
 
+  // Returns the OS downloads folder path (e.g. C:\Users\you\Downloads)
+  getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
+
   // ── Streaming output ──────────────────────────────────────
   // The renderer registers a listener for live script output lines.
   // Returns an unsubscribe function so the component can clean up.
