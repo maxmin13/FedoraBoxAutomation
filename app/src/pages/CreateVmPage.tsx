@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { CreateVmParams } from '../electron.d'
 
-type PageState = 'idle' | 'running' | 'done'
+type PageState = 'idle' | 'running' | 'done' | 'next-steps'
 type Step = 1 | 2 | 3 | 4
 
 const DISK_TYPES = ['VDI', 'VMDK', 'VHD']
@@ -99,12 +99,18 @@ export default function CreateVmPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-4" ref={resultRef}>
         {pageState === 'running' && (
-          <LogPanel
-            title="Creating VM..."
-            showLog={showLog}
-            logLines={logLines}
-            onToggle={() => setShowLog((v) => !v)}
-          />
+          <>
+            <div className="space-y-2">
+              <p className="text-zinc-300 text-sm font-medium">Creating VM...</p>
+              <ProgressBar />
+            </div>
+            <LogPanel
+              title="Script output"
+              showLog={showLog}
+              logLines={logLines}
+              onToggle={() => setShowLog((v) => !v)}
+            />
+          </>
         )}
 
         {pageState === 'done' && success === true && (
@@ -112,7 +118,7 @@ export default function CreateVmPage() {
             <div className="bg-green-900 border border-green-700 rounded-lg p-4">
               <p className="text-green-200 font-medium">VM created successfully.</p>
               <p className="text-green-300 text-sm mt-1">
-                Go to My VMs to start the VM, then follow the steps below.
+                Start the VM, then follow the setup steps on the next page.
               </p>
             </div>
             <LogPanel
@@ -121,8 +127,42 @@ export default function CreateVmPage() {
               logLines={logLines}
               onToggle={() => setShowLog((v) => !v)}
             />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPageState('next-steps')}
+                className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors"
+              >
+                Next: What to do &rarr;
+              </button>
+            </div>
+          </>
+        )}
+
+        {pageState === 'done' && success === false && (
+          <>
+            <div className="bg-red-900 border border-red-700 rounded-lg p-4">
+              <p className="text-red-200 font-medium">VM creation failed.</p>
+              <p className="text-red-300 text-sm mt-1">Check the script output for details.</p>
+            </div>
+            <LogPanel
+              title="Script output"
+              showLog={showLog}
+              logLines={logLines}
+              onToggle={() => setShowLog((v) => !v)}
+            />
+          </>
+        )}
+
+        {pageState === 'next-steps' && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold text-zinc-100">What to do next</h2>
+              <p className="text-zinc-400 text-sm mt-0.5">
+                Follow these steps inside the VM to finish setting up Fedora.
+              </p>
+            </div>
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
-              <p className="text-zinc-200 font-medium">What to do next</p>
               <NextStep number={1} title="Complete the Fedora installer">
                 <p className="text-zinc-400 text-sm">
                   Before rebooting, eject the Live ISO:{' '}
@@ -153,28 +193,11 @@ export default function CreateVmPage() {
               </NextStep>
               <NextStep number={4} title="Provision the VM">
                 <p className="text-zinc-400 text-sm">
-                  Once rebooted with Guest Additions active, use{' '}
-                  <span className="text-zinc-300">provision-vm.ps1</span> (or the Provision page,
-                  when available) to install dev tools.
+                  Now that Guest Additions are active, use the Provision page to install dev tools.
                 </p>
               </NextStep>
             </div>
-          </>
-        )}
-
-        {pageState === 'done' && success === false && (
-          <>
-            <div className="bg-red-900 border border-red-700 rounded-lg p-4">
-              <p className="text-red-200 font-medium">VM creation failed.</p>
-              <p className="text-red-300 text-sm mt-1">Check the script output for details.</p>
-            </div>
-            <LogPanel
-              title="Script output"
-              showLog={showLog}
-              logLines={logLines}
-              onToggle={() => setShowLog((v) => !v)}
-            />
-          </>
+          </div>
         )}
       </div>
     )
@@ -586,6 +609,14 @@ function NextStep({ number, title, children }: NextStepProps) {
         <p className="text-zinc-200 text-sm font-medium mb-1">{title}</p>
         {children}
       </div>
+    </div>
+  )
+}
+
+function ProgressBar() {
+  return (
+    <div className="w-full h-2 bg-zinc-700 rounded-full overflow-hidden">
+      <div className="h-full w-1/3 bg-blue-500 rounded-full animate-slide" />
     </div>
   )
 }
