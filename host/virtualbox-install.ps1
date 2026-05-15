@@ -4,6 +4,11 @@
 # ============================================================
 
 $ErrorActionPreference = 'Stop'
+
+$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
+New-Item -ItemType Directory -Force $logDir | Out-Null
+Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+
 $sep = "=" * 55
 
 try {
@@ -99,4 +104,6 @@ try {
 } catch {
     Write-Host "`n[FAIL] VirtualBox installation failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
+} finally {
+    Stop-Transcript | Out-Null
 }

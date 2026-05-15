@@ -13,6 +13,7 @@ app/
     main.js           <- window creation, close warning dialog
     preload.js        <- contextBridge API exposed to React
     ipc-handlers.js   <- handles requests from the renderer
+    logger.js         <- file logger; writes to %APPDATA%\FedoraBoxAutomation\logs\gui.log
     script-runner.js  <- spawns and kills PowerShell scripts
     scripts.js        <- central registry of .ps1 paths
   src/                <- React renderer (runs in Chromium)
@@ -154,9 +155,13 @@ These apply whether you started the app with `npm run dev` or via the VS Code de
 
 | You want to see... | Look here |
 |--------------------|-----------|
-| Logs from `ipc-handlers.js`, `main.js`, `script-runner.js` | VS Code **Debug Console** tab (bottom panel — switch from Terminal to Debug Console) |
+| Logs from `ipc-handlers.js`, `main.js`, `script-runner.js` | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** (always) and the VS Code **Debug Console** tab (dev only) |
 | Logs from React components (`.tsx` files) | Electron **DevTools** — press `Ctrl+Shift+I` inside the app window, then open the **Console** tab |
-| The `[IPC]` lines that trace data flowing between processes | VS Code **Debug Console** tab |
+| The `[IPC]` lines that trace data flowing between processes | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** |
+| Output from PowerShell scripts (`host/*.ps1`) | **`%APPDATA%\FedoraBoxAutomation\logs\host.log`** |
+| Renderer crashes caught by the error boundary | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** (forwarded via `log-error` IPC) |
+
+To open the log folder: paste `%APPDATA%\FedoraBoxAutomation\logs` into the Windows File Explorer address bar. The folder is created automatically the first time the app or any `.ps1` script runs.
 
 ---
 

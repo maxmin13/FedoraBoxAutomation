@@ -7,6 +7,7 @@
 // ============================================================
 
 const { spawn } = require('child_process')
+const log = require('./logger')
 
 // The currently running child process, or null if nothing is running.
 // Only one script runs at a time.
@@ -34,6 +35,7 @@ function killActiveScript() {
   }
 
   const pid = activeChild.pid.toString()
+  log.warn(`[script] killing process tree PID ${pid}`)
   spawn('taskkill', ['/PID', pid, '/T', '/F'])
   activeChild = null
 }
@@ -71,9 +73,7 @@ function runScript(scriptPath, args, onLine, onDone) {
     ...args,
   ]
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[script-runner] spawning:', 'powershell', psArgs.join(' '))
-  }
+  log.info('[script] spawning:', 'powershell', psArgs.join(' '))
 
   // spawn() starts the process and returns immediately.
   // stdout and stderr are streams — data arrives as the script produces it.
@@ -82,6 +82,7 @@ function runScript(scriptPath, args, onLine, onDone) {
   // stdout: normal output lines from the script (Write-Host, Write-Output)
   activeChild.stdout.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stdout')) {
+      log.info(`[script][stdout] ${line.text}`)
       onLine(line)
     }
   })
@@ -89,6 +90,7 @@ function runScript(scriptPath, args, onLine, onDone) {
   // stderr: error output — PowerShell writes some warnings here too
   activeChild.stderr.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stderr')) {
+      log.warn(`[script][stderr] ${line.text}`)
       onLine(line)
     }
   })
@@ -96,14 +98,16 @@ function runScript(scriptPath, args, onLine, onDone) {
   // 'close' fires when the process has exited and all streams are flushed.
   // exitCode is 0 for success, non-zero for failure.
   activeChild.on('close', (exitCode) => {
+    const code = exitCode ?? 1
+    log.info(`[script] exited with code ${code}`)
     activeChild = null
-    onDone(exitCode ?? 1)
+    onDone(code)
   })
 
   // 'error' fires if the process could not be started at all
   // (e.g. powershell.exe not found on PATH)
   activeChild.on('error', (err) => {
-    console.error('[script-runner] failed to start process:', err.message)
+    log.error('[script] failed to start process:', err.message)
     activeChild = null
     onLine({ text: `ERROR: Could not start PowerShell: ${err.message}`, source: 'stderr' })
     onDone(1)

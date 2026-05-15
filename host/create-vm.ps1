@@ -56,6 +56,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
+New-Item -ItemType Directory -Force $logDir | Out-Null
+Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+
 function Write-Header {
     param([string]$Text)
     $line = "-" * 60
@@ -382,4 +386,6 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
+} finally {
+    Stop-Transcript | Out-Null
 }

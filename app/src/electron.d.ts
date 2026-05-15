@@ -50,6 +50,7 @@ declare global {
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>
       isDev: () => Promise<boolean>
       getDownloadsPath: () => Promise<{ path: string }>
+      logError: (message: string, stack: string) => Promise<void>
     }
   }
 }

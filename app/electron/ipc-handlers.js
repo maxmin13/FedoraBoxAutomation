@@ -17,38 +17,31 @@ const path = require('path')
 const fs = require('fs')
 const { runScript } = require('./script-runner')
 const SCRIPTS = require('./scripts')
+const log = require('./logger')
 
 // The docs/ folder sits two levels above app/electron/
 const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 
-// In development, wrap ipcMain.handle to log every call and reply.
-// This makes it easy to see what data is flowing between processes.
-const isDev = process.env.NODE_ENV !== 'production'
-
 // Channels too trivial to log (polled on every page load)
 const SILENT_CHANNELS = new Set(['is-dev'])
 
-function ts() {
-  return new Date().toTimeString().slice(0, 8)
-}
-
 /**
- * Wraps ipcMain.handle with development logging.
- * Use this instead of ipcMain.handle() everywhere in this file.
+ * Wraps ipcMain.handle with logging to gui.log (all environments)
+ * and console (development only, via logger).
  *
  * @param {string}   channel - The IPC channel name
  * @param {function} handler - Async function that handles the request
  */
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
-    if (isDev && !SILENT_CHANNELS.has(channel)) {
-      console.log(`[${ts()}][IPC] received: ${channel} ${JSON.stringify(args, null, 2)}`)
+    if (!SILENT_CHANNELS.has(channel)) {
+      log.info(`[ipc] recv ${channel}`, args.length ? JSON.stringify(args) : '')
     }
 
     const result = await handler(event, ...args)
 
-    if (isDev && !SILENT_CHANNELS.has(channel)) {
-      console.log(`[${ts()}][IPC] replied: ${channel} ${JSON.stringify(result, null, 2)}`)
+    if (!SILENT_CHANNELS.has(channel)) {
+      log.info(`[ipc] reply ${channel}`, JSON.stringify(result))
     }
 
     return result
@@ -62,7 +55,7 @@ function handleIpc(channel, handler) {
 function registerIpcHandlers(win) {
 
   // ── is-dev ────────────────────────────────────────────────
-  handleIpc('is-dev', async () => isDev)
+  handleIpc('is-dev', async () => process.env.NODE_ENV !== 'production')
 
   // ── get-downloads-path ────────────────────────────────────
   handleIpc('get-downloads-path', async () => ({ path: app.getPath('downloads') }))
@@ -78,6 +71,7 @@ function registerIpcHandlers(win) {
       const content = fs.readFileSync(filePath, 'utf8')
       return { ok: true, content }
     } catch (error) {
+      log.error(`[ipc][read-doc] ${filename}:`, error.message)
       return { ok: false, error: `Could not read ${filename}: ${error.message}` }
     }
   })
@@ -103,14 +97,10 @@ function registerIpcHandlers(win) {
         running: runningNames.includes(vm.name),
       }))
 
-      if (isDev) {
-        const summary = vms.map((v) => `"${v.name}" [${v.running ? 'running' : 'stopped'}]`).join(', ')
-        console.log(`[${ts()}][list-vms] ${summary || 'no VMs registered'}`)
-      }
-
       return { ok: true, vms }
     } catch (error) {
       // VBoxManage not found or not installed
+      log.error('[ipc][list-vms]', error.message)
       return { ok: false, error: error.message, vms: [] }
     }
   })
@@ -125,24 +115,18 @@ function registerIpcHandlers(win) {
       )
 
       if (/^VMState="running"/m.test(info)) {
-        if (isDev) {
-          console.log(`[${ts()}][start-vm] "${name}" is already running — skipping`)
-        }
+        log.info(`[ipc][start-vm] "${name}" already running — skipping`)
         return { ok: true }
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][start-vm] Starting VM "${name}"...`)
-      }
+      log.info(`[ipc][start-vm] starting "${name}"`)
       execSync(
         `VBoxManage startvm "${name}" --type gui`,
         { encoding: 'utf8' }
       )
       return { ok: true }
     } catch (error) {
-      if (isDev) {
-        console.error(`[${ts()}][start-vm] error:`, error.message)
-      }
+      log.error(`[ipc][start-vm] "${name}":`, error.message)
       return { ok: false, error: error.message }
     }
   })
@@ -165,36 +149,28 @@ function registerIpcHandlers(win) {
 
     try {
       if (!vmRunning()) {
-        if (isDev) {
-          console.log(`[${ts()}][stop-vm] "${name}" is already stopped — skipping`)
-        }
+        log.info(`[ipc][stop-vm] "${name}" already stopped — skipping`)
         return { ok: true }
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][stop-vm] Sending ACPI shutdown signal to "${name}"...`)
-      }
+      log.info(`[ipc][stop-vm] sending ACPI shutdown to "${name}"`)
       execSync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
 
       const deadline = Date.now() + 60_000
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 1000))
         if (!vmRunning()) {
-          if (isDev) console.log(`[${ts()}][stop-vm] "${name}" stopped (ACPI)`)
+          log.info(`[ipc][stop-vm] "${name}" stopped (ACPI)`)
           return { ok: true }
         }
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][stop-vm] ACPI timeout — forcing poweroff for "${name}"...`)
-      }
+      log.warn(`[ipc][stop-vm] ACPI timeout — forcing poweroff for "${name}"`)
       execSync(`VBoxManage controlvm "${name}" poweroff`, { encoding: 'utf8' })
-      if (isDev) console.log(`[${ts()}][stop-vm] "${name}" stopped (forced)`)
+      log.info(`[ipc][stop-vm] "${name}" stopped (forced)`)
       return { ok: true }
     } catch (error) {
-      if (isDev) {
-        console.error(`[${ts()}][stop-vm] error:`, error.message)
-      }
+      log.error(`[ipc][stop-vm] "${name}":`, error.message)
       return { ok: false, error: error.message }
     }
   })
@@ -204,15 +180,11 @@ function registerIpcHandlers(win) {
   // Only safe to call when the VM is stopped.
   handleIpc('delete-vm', async (_event, name) => {
     try {
-      if (isDev) {
-        console.log(`[${ts()}][delete-vm] Deleting VM "${name}"...`)
-      }
+      log.info(`[ipc][delete-vm] deleting "${name}"`)
       execSync(`VBoxManage unregistervm "${name}" --delete`, { encoding: 'utf8' })
       return { ok: true }
     } catch (error) {
-      if (isDev) {
-        console.error(`[${ts()}][delete-vm] error:`, error.message)
-      }
+      log.error(`[ipc][delete-vm] "${name}":`, error.message)
       return { ok: false, error: error.message }
     }
   })
@@ -237,18 +209,11 @@ function registerIpcHandlers(win) {
       function onDone(exitCode) {
         win.webContents.send('script-done', exitCode)
 
-        if (isDev) {
-          console.log(`[${ts()}][run-sanity-checks] stdout lines:`, stdoutLines.length)
-          console.log(`[${ts()}][run-sanity-checks] stderr lines:`, stderrLines.length)
-          if (stderrLines.length) {
-            console.log(`[${ts()}][run-sanity-checks] stderr:\n` + stderrLines.join('\n'))
-          }
-        }
-
         try {
           const checks = parseChecksOutput(stdoutLines, stderrLines)
           resolve({ ok: true, checks })
         } catch (parseError) {
+          log.error('[ipc][run-sanity-checks] parse failed:', parseError.message)
           resolve({
             ok: false,
             error: 'Could not parse check results: ' + parseError.message,
@@ -257,9 +222,6 @@ function registerIpcHandlers(win) {
         }
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][run-sanity-checks] Launching sanity checks script...`)
-      }
       runScript(SCRIPTS.sanityChecks, ['-Json'], onLine, onDone)
     })
   })
@@ -296,9 +258,6 @@ function registerIpcHandlers(win) {
         psArgs.push('-vmFolder', params.vmFolder)
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][create-vm] vmName="${params.vmName}"`)
-      }
       runScript(SCRIPTS.createVm, psArgs, onLine, onDone)
     })
   })
@@ -316,11 +275,15 @@ function registerIpcHandlers(win) {
         resolve({ ok: exitCode === 0 })
       }
 
-      if (isDev) {
-        console.log(`[${ts()}][install-virtualbox] Launching VirtualBox installer script...`)
-      }
       runScript(SCRIPTS.installVirtualBox, [], onLine, onDone)
     })
+  })
+
+  // ── log-error ─────────────────────────────────────────────
+  // Receives uncaught renderer errors from the React error boundary.
+  handleIpc('log-error', async (_event, message, stack) => {
+    log.error('[renderer] uncaught error:', message)
+    if (stack) log.error('[renderer] stack:', stack)
   })
 }
 

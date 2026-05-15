@@ -8,6 +8,7 @@ const { app, BrowserWindow, dialog } = require('electron')
 const path = require('path')
 const { registerIpcHandlers } = require('./ipc-handlers')
 const { killActiveScript, hasActiveScript } = require('./script-runner')
+const log = require('./logger')
 
 // isDev is true when running via `npm run dev` (Vite dev server).
 // We check NODE_ENV first so `npm start` (build + electron .) works too.
@@ -17,6 +18,8 @@ const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
  * Creates the main browser window and loads the renderer.
  */
 function createWindow() {
+  log.info('[main] creating window')
+
   const win = new BrowserWindow({
     width: 1100,
     height: 750,
@@ -67,8 +70,11 @@ function createWindow() {
     // response.response is the index of the button the user clicked:
     // 0 = 'Keep waiting', 1 = 'Force quit'
     if (response.response === 1) {
+      log.warn('[main] force quit while script was running')
       killActiveScript()
       app.exit(0)
+    } else {
+      log.info('[main] user chose to keep waiting')
     }
   })
 
@@ -78,17 +84,38 @@ function createWindow() {
 // 'ready' fires when Electron has finished initialising.
 // You must not create windows before this event.
 app.whenReady().then(() => {
+  log.info(`[main] app ready — mode: ${isDev ? 'development' : 'production'}`)
   const win = createWindow()
 
   // Register all ipcMain.handle() calls so the renderer can talk to main
   registerIpcHandlers(win)
-
-  if (isDev) {
-    console.log('[main] Running in development mode')
-  }
 })
 
 // On Windows and Linux, closing all windows quits the app
 app.on('window-all-closed', () => {
+  log.info('[main] all windows closed — quitting')
   app.quit()
+})
+
+app.on('will-quit', () => {
+  log.info('[main] will-quit')
+})
+
+// Renderer crash or kill
+app.on('render-process-gone', (_event, _webContents, details) => {
+  log.error('[main] render-process-gone', JSON.stringify(details))
+})
+
+// GPU or utility process crash
+app.on('child-process-gone', (_event, details) => {
+  log.error('[main] child-process-gone', JSON.stringify(details))
+})
+
+// Uncaught exceptions in the main process
+process.on('uncaughtException', (err) => {
+  log.error('[main] uncaughtException:', err.stack || err.message)
+})
+
+process.on('unhandledRejection', (reason) => {
+  log.error('[main] unhandledRejection:', reason instanceof Error ? reason.stack : String(reason))
 })

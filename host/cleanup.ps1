@@ -17,6 +17,10 @@
 
 $ErrorActionPreference = 'Stop'
 
+$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
+New-Item -ItemType Directory -Force $logDir | Out-Null
+Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+
 try {
     # Unregister and delete the failed VM
     $vmName     = "Fedora-44"
@@ -59,4 +63,6 @@ try {
 } catch {
     Write-Host "ERROR: Cleanup failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
+} finally {
+    Stop-Transcript | Out-Null
 }

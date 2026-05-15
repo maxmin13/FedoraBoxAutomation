@@ -34,6 +34,7 @@ app/
     main.js                      <- window creation, close warning dialog
     preload.js                   <- contextBridge: exposes safe IPC API to renderer
     ipc-handlers.js              <- all ipcMain.handle() registrations
+    logger.js                    <- file logger; writes gui.log to %APPDATA%\FedoraBoxAutomation\logs\
     script-runner.js             <- spawn, stream, and kill logic
     scripts.js                   <- single source of truth for all .ps1 paths
   src/                           <- React renderer files
@@ -68,6 +69,7 @@ app/
   - `run-sanity-checks` — runs `virtualbox-sanity-checks.ps1 -Json` and returns structured results
   - `install-virtualbox` — runs `virtualbox-install.ps1` and streams output
   - `create-vm` — runs `create-vm.ps1` with all VM parameters; streams output; returns `{ ok: boolean }`
+  - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
   - `script-done` — exit code when the script finishes
@@ -470,27 +472,27 @@ app/
     ...
 ```
 
-### Log every IPC message in development
+### Log every IPC message (always, not just dev)
 
-When learning, it is easy to get lost between the main process and the renderer.
-A simple wrapper makes the data flow visible in the terminal:
+A `handleIpc` wrapper logs every IPC call and reply to `gui.log` unconditionally,
+and also mirrors to the VS Code Debug Console in dev mode. This makes the data
+flow visible without needing a breakpoint:
 
 ```js
-// Wraps ipcMain.handle to log every call and reply during development.
+// Wraps ipcMain.handle to log every call and reply to gui.log.
 // Replace ipcMain.handle(...) with handleIpc(...) everywhere.
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
-    if (isDev) {
-      console.log(`[${ts()}][IPC] received: ${channel} ${JSON.stringify(args, null, 2)}`)
-    }
+    log.info(`[IPC] received: ${channel}`, JSON.stringify(args))
     const result = await handler(event, ...args)
-    if (isDev) {
-      console.log(`[${ts()}][IPC] replied: ${channel} ${JSON.stringify(result, null, 2)}`)
-    }
+    log.info(`[IPC] replied: ${channel}`, JSON.stringify(result))
     return result
   })
 }
 ```
+
+Logs go to `%APPDATA%\FedoraBoxAutomation\logs\gui.log`. In dev mode they also
+appear in the VS Code Debug Console. `logger.js` handles both destinations.
 
 ### Separate dev and prod behaviour with an isDev flag
 

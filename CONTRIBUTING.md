@@ -147,6 +147,37 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 
 - Always use `$ErrorActionPreference = 'Stop'` and `try/catch` for error handling.
 - Never use Unicode punctuation in string literals — PowerShell 5.1 renders em dashes (`—`), curly quotes (`""`), and similar characters as garbled text (`â€"`). Use plain ASCII equivalents (`-`, `"`, `'`) instead.
+
+### Logging
+
+Every `.ps1` script must write to `%APPDATA%\FedoraBoxAutomation\logs\host.log` using PowerShell's built-in transcript mechanism. Add these three lines immediately after `$ErrorActionPreference = 'Stop'` (or after the `param()` block if one exists):
+
+```powershell
+$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
+New-Item -ItemType Directory -Force $logDir | Out-Null
+Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+```
+
+Then add a `finally` block to the outermost `try/catch` to guarantee the transcript is stopped even if the script calls `exit 1`:
+
+```powershell
+try {
+    # ... script body ...
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+} finally {
+    Stop-Transcript | Out-Null
+}
+```
+
+Rules:
+- Always pipe `Start-Transcript` and `Stop-Transcript` with `| Out-Null` — they print their own status lines which contaminate stdout (critical for scripts like `virtualbox-sanity-checks.ps1` that emit JSON to stdout).
+- Always use `-Append -Force` on `Start-Transcript` so multiple runs append rather than overwrite.
+- If a script has no wrapping `try/catch` (rare), place `Stop-Transcript | Out-Null` at the very end of the file.
+
+### Guest script output coloring
+
 - Guest script output printed to the console must be color-coded:
   - **Red** — lines matching `error`, `failed`, `fatal`, `command not found`, `permission denied`
   - **Yellow** — lines matching `warning`

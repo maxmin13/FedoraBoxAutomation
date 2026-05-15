@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage'
 import SetupPage from './pages/SetupPage'
 import DocsPage from './pages/DocsPage'
 import CreateVmPage from './pages/CreateVmPage'
+import ErrorBoundary from './ErrorBoundary'
 
 // All valid page names in the app
 export type Page = 'landing' | 'setup' | 'create-vm' | 'docs'
@@ -26,10 +27,12 @@ export default function App() {
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-y-auto p-6">
-        {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
-        {currentPage === 'setup' && <SetupPage />}
-        {currentPage === 'create-vm' && <CreateVmPage />}
-        {currentPage === 'docs' && <DocsPage />}
+        <ErrorBoundary>
+          {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
+          {currentPage === 'setup' && <SetupPage />}
+          {currentPage === 'create-vm' && <CreateVmPage />}
+          {currentPage === 'docs' && <DocsPage />}
+        </ErrorBoundary>
       </main>
     </div>
   )

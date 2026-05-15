@@ -42,6 +42,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reads a markdown file from the docs/ folder and returns its content as a string
   readDoc: (filename) => ipcRenderer.invoke('read-doc', filename),
 
+  // ── Error logging ─────────────────────────────────────────
+  // Forwards uncaught renderer errors (from the React error boundary) to the main process log
+  logError: (message, stack) => ipcRenderer.invoke('log-error', message, stack),
+
   // ── Environment ───────────────────────────────────────────
   // True when running via `npm run dev`, false in a packaged build
   isDev: () => ipcRenderer.invoke('is-dev'),
