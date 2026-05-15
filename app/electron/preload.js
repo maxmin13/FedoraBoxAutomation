@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sends an ACPI shutdown signal to a running VM
   stopVm: (name) => ipcRenderer.invoke('stop-vm', name),
 
+  // Unregisters and permanently deletes a stopped VM and all its files
+  deleteVm: (name) => ipcRenderer.invoke('delete-vm', name),
+
   // ── Create VM ─────────────────────────────────────────────
   // Runs create-vm.ps1 with the supplied parameters; streams output to the renderer
   createVm: (params) => ipcRenderer.invoke('create-vm', params),

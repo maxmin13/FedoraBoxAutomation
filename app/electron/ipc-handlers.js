@@ -199,6 +199,24 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── delete-vm ─────────────────────────────────────────────
+  // Unregisters the VM and deletes all associated files (VDI, snapshots, etc.).
+  // Only safe to call when the VM is stopped.
+  handleIpc('delete-vm', async (_event, name) => {
+    try {
+      if (isDev) {
+        console.log(`[${ts()}][delete-vm] Deleting VM "${name}"...`)
+      }
+      execSync(`VBoxManage unregistervm "${name}" --delete`, { encoding: 'utf8' })
+      return { ok: true }
+    } catch (error) {
+      if (isDev) {
+        console.error(`[${ts()}][delete-vm] error:`, error.message)
+      }
+      return { ok: false, error: error.message }
+    }
+  })
+
   // ── run-sanity-checks ─────────────────────────────────────
   // Runs the sanity check script with -Json flag and returns structured results.
   // The script writes a JSON array to stdout; we collect all lines then parse.

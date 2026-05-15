@@ -171,11 +171,11 @@ describe('name conflict', () => {
 // ── Running state ────────────────────────────────────────────────────────────
 
 describe('running state', () => {
-  it('replaces the wizard with the log panel when the script starts', async () => {
+  it('replaces the wizard with the progress bar when the script starts', async () => {
     window.electronAPI.createVm = vi.fn().mockReturnValue(new Promise(() => {}))
     await submitForm()
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /creating vm/i })).toBeInTheDocument()
+      expect(screen.getByText('Creating VM...')).toBeInTheDocument()
     })
   })
 
@@ -235,7 +235,12 @@ describe('success state', () => {
     expect(screen.getByText('VM created successfully.')).toBeInTheDocument()
   })
 
-  it('shows the "What to do next" section', () => {
+  it('shows the "Next: What to do" navigation button', () => {
+    expect(screen.getByRole('button', { name: /next.*what to do/i })).toBeInTheDocument()
+  })
+
+  it('shows the "What to do next" section after clicking the navigation button', () => {
+    fireEvent.click(screen.getByRole('button', { name: /next.*what to do/i }))
     expect(screen.getByText('What to do next')).toBeInTheDocument()
   })
 })

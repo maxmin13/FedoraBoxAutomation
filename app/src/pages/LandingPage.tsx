@@ -122,6 +122,7 @@ interface VmCardProps {
 function VmCard({ vm, onRefresh }: VmCardProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   async function handleStart() {
     setBusy(true)
@@ -144,6 +145,21 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
       const result = await window.electronAPI.stopVm(vm.name)
       if (!result.ok) {
         setError(result.error ?? 'Failed to stop VM')
+      }
+    } finally {
+      setBusy(false)
+      onRefresh()
+    }
+  }
+
+  async function handleDelete() {
+    setBusy(true)
+    setError(null)
+    setConfirming(false)
+    try {
+      const result = await window.electronAPI.deleteVm(vm.name)
+      if (!result.ok) {
+        setError(result.error ?? 'Failed to delete VM')
       }
     } finally {
       setBusy(false)
@@ -174,7 +190,7 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
       {error && <p className="text-red-400 text-xs">{error}</p>}
 
       {/* Action buttons */}
-      <div className="flex gap-2 mt-auto">
+      <div className="flex gap-2 mt-auto flex-wrap">
         {vm.running ? (
           <button
             onClick={handleStop}
@@ -190,6 +206,33 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
             className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50"
           >
             {busy ? 'Starting...' : 'Start'}
+          </button>
+        )}
+
+        {confirming ? (
+          <>
+            <button
+              onClick={handleDelete}
+              disabled={busy}
+              className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-sm disabled:opacity-50"
+            >
+              {busy ? 'Deleting...' : 'Confirm Delete'}
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+              className="px-3 py-1 bg-zinc-600 hover:bg-zinc-500 text-white rounded text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            disabled={vm.running || busy}
+            className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm disabled:opacity-50"
+          >
+            Delete
           </button>
         )}
       </div>
