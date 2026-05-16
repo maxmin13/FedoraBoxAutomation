@@ -64,7 +64,8 @@ describe('SetupPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Operating System')).toBeInTheDocument()
         expect(screen.getByText('RAM')).toBeInTheDocument()
-        expect(screen.getByText('VirtualBox')).toBeInTheDocument()
+        // VirtualBox is auto-selected so it appears in both the left list and right panel
+        expect(screen.getAllByText('VirtualBox').length).toBeGreaterThan(0)
       })
     })
 
@@ -200,12 +201,60 @@ describe('SetupPage', () => {
     })
   })
 
+  describe('detail panel', () => {
+    it('auto-selects the first failing check and shows its detail after analysis', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+      await waitFor(() => {
+        // vboxinst is the only fail check — its detail appears in the right panel
+        expect(screen.getByText('Not installed.')).toBeInTheDocument()
+      })
+    })
+
+    it('shows the detail text for the selected check in the right panel', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      // Click the "Operating System" row to switch selection
+      fireEvent.click(screen.getByRole('button', { name: /operating system/i }))
+
+      expect(screen.getByText('Windows 11 (64-bit)')).toBeInTheDocument()
+    })
+
+    it('shows "No action needed" when a passing check is selected', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: /operating system/i }))
+
+      expect(screen.getByText('No action needed.')).toBeInTheDocument()
+    })
+
+    it('switches the right panel when a different check row is clicked', async () => {
+      render(<SetupPage />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+      await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
+
+      // Start with vboxinst auto-selected
+      expect(screen.getByText('Not installed.')).toBeInTheDocument()
+
+      // Switch to RAM (button accessible name includes the badge text: "OK RAM")
+      fireEvent.click(screen.getByRole('button', { name: /OK RAM/i }))
+      expect(screen.getByText('16 GB total')).toBeInTheDocument()
+      expect(screen.queryByText('Not installed.')).not.toBeInTheDocument()
+    })
+  })
+
   describe('InstallVirtualBox action', () => {
+    // vboxinst is the only failing check in SAMPLE_CHECKS, so it is auto-selected
+    // and the fix panel opens without any extra click.
     async function openVboxFixPanel() {
       render(<SetupPage />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
-      await waitFor(() => expect(screen.getByText('VirtualBox')).toBeInTheDocument())
-      fireEvent.click(screen.getByRole('button', { name: 'How to fix' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Install VirtualBox' })).toBeInTheDocument())
     }
 
     it('shows the Install VirtualBox button inside the fix panel', async () => {

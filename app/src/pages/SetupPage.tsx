@@ -1,52 +1,55 @@
 // Setup page — lets the user analyse their Windows host and fix any issues
 // before creating a VM.
 //
-// Flow:
-//   1. User clicks "Run Analysis"
-//   2. Sanity check script runs; results appear as CheckCards
-//   3. Failing/warning cards show inline fix actions
+// Layout: header + summary bar (fixed), then a left/right split.
+// Left: compact check list. Right: detail + fix instructions for selected check.
 
 import { useState } from 'react'
-import CheckCard from '../components/CheckCard'
 import type { CheckResult } from '../electron.d'
 
-// State the page can be in
 type PageState = 'idle' | 'running' | 'done'
+
+const STATUS_BADGE: Record<CheckResult['status'], string> = {
+  pass: 'bg-green-700 text-green-100',
+  warn: 'bg-yellow-700 text-yellow-100',
+  fail: 'bg-red-700 text-red-100',
+}
+
+const STATUS_ICON: Record<CheckResult['status'], string> = {
+  pass: 'OK',
+  warn: '!!',
+  fail: 'XX',
+}
 
 export default function SetupPage() {
   const [pageState, setPageState] = useState<PageState>('idle')
   const [checks, setChecks] = useState<CheckResult[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  // Live log lines streamed from the script while it runs
   const [logLines, setLogLines] = useState<string[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  /**
-   * Starts the sanity check script.
-   * Results come back as a structured array from ipc-handlers.js.
-   */
   async function runAnalysis() {
     setPageState('running')
     setChecks([])
     setLogLines([])
     setErrorMessage(null)
+    setSelectedId(null)
 
-    // Subscribe to live log lines while the script runs.
-    // onScriptLine returns a cleanup function — we call it after the script finishes.
     const unsubscribeLine = window.electronAPI.onScriptLine((line) => {
-      // We pass a function to setLogLines so React gives us the latest list (prev).
-      // Using logLines directly here would capture a stale snapshot from when
-      // runAnalysis started, causing earlier lines to be lost.
       setLogLines((prev) => [...prev, line.text])
     })
 
     const result = await window.electronAPI.runSanityChecks()
-
-    // Unsubscribe from the live log stream now that the script is done
     unsubscribeLine()
 
     if (result.ok) {
       setChecks(result.checks)
+      // Auto-select first failing check, or first warning, or first check
+      const first =
+        result.checks.find((c) => c.status === 'fail') ??
+        result.checks.find((c) => c.status === 'warn') ??
+        result.checks[0]
+      if (first) setSelectedId(first.id)
     } else {
       setErrorMessage(result.error ?? 'Analysis failed')
     }
@@ -54,23 +57,25 @@ export default function SetupPage() {
     setPageState('done')
   }
 
-  // Count results by status for the summary bar
   const passCount = checks.filter((c) => c.status === 'pass').length
   const warnCount = checks.filter((c) => c.status === 'warn').length
   const failCount = checks.filter((c) => c.status === 'fail').length
   const allPassing = failCount === 0
 
+  const selectedCheck = checks.find((c) => c.id === selectedId) ?? null
+  const selectedAction = selectedCheck ? getActionForCheck(selectedCheck) : undefined
+
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="h-full flex flex-col">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-100">Environment Setup</h1>
           <p className="text-zinc-400 text-sm mt-1">
             Analyse your Windows host before creating a Fedora VM.
           </p>
         </div>
-
         <button
           onClick={runAnalysis}
           disabled={pageState === 'running'}
@@ -80,39 +85,17 @@ export default function SetupPage() {
         </button>
       </div>
 
-      {/* Running indicator */}
-      {pageState === 'running' && (
-        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-4">
-          <p className="text-zinc-300 text-sm font-medium mb-2">Analysing host...</p>
-          {/* Live log output */}
-          <div className="font-mono text-xs text-zinc-400 max-h-32 overflow-y-auto space-y-0.5">
-            {logLines.map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Error — script failed to run entirely */}
-      {pageState === 'done' && errorMessage && (
-        <div className="bg-red-900 border border-red-700 rounded-lg p-4 mb-4">
-          <p className="text-red-200 font-medium">Analysis failed</p>
-          <p className="text-red-300 text-sm mt-1">{errorMessage}</p>
-        </div>
-      )}
-
       {/* Summary bar */}
       {pageState === 'done' && checks.length > 0 && (
-        <div className="flex items-center gap-4 mb-5 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-4 mb-4 shrink-0 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3">
           <span className="text-green-400 text-sm font-medium">{passCount} passed</span>
-          <span className="text-yellow-400 text-sm font-medium">{warnCount} {warnCount === 1 ? 'warning' : 'warnings'}</span>
+          <span className="text-yellow-400 text-sm font-medium">
+            {warnCount} {warnCount === 1 ? 'warning' : 'warnings'}
+          </span>
           <span className="text-red-400 text-sm font-medium">{failCount} failed</span>
-
           <div className="ml-auto">
             {allPassing ? (
-              <span className="text-green-400 text-sm font-semibold">
-                Ready to create a VM
-              </span>
+              <span className="text-green-400 text-sm font-semibold">Ready to create a VM</span>
             ) : (
               <span className="text-red-400 text-sm font-semibold">
                 Fix the failed items before continuing
@@ -122,41 +105,105 @@ export default function SetupPage() {
         </div>
       )}
 
-      {/* Check result cards */}
-      {checks.length > 0 && (
-        <div className="space-y-3">
-          {checks.map((check) => (
-            <CheckCard
-              key={check.id}
-              check={check}
-              action={getActionForCheck(check)}
-            />
-          ))}
+      {/* Error — script failed entirely */}
+      {pageState === 'done' && errorMessage && (
+        <div className="bg-red-900 border border-red-700 rounded-lg p-4 mb-4 shrink-0">
+          <p className="text-red-200 font-medium">Analysis failed</p>
+          <p className="text-red-300 text-sm mt-1">{errorMessage}</p>
         </div>
       )}
 
-      {/* Idle state — nothing run yet */}
-      {pageState === 'idle' && (
-        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 text-center text-zinc-500 text-sm">
-          Click "Run Analysis" to check your system.
+      {/* Split area */}
+      <div className="flex flex-1 gap-4 min-h-0">
+
+        {/* Left: check list — only shown once results exist */}
+        {checks.length > 0 && (
+          <div className="w-56 shrink-0 flex flex-col gap-1">
+            {checks.map((check) => (
+              <button
+                key={check.id}
+                onClick={() => setSelectedId(check.id)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors border ${
+                  selectedId === check.id
+                    ? 'bg-zinc-600 border-zinc-500'
+                    : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'
+                }`}
+              >
+                <span
+                  className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${STATUS_BADGE[check.status]}`}
+                >
+                  {STATUS_ICON[check.status]}
+                </span>
+                <span className="text-zinc-100 text-sm font-medium truncate">{check.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Right: detail panel */}
+        <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-5 overflow-hidden">
+
+          {/* Idle */}
+          {pageState === 'idle' && (
+            <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+              Click "Run Analysis" to check your system.
+            </div>
+          )}
+
+          {/* Running — live log */}
+          {pageState === 'running' && (
+            <div>
+              <p className="text-zinc-300 text-sm font-medium mb-2">Analysing host...</p>
+              <div className="font-mono text-xs text-zinc-400 space-y-0.5">
+                {logLines.map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Done, nothing selected yet */}
+          {pageState === 'done' && !selectedCheck && checks.length > 0 && (
+            <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+              Select a check on the left to see details.
+            </div>
+          )}
+
+          {/* Selected check detail */}
+          {selectedCheck && (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <span
+                  className={`text-xs font-mono font-bold px-2 py-1 rounded ${STATUS_BADGE[selectedCheck.status]}`}
+                >
+                  {STATUS_ICON[selectedCheck.status]}
+                </span>
+                <h2 className="text-zinc-100 font-semibold text-lg">{selectedCheck.label}</h2>
+              </div>
+
+              <p className="text-zinc-300 text-sm mb-4">{selectedCheck.detail}</p>
+
+              {selectedAction && (
+                <div className="border-t border-zinc-700 pt-4">
+                  {selectedAction}
+                </div>
+              )}
+
+              {!selectedAction && selectedCheck.status === 'pass' && (
+                <p className="text-green-400 text-sm">No action needed.</p>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ── Fix actions ─────────────────────────────────────────────────────────────
-// Each failing or warning check gets a specific fix action rendered inside
-// the CheckCard. Keep these as simple JSX — a button or a code block.
+// ── Fix actions ──────────────────────────────────────────────────────────────
 
-/**
- * Returns the fix action node for a given check, or undefined if none needed.
- * @param {CheckResult} check
- */
 function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
-  if (check.status === 'pass') {
-    return undefined
-  }
+  if (check.status === 'pass') return undefined
 
   switch (check.id) {
 
@@ -230,20 +277,24 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
             <p>
               <strong className="text-zinc-300">What is CPU Virtualisation?</strong><br />
               It is a hardware feature (Intel VT-x or AMD-V) built into your processor that lets your PC
-              run virtual machines — isolated environments where a separate operating system like Fedora
-              Linux runs safely inside Windows without affecting your main system. VirtualBox requires it.
+              run virtual machines. VirtualBox requires it.
             </p>
-            <p className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
+            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
               <strong>Note:</strong> Windows does not always detect this setting correctly — it may report
               it as disabled even when it is on. Try starting a VM first. If it works, no action is needed.
             </p>
-            <p>
-              <strong className="text-zinc-300">How to enable it:</strong>
-            </p>
+            <p><strong className="text-zinc-300">How to enable it:</strong></p>
             <ol className="list-decimal list-inside space-y-1 pl-1">
               <li>Restart your PC.</li>
-              <li>Press <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F2</kbd>, <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F10</kbd>, <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F12</kbd>, or <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">Delete</kbd> during startup to enter BIOS/UEFI.</li>
-              <li>Look for a setting named <em>Intel VT-x</em>, <em>AMD-V</em>, <em>SVM</em>, or <em>Virtualisation Technology</em>.</li>
+              <li>
+                Press{' '}
+                <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F2</kbd>,{' '}
+                <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F10</kbd>,{' '}
+                <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">F12</kbd>, or{' '}
+                <kbd className="bg-zinc-700 text-zinc-200 px-1 rounded text-xs">Delete</kbd>{' '}
+                during startup to enter BIOS/UEFI.
+              </li>
+              <li>Look for <em>Intel VT-x</em>, <em>AMD-V</em>, <em>SVM</em>, or <em>Virtualisation Technology</em>.</li>
               <li>Set it to <strong>Enabled</strong>, save and reboot.</li>
             </ol>
             <p className="text-zinc-500">The exact location depends on your motherboard manufacturer.</p>
@@ -259,12 +310,12 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
             <p>
               <strong className="text-zinc-300">What is Secure Boot?</strong><br />
               Secure Boot is a UEFI security feature that prevents unsigned or untrusted software from
-              loading during startup. It is designed to protect against rootkits and bootkits.
+              loading during startup.
             </p>
             <p>
               VirtualBox 7+ is signed and fully supports Secure Boot — no action is needed if you are on
-              VirtualBox 7 or later. If you are on an older version and experiencing driver signing errors
-              on startup, you may need to disable Secure Boot in your BIOS/UEFI settings.
+              VirtualBox 7 or later. If you are on an older version and experiencing driver signing errors,
+              you may need to disable Secure Boot in your BIOS/UEFI settings.
             </p>
           </>}
         />
@@ -277,17 +328,14 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
           description={<>
             <p>
               <strong className="text-zinc-300">Total RAM</strong> is the physical memory installed in
-              your PC. VirtualBox needs at least 4 GB to run a VM, and 8 GB or more is recommended so
-              both Windows and the VM have enough to work with.
+              your PC. VirtualBox needs at least 4 GB to run a VM, and 8 GB or more is recommended.
             </p>
             <p>
               <strong className="text-zinc-300">Free RAM</strong> is how much memory is available right
-              now. Even if your PC has plenty of RAM installed, running too many applications at once can
-              leave too little free for a VM. At least 3 GB free is required to start one.
+              now. At least 3 GB free is required to start a VM.
             </p>
             <p>
-              Close unused applications (browsers, games, editors) before starting your VM to free up
-              memory. If your total RAM is less than 4 GB, consider upgrading your hardware.
+              Close unused applications before starting your VM to free up memory.
             </p>
           </>}
         />
@@ -340,16 +388,13 @@ function InstallVirtualBoxAction() {
         {installing ? 'Installing...' : 'Install VirtualBox'}
       </button>
       {installing && (
-        <span className="text-zinc-400 text-xs">
-          Check the log panel above for progress.
-        </span>
+        <span className="text-zinc-400 text-xs">This may take a few minutes...</span>
       )}
     </div>
   )
 }
 
 // ── FixInstructions ──────────────────────────────────────────────────────────
-// Renders a fix description and an optional copyable command.
 
 interface FixInstructionsProps {
   title: string
@@ -364,8 +409,6 @@ function FixInstructions({ title, description, command }: FixInstructionsProps) 
     if (!command) return
     navigator.clipboard.writeText(command)
     setCopied(true)
-
-    // Reset the "Copied!" label after 2 seconds
     setTimeout(() => setCopied(false), 2000)
   }
 

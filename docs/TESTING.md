@@ -259,13 +259,14 @@ A passing run looks like:
 
 ```
  ✓ src/__tests__/CheckCard.test.tsx         (15 tests)
- ✓ src/__tests__/SetupPage.test.tsx         (12 tests)
- ✓ src/__tests__/CreateVmPage.test.tsx      (18 tests)
- ✓ electron/__tests__/ipc-handlers.test.js  (14 tests)
- ✓ electron/__tests__/script-runner.test.js  (7 tests)
+ ✓ src/__tests__/SetupPage.test.tsx         (24 tests)
+ ✓ src/__tests__/CreateVmPage.test.tsx      (25 tests)
+ ✓ src/__tests__/LogsPage.test.tsx          (12 tests)
+ ✓ electron/__tests__/ipc-handlers.test.js  (21 tests)
+ ✓ electron/__tests__/script-runner.test.js (11 tests)
 
-Test Files  5 passed (5)
-     Tests  70 passed (70)
+Test Files  6 passed (6)
+     Tests  108 passed (108)
 ```
 
 ### What is tested
@@ -273,10 +274,11 @@ Test Files  5 passed (5)
 | Test file | Describe groups | Count |
 |-----------|----------------|-------|
 | `src/__tests__/CheckCard.test.tsx` | `status badges` — OK/!!/XX badges; `content` — label and detail text; `"How to fix" toggle` — hidden for pass, shown for fail/warn, open/close lifecycle | 15 |
-| `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — cards rendered, summary counts (pass/warn/fail), pass/fail message; `live log stream` — emitted lines appear; `error state` — script failure message; `InstallVirtualBox action` — button states and success message | 12 |
-| `src/__tests__/CreateVmPage.test.tsx` | `submit button` — disabled when fields empty/partial, enabled when both filled; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating..." + disabled, correct args passed, live log lines; `success state` — green banner, "What to do next"; `failure state` — red banner, log toggle; `log toggle` — hidden by default, Show/Hide lifecycle | 18 |
-| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item array, bare-object Array.isArray guard, error paths with stdout/stderr snippets | 14 |
-| `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input | 7 |
+| `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — left-panel rows rendered, summary counts (pass/warn/fail), pass/fail message, re-run; `live log stream` — emitted lines appear in right panel; `error state` — script failure message; `detail panel` — auto-selects first failing check, clicking a row shows its detail and fix content, "No action needed" for passing checks, switching selection clears previous detail; `InstallVirtualBox action` — button states and success message | 24 |
+| `src/__tests__/CreateVmPage.test.tsx` | `submit button` — disabled when fields empty/partial, enabled when both filled; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating..." + disabled, correct args passed, live log lines; `success state` — green banner, "What to do next"; `failure state` — red banner, log toggle; `log toggle` — hidden by default, Show/Hide lifecycle | 25 |
+| `src/__tests__/LogsPage.test.tsx` | default log selection, content rendered, empty/error states, switching logs, Refresh button, Refresh disabled while loading, folder buttons visible, correct `openLogDir` keys | 12 |
+| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item array, bare-object Array.isArray guard, error paths with stdout/stderr snippets; `get-downloads-path`; `open-log-dir` — success, correct paths, error string, unknown key | 21 |
+| `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input; `hasActiveScript`; `killActiveScript` | 11 |
 
 ### Debugging a failing test in VS Code
 

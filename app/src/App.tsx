@@ -31,10 +31,10 @@ export default function App() {
         <ErrorBoundary>
           {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
-          <div style={{ display: currentPage === 'setup' ? undefined : 'none' }}>
+          <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
             <SetupPage />
           </div>
-          <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }}>
+          <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
             <CreateVmPage />
           </div>
           {currentPage === 'docs' && <DocsPage />}

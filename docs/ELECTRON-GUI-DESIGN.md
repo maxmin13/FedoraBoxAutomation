@@ -108,7 +108,7 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
 | 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM |
-| 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions; analysis results persist when navigating away and back |
+| 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
 | 3 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
 | 4 | **Logs** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
 | 5 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
@@ -123,7 +123,7 @@ A top navigation bar shows which page is active. The Docs tab is hidden in produ
 
 `virtualbox-sanity-checks.ps1` accepts a `-Json` switch. When set, it writes a JSON array to stdout instead of coloured text. The `run-sanity-checks` IPC handler always passes this flag.
 
-Each element has four fields: `id`, `label`, `status` (`"pass"` | `"warn"` | `"fail"`), and `detail`. The GUI renders each as a `CheckCard` and shows a summary bar at the bottom that counts pass/warn/fail. A "Proceed anyway" button appears when only warnings are present.
+Each element has four fields: `id`, `label`, `status` (`"pass"` | `"warn"` | `"fail"`), and `detail`. The GUI renders a summary bar (pass/warn/fail counts) plus a master/detail split layout: the left panel lists all checks as compact badge + label rows; clicking a row loads that check's `detail` text and fix action into the right panel. The first failing check is auto-selected when analysis completes so the most urgent fix is immediately visible.
 
 `parseChecksOutput` in `ipc-handlers.js` handles two edge cases: DISM progress noise lines that appear before the JSON, and the PowerShell `ConvertTo-Json` quirk that emits a bare object instead of a one-element array when there is only one result.
 
@@ -250,7 +250,7 @@ npm test
 | Test file | Component | Key behaviours covered |
 |-----------|-----------|----------------------|
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
-| `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, cards rendered, summary counts, "Ready"/"Fix" banners, error message |
+| `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, left-panel rows rendered, summary counts, "Ready"/"Fix" banners, error message, auto-selection of first failing check, clicking a row loads detail in right panel, "No action needed" for pass checks, panel switching |
 | `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
 | `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading, "App logs" and "VirtualBox VMs" folder buttons visible, each calls `openLogDir` with the correct key |
 
@@ -292,8 +292,8 @@ easy to read and learn, no separate CSS files to maintain.
 ### Layout
 
 - Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Logs, Docs); Docs is hidden in production; active tab highlighted
-- Main content area scrollable
-- Streaming log panel on the Setup page, auto-scrolls as lines arrive
+- Main content area: SetupPage and CreateVmPage fill the viewport with `h-full` and manage their own internal layout (no outer scroll); other pages scroll through the main area as needed
+- SetupPage uses a left/right split — left panel is a fixed-width check list, right panel fills remaining width with detail + fix content; both panels use `overflow-hidden` so no scrollbars appear at the fixed 1100×750 window size
 
 ---
 
