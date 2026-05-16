@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a PowerShell automation project for VirtualBox. A PowerShell automation toolkit for creating and provisioning Fedora Linux VMs in VirtualBox on Windows 11 Home, with an Electron + React GUI to orchestrate the pipeline.
+A PowerShell automation toolkit for creating and provisioning Fedora Linux VMs in VirtualBox on Windows 11 Home, with an Electron + React GUI to orchestrate the pipeline.
 
 **Test frameworks in use:**
 - PowerShell scripts — Pester v5 (`host/virtualbox-sanity-checks.Tests.ps1`)
@@ -12,23 +12,19 @@ This is a PowerShell automation project for VirtualBox. A PowerShell automation 
 - React components — Vitest + React Testing Library (`app/src/__tests__/*.test.tsx`; run via `npm test` in `app/`)
 - Electron main process — Vitest (`app/electron/__tests__/*.test.js`; run via `npm test` in `app/`)
 
-Always use error handling in scripts.
-
 ## Running Scripts
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\<script-name>.ps1"
+powershell -ExecutionPolicy Bypass -File ".\host\<script-name>.ps1"
 ```
 
-Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
+Scripts run in order, or use the Electron GUI (`cd app && npm run dev`):
 
-1. `host\virtualbox-sanity-checks.ps1` — validates prerequisites (RAM, disk, CPU virtualization, Hyper-V)
+1. `host\virtualbox-sanity-checks.ps1` — validates prerequisites (RAM, disk, CPU virtualisation, Hyper-V)
 2. `host\virtualbox-install.ps1` — downloads and silently installs VirtualBox
 3. `host\create-vm.ps1` — creates a Fedora VM from ISO with user-specified parameters; prompts to attach Guest Additions ISO
 4. `host\provision-vm.ps1` — installs dev tools into a running VM (requires Guest Additions)
-5. `host\cleanup.ps1` — removes failed VMs
-6. `run.ps1` — GUI orchestrator that runs the full pipeline with optional cleanup and sanity checks
-
+5. `host\cleanup.ps1` — removes failed VMs (preserves ISOs)
 
 ## Architecture
 
@@ -36,70 +32,77 @@ Scripts can be run interactively in order, or use `run.ps1` for a guided GUI:
 - `Write-Header` / `Read-YesNo` — styled I/O helpers
 - `Find-VBoxManage` — locates `VBoxManage.exe` on the host
 - `Invoke-VBox` — wraps `VBoxManage` calls with error handling and direct execution (no `Start-Process`)
-- Guest Additions helpers in `create-vm.ps1`:
-  - `Get-VBoxGuestAdditionsIso` — locates the local `VBoxGuestAdditions.iso`
-  - `Get-VBoxIDEControllerName` — creates IDE controller if needed
-  - `Attach-VBoxGuestAdditionsIso` — mounts Guest Additions ISO to the VM for later installation
+- `param()` blocks with `Read-Host` fallback — scripts accept parameters but always fall back to interactive prompts when parameters are empty, so they work both standalone and when called from the Electron GUI
+- Guest Additions helpers in `create-vm.ps1`: `Get-VBoxGuestAdditionsIso`, `Get-VBoxIDEControllerName`, `Attach-VBoxGuestAdditionsIso`
 
-**Guest side (Bash):** Shell scripts under `vm/` run inside the Fedora VM via `VBoxManage guestcontrol`. They use color-coded output helpers and structured exit codes.
+**Guest side (Bash):** Shell scripts under `vm/` run inside the Fedora VM via `VBoxManage guestcontrol`. They use colour-coded output helpers (`log`, `warn`, `error`) from `vm/lib/common.sh` and structured exit codes. All scripts must use LF line endings — CRLF causes exit 126 on Linux.
 
-**Guest control requirement:** `provision-vm.ps1` and guest script execution require VirtualBox Guest Additions to be installed in the VM. Guest Additions can be installed during the Fedora OS installation or manually after. All guest commands authenticate with the VM user credentials passed interactively.
+**Electron GUI (`app/`):** Electron + React + TypeScript, bundled by Vite, styled with Tailwind CSS.
+- `electron/main.js` — window creation, close-during-script warning dialog
+- `electron/ipc-handlers.js` — all `ipcMain.handle()` registrations; wrapped in `handleIpc()` which logs every call to `gui.log`
+- `electron/script-runner.js` — spawns PowerShell scripts, streams stdout/stderr line-by-line over IPC
+- `electron/scripts.js` — single source of truth for all `.ps1` paths; register new scripts here first
+- `electron/preload.js` — `contextBridge` exposes `window.electronAPI` to React; add new IPC calls here and in `electron.d.ts`
+- `src/pages/` — one component per page: LandingPage, SetupPage, CreateVmPage, LogsPage, DocsPage
+- `src/components/` — NavBar, CheckCard
 
-**Guest Additions attachment:** `create-vm.ps1` now prompts to attach the Guest Additions ISO before VM startup, allowing manual installation during or after Fedora setup.
+**SetupPage layout:** Master/detail split — left panel is a compact check list (badge + label), right panel shows detail + fix instructions for the selected check. First failing check is auto-selected on completion. Uses `h-full flex flex-col` with `overflow-hidden` panels to fit the fixed 1100×750 window without scrollbars.
+
+**State persistence:** SetupPage and CreateVmPage are kept always-mounted with `display: none` in App.tsx so their state survives navigation.
 
 ## Key Constraints
 
-- Targets **Windows 11 Home** specifically — Hyper-V must be disabled (VirtualBox incompatibility)
-- Minimum host requirements: 8 GB RAM, 30 GB free disk, CPU virtualization enabled in BIOS
+- Targets **Windows 11 Home** — Hyper-V must be disabled (VirtualBox incompatibility)
+- Minimum host requirements: 8 GB RAM, 30 GB free disk, CPU virtualisation enabled in BIOS
 - Guest OS: Fedora Linux (uses `dnf` package manager and `systemctl`)
-- VBoxManage must be on the system PATH or discoverable; `Find-VBoxManage` searches common install locations
-- PowerShell 5.1+ required; scripts use `try/catch` and `$ErrorActionPreference = 'Stop'` patterns
+- VBoxManage must be on PATH or discoverable; `Find-VBoxManage` searches common install locations
 - ISO files are preserved by cleanup; only failed VMs are removed
+- All PowerShell scripts use `try/catch` and `$ErrorActionPreference = 'Stop'`
+- Use plain ASCII in `.ps1` files — PowerShell 5.1 garbles Unicode punctuation (use `-` not `—`, `->` not `→`)
 
-## Workflow Notes
+## Critical Coding Rules
 
-**Expected prompts during `create-vm.ps1`:**
-- VM name — if a VM with that name already exists, the script offers to unregister it (files are kept)
-- Folder location, ISO path
-- RAM (MB) — default 4096, CPU count — default 4, disk size (MB) — default 40000
-- Disk format — `[VDI*|VMDK|VHD]` where `*` marks the default; VDI is VirtualBox native, VMDK is VMware-compatible, VHD is Microsoft/Hyper-V
-- Video RAM (MB) — default 128; 16 MB is too low for Fedora Workstation graphics
-- Network adapter type — `[NAT*|bridged|host-only|none]`; NAT gives internet access without host network config
-- Planned guest username and password (for reference during Fedora setup)
-- Option to attach Guest Additions ISO
-- Option to start the VM immediately
+**PowerShell scripts:**
+- Always include `param()` blocks but fall back to `Read-Host` when parameters are empty
+- Use `Invoke-VBox` for all VBoxManage calls — never call VBoxManage directly with `Start-Process`
+- `showvminfo` output has trailing `\r` on each line — use `-match` not `-eq` or `-contains` for string comparisons
 
-**Guest Additions installation:**
-1. If ISO is attached, it appears as a second DVD drive (`/dev/sr1`) inside the VM
-2. After OS installation, open a terminal and run:
-   ```bash
-   sudo dnf update -y
-   sudo dnf install -y dkms kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2
-   sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
-   sudo reboot
-   ```
-3. After reboot, mount and install Guest Additions:
-   ```bash
-   sudo mkdir -p /mnt/ga
-   sudo mount /dev/sr1 /mnt/ga   # if it fails, run lsblk and try /dev/sr0
-   sudo /mnt/ga/VBoxLinuxAdditions.run
-   ```
-4. Reboot again; Guest Additions and SELinux changes will then be active (shared clipboard, drag-and-drop, better resolution, guest control)
-5. Without Guest Additions, remote script execution via `provision-vm.ps1` will not work
+**Bash scripts:**
+- All `dnf` calls must include `-y` — scripts run non-interactively via guestcontrol and will hang on any prompt
+- Set LF line endings — CRLF causes "file not found" / exit 126 on Linux
+- Docker group commands: use `sg docker -c "cmd"` to activate group membership without logout
+- Never use `--enable-optimizations` in Python `./configure`; use `make altinstall` not `make install`
+- Name Python venvs `~/python_venv_X.Y` to allow multiple versions to coexist
 
-**Keeping Guest Additions in sync with the kernel:**
-Guest Additions compile kernel modules for the kernel running at install time. Installing `dkms` (step 2 above) ensures modules are automatically recompiled whenever a new kernel boots after `dnf update`. Without DKMS, Guest Additions will break after every kernel upgrade and must be reinstalled manually:
-   ```bash
-   sudo dnf install -y kernel-devel-$(uname -r)
-   sudo /mnt/ga/VBoxLinuxAdditions.run
-   sudo reboot
-   ```
-`$(uname -r)` is essential — it pins `kernel-devel` to the exact running kernel version.
+**Guest control:**
+- Always authenticate as `root`, not a regular user — `sudo` requires a TTY which Guest Control does not provide
+- Set a root password inside the VM (`sudo passwd root`) before running `provision-vm.ps1`
+
+**Electron / React:**
+- New `handleIpc()` calls in `ipc-handlers.js` require a full app restart — main process loads the file once at startup
+- `ConvertTo-Json` emits a bare object (not array) for single-item collections — always wrap with `@(...)` and add `Array.isArray` guard in JS
+- DISM progress text contaminates JSON parsing — set `$ProgressPreference = 'SilentlyContinue'` and keep stdout/stderr in separate Node.js buffers
+- Extract pure logic from IPC handlers into named exported functions before testing (allows unit testing without a running Electron process)
+
+## Sanity Check Thresholds
+
+| Check | Pass | Warn | Fail |
+|-------|------|------|------|
+| OS architecture | 64-bit | — | 32-bit |
+| Total RAM | >= 8 GB | 4–8 GB | < 4 GB |
+| Free RAM | >= 5120 MB | 3072–5119 MB | < 3072 MB |
+| Disk free (C:) | >= 30 GB | 10–29 GB | < 10 GB |
+| CPU virtualisation | Enabled | Disabled (check unreliable, may be false negative) | — |
+| Hyper-V | Not enabled | Enabled | — |
+| Windows Hypervisor Platform | Not enabled | Enabled | — |
+| Virtual Machine Platform | Not enabled | Enabled | — |
+| Secure Boot | Disabled | Enabled | — |
+| VirtualBox | >= 7.x | Older version | Not installed |
 
 ## Troubleshooting
 
-**VBoxManage not found:** Ensure VirtualBox is installed. Run `virtualbox-install.ps1` or manually add `C:\Program Files\Oracle\VirtualBox` to system PATH.
+**VBoxManage not found:** Run `virtualbox-install.ps1` or add `C:\Program Files\Oracle\VirtualBox` to system PATH.
 
-**Guest Additions ISO not found:** The script searches standard VirtualBox install locations. If not found, manually specify the path or install VirtualBox with default options.
+**Guest Additions ISO not found:** The script searches standard VirtualBox install locations. Specify the path manually or install VirtualBox with default options.
 
-**Guest control fails in provision-vm.ps1:** Verify Guest Additions are installed in the VM. Check that the VM is running and credentials are correct.
+**Guest control fails:** Verify Guest Additions are installed and the VM is running. Authenticate as `root`. If Guest Additions were installed before a kernel update, reinstall them with `sudo dnf install -y kernel-devel-$(uname -r)` then re-run `VBoxLinuxAdditions.run`.

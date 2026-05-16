@@ -97,14 +97,29 @@ LOGIN_USER="${1}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 ```
 
+**Optional version argument for testability:** Scripts that fetch a version string via `curl` should accept an optional `$2` so tests can inject a fixed version without network access:
+
+```bash
+VERSION="${2:-}"
+if [[ -z "${VERSION}" ]]; then
+    VERSION=$(curl -sL https://endoflife.date/api/<product>/latest.json | python3 -c "import sys,json; print(json.load(sys.stdin)['latest'])")
+fi
+```
+
 ### Downloads
 
 - Use plain `wget` for large file downloads (`--progress=dot` is not implemented in Fedora's wget and produces a warning).
 - Use `curl -#` (or `curl -sL` for small text-only fetches like version strings).
+- Fetch latest stable versions dynamically from the endoflife.date API rather than hardcoding:
+
+```bash
+VERSION=$(curl -sL https://endoflife.date/api/<product>/latest.json \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['latest'])")
+```
+
 - Always validate version strings fetched via curl before using them in URLs:
 
 ```bash
-VERSION=$(curl -sL https://example.com/stable.txt)
 if [[ -z "${VERSION}" ]]; then
     log_error 'Could not determine latest version.'
     exit 1
@@ -120,6 +135,26 @@ if ! docker --version > /dev/null 2>&1; then
     log_error 'Docker is not installed. Run docker.sh first.'
     exit 1
 fi
+```
+
+### Docker group activation
+
+After adding a user to the `docker` group, activate group membership in the same session with `sg` — never require a logout:
+
+```bash
+sg docker -c "docker run --rm hello-world"
+```
+
+This applies to any command that needs the `docker` group to be active.
+
+### Python builds
+
+- Never use `--enable-optimizations` in `./configure` — it causes test failures inside VMs.
+- Always use `make altinstall` not `make install` to avoid overwriting the system Python.
+- Name virtual environments `~/python_venv_X.Y` to allow multiple Python versions to coexist:
+
+```bash
+python3.12 -m venv ~/python_venv_3.12
 ```
 
 ### Temporary files
@@ -146,7 +181,93 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 ## PowerShell Scripts (.ps1)
 
 - Always use `$ErrorActionPreference = 'Stop'` and `try/catch` for error handling.
-- Never use Unicode punctuation in string literals — PowerShell 5.1 renders em dashes (`—`), curly quotes (`""`), and similar characters as garbled text (`â€"`). Use plain ASCII equivalents (`-`, `"`, `'`) instead.
+- Never use Unicode punctuation in string literals — PowerShell 5.1 renders em dashes (`—`), curly quotes (`""`), and similar characters as garbled text. Use plain ASCII equivalents (`-`, `"`, `'`) instead.
+
+### Parameters with Read-Host fallback
+
+Every `.ps1` that accepts input must have a `param()` block, but always fall back to `Read-Host` when the parameter is empty. This makes scripts work both standalone (interactive) and when called from the Electron GUI (parameters passed programmatically):
+
+```powershell
+param(
+    [string]$VmName = ''
+)
+
+if (-not $VmName) {
+    $VmName = Read-Host 'Enter VM name'
+}
+```
+
+Never use `Read-Host` without this guard — it will block Electron's script runner indefinitely.
+
+### VBoxManage calls
+
+Always use the `Invoke-VBox` helper for every VBoxManage call — never call `VBoxManage` directly via `Start-Process`:
+
+```powershell
+# Correct
+Invoke-VBox 'createvm', '--name', $VmName, '--register'
+
+# Wrong
+Start-Process -FilePath 'VBoxManage' -ArgumentList 'createvm', ...
+```
+
+`Invoke-VBox` handles error checking and direct execution in the same process.
+
+### Parsing showvminfo output
+
+`VBoxManage showvminfo` output has a trailing `\r` on each line (Windows CRLF behaviour). Use `-match` for string comparisons — never `-eq` or `-contains`:
+
+```powershell
+# Correct
+if ($line -match 'State:\s+running') { ... }
+
+# Wrong — trailing \r means this never matches
+if ($line -eq 'State:         running') { ... }
+```
+
+### Per-section try/catch in diagnostic scripts
+
+Diagnostic scripts like `virtualbox-sanity-checks.ps1` must wrap each check in its own `try/catch`. A single outer wrapper kills all JSON output the moment any one check fails:
+
+```powershell
+# Correct — each check is independent
+try { $ramCheck = Check-Ram } catch { $ramCheck = @{ status = 'fail'; detail = $_.Exception.Message } }
+try { $diskCheck = Check-Disk } catch { $diskCheck = @{ status = 'fail'; detail = $_.Exception.Message } }
+
+# Wrong — one failure silences all remaining checks
+try {
+    $ramCheck  = Check-Ram
+    $diskCheck = Check-Disk
+} catch { ... }
+```
+
+### ConvertTo-Json with single-item collections
+
+`ConvertTo-Json` emits a bare object (not an array) when the input collection has exactly one item. Always wrap with `@(...)` before piping:
+
+```powershell
+# Correct
+@($checks) | ConvertTo-Json -Depth 5
+
+# Wrong — outputs {} instead of [{}] for a single check
+$checks | ConvertTo-Json -Depth 5
+```
+
+Add a matching `Array.isArray` guard in the JavaScript consumer:
+
+```js
+const checks = Array.isArray(parsed) ? parsed : [parsed]
+```
+
+### DISM / progress output contamination
+
+DISM and some Windows cmdlets write progress text to stdout, which corrupts JSON parsing. Suppress it at the top of any script that emits structured output:
+
+```powershell
+$ProgressPreference = 'SilentlyContinue'
+```
+
+In the Electron script runner, keep stdout and stderr in **separate** Node.js buffers — never mix them before parsing JSON.
 
 ### Logging
 
@@ -182,6 +303,42 @@ Rules:
   - **Red** — lines matching `error`, `failed`, `fatal`, `command not found`, `permission denied`
   - **Yellow** — lines matching `warning`
   - Default — everything else
+
+## Electron / React (`app/`)
+
+### Adding a new PowerShell script
+
+1. Register the `.ps1` path in `electron/scripts.js` — this is the single source of truth for all script paths.
+2. Add an `ipcMain.handle()` call (via `handleIpc()`) in `electron/ipc-handlers.js`.
+3. Expose the new call through `contextBridge` in `electron/preload.js`.
+4. Add the TypeScript signature in `src/electron.d.ts` so React components get autocomplete.
+5. **Restart the Electron app** — `ipc-handlers.js` is loaded once at startup; new handlers are not picked up by hot reload.
+
+### Adding a new IPC handler
+
+New `handleIpc()` calls require a full app restart (`npm run dev` again) — the main process loads `ipc-handlers.js` once at startup and hot-reload does not re-execute it.
+
+Document every new channel in the IPC channel list in `docs/ELECTRON-GUI-DESIGN.md`.
+
+### Testing IPC handlers
+
+Extract pure logic out of handler callbacks into named exported functions before writing tests. The test environment cannot load Electron, so handlers must be unit-tested without a running process:
+
+```js
+// ipc-handlers.js
+export function parseVmList(raw) { ... }   // pure, testable
+
+ipcMain.handle('list-vms', () => {
+    const raw = execSync('VBoxManage list vms').toString()
+    return parseVmList(raw)
+})
+```
+
+Use a `__mocks__/electron.js` stub and `vitest.workspace.ts` to run Electron tests in the `node` environment and React tests in `jsdom`.
+
+### TypeScript types
+
+Add a matching entry in `src/electron.d.ts` for every new `ipcMain.handle()` channel. React components depend on `window.electronAPI` being fully typed for autocomplete and compile-time checks.
 
 ## Credentials (.credentials/)
 
