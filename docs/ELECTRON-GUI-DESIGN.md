@@ -1,13 +1,5 @@
 # Electron GUI Design — FedoraBoxAutomation
 
-## Overview
-
-Replaces the removed `run.ps1`. The GUI orchestrates the same pipeline via a
-point-and-click interface, calling the existing PowerShell scripts under the
-hood via `child_process.spawn`.
-
----
-
 ## Technology Stack
 
 | Layer | Technology |
@@ -69,6 +61,9 @@ app/
   - `run-sanity-checks` — runs `virtualbox-sanity-checks.ps1 -Json` and returns structured results
   - `install-virtualbox` — runs `virtualbox-install.ps1` and streams output
   - `create-vm` — runs `create-vm.ps1` with all VM parameters; streams output; returns `{ ok: boolean }`
+  - `delete-vm` — unregisters the VM and deletes all associated files (VDI, snapshots); VM must be stopped first
+  - `get-downloads-path` — returns the OS downloads folder path (used to pre-fill the ISO picker)
+  - `pick-iso` — opens a native file picker filtered to `.iso` files; returns `{ filePath }` or `{ filePath: null }` if cancelled
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
@@ -275,7 +270,7 @@ easy to read and learn, no separate CSS files to maintain.
 
 ### Layout
 
-- Fixed top navigation bar with 3 tabs (My VMs, Setup, Docs); active tab highlighted
+- Fixed top navigation bar with 4 tabs (My VMs, Setup, Create VM, Docs); active tab highlighted
 - Main content area scrollable
 - Streaming log panel on the Setup page, auto-scrolls as lines arrive
 
@@ -458,20 +453,6 @@ const SCRIPTS = {
 module.exports = SCRIPTS
 ```
 
-Add `scripts.js` to the file structure:
-
-```
-app/
-  electron/
-    main.js              <- app entry and window creation only
-    ipc-handlers.js      <- all ipcMain.handle() registrations
-    script-runner.js     <- spawn, stream, and kill logic
-    preload.js           <- contextBridge API
-    scripts.js           <- single source of truth for all .ps1 paths
-  src/                   <- React renderer
-    ...
-```
-
 ### Log every IPC message (always, not just dev)
 
 A `handleIpc` wrapper logs every IPC call and reply to `gui.log` unconditionally,
@@ -479,13 +460,20 @@ and also mirrors to the VS Code Debug Console in dev mode. This makes the data
 flow visible without needing a breakpoint:
 
 ```js
+// Channels too trivial to log (polled on every page load)
+const SILENT_CHANNELS = new Set(['is-dev'])
+
 // Wraps ipcMain.handle to log every call and reply to gui.log.
 // Replace ipcMain.handle(...) with handleIpc(...) everywhere.
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
-    log.info(`[IPC] received: ${channel}`, JSON.stringify(args))
+    if (!SILENT_CHANNELS.has(channel)) {
+      log.info(`[ipc] recv ${channel}`, args.length ? JSON.stringify(args) : '')
+    }
     const result = await handler(event, ...args)
-    log.info(`[IPC] replied: ${channel}`, JSON.stringify(result))
+    if (!SILENT_CHANNELS.has(channel)) {
+      log.info(`[ipc] reply ${channel}`, JSON.stringify(result))
+    }
     return result
   })
 }
