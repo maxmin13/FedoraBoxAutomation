@@ -233,8 +233,8 @@ export default function CreateVmPage() {
             </label>
             <input
               type="text"
-              value={isoPath}
-              onChange={(e) => setIsoPath(e.target.value)}
+              value={isoPath ? isoPath.split(/[\\/]/).pop()! : ''}
+              readOnly
               onClick={async () => {
                 const result = await window.electronAPI.pickIso()
                 if (result.filePath) setIsoPath(result.filePath)
@@ -407,7 +407,7 @@ export default function CreateVmPage() {
             {/* Identity — full width */}
             <ConfirmSection title="Identity">
               <ConfirmRow label="VM Name"   value={trimmedName} />
-              <ConfirmRow label="ISO File"  value={isoPath.trim() || '—'} />
+              <ConfirmRow label="ISO File"  value={isoPath.trim() ? isoPath.trim().split(/[\\/]/).pop()! : '—'} />
               <ConfirmRow label="VM Folder" value={vmFolder.trim() || '(VirtualBox default)'} />
             </ConfirmSection>
             {/* Hardware + Options — two columns */}
@@ -558,6 +558,14 @@ interface LogPanelProps {
 }
 
 function LogPanel({ title, showLog, logLines, onToggle }: LogPanelProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (showLog && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [logLines, showLog])
+
   return (
     <div className="bg-zinc-800 border border-zinc-700 rounded-lg">
       <button
@@ -569,7 +577,7 @@ function LogPanel({ title, showLog, logLines, onToggle }: LogPanelProps) {
         <span className="text-zinc-500 text-xs">{showLog ? 'Hide' : 'Show'}</span>
       </button>
       {showLog && (
-        <div className="px-4 pb-4 font-mono text-xs text-zinc-400 max-h-64 overflow-y-auto space-y-0.5">
+        <div ref={scrollRef} className="px-4 pb-4 font-mono text-xs text-zinc-400 max-h-64 overflow-y-auto space-y-0.5">
           {logLines.map((line, i) => (
             <div key={i}>{line}</div>
           ))}

@@ -46,6 +46,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Opens a native OS file picker filtered to .iso files; returns the chosen path or null
   pickIso: () => ipcRenderer.invoke('pick-iso'),
 
+  // ── Log viewer ────────────────────────────────────────────
+  // Reads one of the app log files ('gui.log' or 'host.log') and returns its content
+  readLog: (name) => ipcRenderer.invoke('read-log', name),
+
   // ── Error logging ─────────────────────────────────────────
   // Forwards uncaught renderer errors (from the React error boundary) to the main process log
   logError: (message, stack) => ipcRenderer.invoke('log-error', message, stack),

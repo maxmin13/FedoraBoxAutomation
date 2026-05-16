@@ -13,6 +13,7 @@ const NAV_ITEMS: { page: Page; label: string; devOnly?: boolean }[] = [
   { page: 'landing', label: 'My VMs' },
   { page: 'setup', label: 'Setup' },
   { page: 'create-vm', label: 'Create VM' },
+  { page: 'logs', label: 'Logs' },
   { page: 'docs', label: 'Docs', devOnly: true },
 ]
 

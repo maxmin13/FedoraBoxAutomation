@@ -13,8 +13,10 @@
 
 const { ipcMain, app, dialog } = require('electron')
 const { execSync } = require('child_process')
+const { inspect } = require('util')
 const path = require('path')
 const fs = require('fs')
+const os = require('os')
 const { runScript } = require('./script-runner')
 const SCRIPTS = require('./scripts')
 const log = require('./logger')
@@ -22,8 +24,10 @@ const log = require('./logger')
 // The docs/ folder sits two levels above app/electron/
 const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 
-// Channels too trivial to log (polled on every page load)
-const SILENT_CHANNELS = new Set(['is-dev'])
+// Channels excluded from IPC logging.
+// 'is-dev' is polled on every page load; 'read-log' returns the full file
+// content — logging it back to the log file would create a feedback loop.
+const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
 
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
@@ -35,13 +39,13 @@ const SILENT_CHANNELS = new Set(['is-dev'])
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] recv ${channel}`, args.length ? JSON.stringify(args) : '')
+      log.info(`[ipc] recv ${channel}`, args.length ? inspect(args, { depth: 3, breakLength: Infinity }) : '')
     }
 
     const result = await handler(event, ...args)
 
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] reply ${channel}`, JSON.stringify(result))
+      log.info(`[ipc] reply ${channel}`, inspect(result, { depth: 3, breakLength: Infinity }))
     }
 
     return result
@@ -293,6 +297,35 @@ function registerIpcHandlers(win) {
       properties: ['openFile'],
     })
     return { filePath: result.canceled ? null : result.filePaths[0] }
+  })
+
+  // ── read-log ──────────────────────────────────────────────
+  // Reads the last 500 lines of one of the two app log files.
+  // Only 'gui.log' and 'host.log' are accepted — no arbitrary path traversal.
+  // Uses async fs.promises.readFile so it never blocks the main process event loop.
+  handleIpc('read-log', async (_event, name) => {
+    const allowed = new Set(['gui.log', 'host.log'])
+    if (!allowed.has(name)) {
+      return { ok: false, error: `Unknown log file: ${name}` }
+    }
+    const logPath = path.join(
+      process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+      'FedoraBoxAutomation',
+      'logs',
+      name
+    )
+    try {
+      const raw = await fs.promises.readFile(logPath, 'utf8')
+      const lines = raw.split('\n')
+      const tail = lines.slice(-500).join('\n')
+      return { ok: true, content: tail }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return { ok: true, content: '' }
+      }
+      log.error(`[ipc][read-log] ${name}:`, error.message)
+      return { ok: false, error: error.message }
+    }
   })
 
   // ── log-error ─────────────────────────────────────────────

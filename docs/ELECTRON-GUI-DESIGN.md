@@ -43,14 +43,16 @@ app/
       LandingPage.tsx            <- lists all registered VMs
       SetupPage.tsx              <- environment analysis and fix actions
       CreateVmPage.tsx           <- form to configure and create a new Fedora VM
+      LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
     components/
-      NavBar.tsx                 <- My VMs / Setup / Create VM / Docs navigation
+      NavBar.tsx                 <- My VMs / Setup / Create VM / Logs / Docs navigation
       CheckCard.tsx              <- pass/warn/fail result card
     __tests__/
       CheckCard.test.tsx
       SetupPage.test.tsx
       CreateVmPage.test.tsx
+      LogsPage.test.tsx
       setup.ts                   <- jest-dom matchers setup
   __mocks__/
     electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
@@ -77,6 +79,7 @@ app/
   - `delete-vm` — unregisters the VM and deletes all associated files (VDI, snapshots); VM must be stopped first
   - `get-downloads-path` — returns the OS downloads folder path (used to pre-fill the ISO picker)
   - `pick-iso` — opens a native file picker filtered to `.iso` files; returns `{ filePath }` or `{ filePath: null }` if cancelled
+  - `read-log` — reads the last 500 lines of `gui.log` or `host.log` from `%APPDATA%\FedoraBoxAutomation\logs\`; returns `{ ok, content }`; excluded from IPC logging to prevent a feedback loop
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
@@ -103,12 +106,15 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
-| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop buttons per VM |
-| 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions |
-| 3 | **Create VM** | `host/create-vm.ps1` | VM name, ISO path, RAM/CPU/disk/network options; streams live output; shows "What to do next" on success |
-| 4 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
+| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM |
+| 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions; analysis results persist when navigating away and back |
+| 3 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
+| 4 | **Logs** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button |
+| 5 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
 
-A top navigation bar shows which page is active.
+A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
+
+**State persistence:** `SetupPage` and `CreateVmPage` are kept always-mounted and hidden with `display: none` (via a wrapping `<div>` in `App.tsx`) so their React state — analysis results, wizard step, log lines — survives navigation. Other pages are unmounted when inactive.
 
 ---
 
@@ -244,7 +250,8 @@ npm test
 |-----------|-----------|----------------------|
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, cards rendered, summary counts, "Ready"/"Fix" banners, error message |
-| `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, name conflict warning + "Recreate VM" label, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
+| `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
+| `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading |
 
 ---
 
@@ -283,7 +290,7 @@ easy to read and learn, no separate CSS files to maintain.
 
 ### Layout
 
-- Fixed top navigation bar with 4 tabs (My VMs, Setup, Create VM, Docs); active tab highlighted
+- Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Logs, Docs); Docs is hidden in production; active tab highlighted
 - Main content area scrollable
 - Streaming log panel on the Setup page, auto-scrolls as lines arrive
 
@@ -473,19 +480,22 @@ and also mirrors to the VS Code Debug Console in dev mode. This makes the data
 flow visible without needing a breakpoint:
 
 ```js
-// Channels too trivial to log (polled on every page load)
-const SILENT_CHANNELS = new Set(['is-dev'])
+// Channels excluded from logging.
+// 'is-dev' is polled on every page load; 'read-log' returns full file content —
+// logging it back to gui.log would create a feedback loop.
+const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
 
 // Wraps ipcMain.handle to log every call and reply to gui.log.
-// Replace ipcMain.handle(...) with handleIpc(...) everywhere.
+// util.inspect is used instead of JSON.stringify so Windows paths with
+// backslashes are not double-escaped in the log file.
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] recv ${channel}`, args.length ? JSON.stringify(args) : '')
+      log.info(`[ipc] recv ${channel}`, args.length ? inspect(args, { depth: 3, breakLength: Infinity }) : '')
     }
     const result = await handler(event, ...args)
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] reply ${channel}`, JSON.stringify(result))
+      log.info(`[ipc] reply ${channel}`, inspect(result, { depth: 3, breakLength: Infinity }))
     }
     return result
   })

@@ -6,7 +6,8 @@ const EXISTING_VMS = [
   { name: 'FedoraBox', uuid: 'uuid-1', running: false },
 ]
 
-const ISO_PATH = 'C:\\Users\\test\\Downloads\\fedora.iso'
+const ISO_PATH     = 'C:\\Users\\test\\Downloads\\fedora.iso'
+const ISO_FILENAME = 'fedora.iso'
 
 beforeEach(() => {
   window.electronAPI = {
@@ -14,7 +15,8 @@ beforeEach(() => {
     createVm:     vi.fn().mockResolvedValue({ ok: true }),
     onScriptLine: vi.fn().mockReturnValue(() => {}),
     onScriptDone: vi.fn().mockReturnValue(() => {}),
-    pickIso:      vi.fn().mockResolvedValue({ filePath: null }),
+    // Default: clicking the ISO input fills in ISO_PATH
+    pickIso:      vi.fn().mockResolvedValue({ filePath: ISO_PATH }),
   } as unknown as typeof window.electronAPI
 })
 
@@ -26,13 +28,14 @@ async function renderAndFlush() {
   await act(async () => {})
 }
 
-function fillStep1(vmName = 'MyVM', isoFullPath = ISO_PATH) {
+// Fills step 1. The ISO input is read-only and opens a file picker on click,
+// so we fire a click event and await the async pickIso resolution.
+async function fillStep1(vmName = 'MyVM') {
   fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
     target: { value: vmName },
   })
-  fireEvent.change(screen.getByPlaceholderText(/Click to browse/i), {
-    target: { value: isoFullPath },
-  })
+  fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
+  await act(async () => {})
 }
 
 function navigateToConfirm() {
@@ -41,9 +44,9 @@ function navigateToConfirm() {
   fireEvent.click(screen.getByRole('button', { name: 'Review' })) // step 3 -> 4
 }
 
-async function submitForm(vmName = 'MyVM', isoFullPath = ISO_PATH) {
+async function submitForm(vmName = 'MyVM') {
   await renderAndFlush()
-  fillStep1(vmName, isoFullPath)
+  await fillStep1(vmName)
   navigateToConfirm()
   fireEvent.click(screen.getByRole('button', { name: /create vm|recreate vm/i }))
 }
@@ -56,7 +59,8 @@ describe('step 1 next button', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('is disabled when VM name is filled but ISO path is empty', () => {
+  it('is disabled when VM name is filled but ISO path is empty', async () => {
+    window.electronAPI.pickIso = vi.fn().mockResolvedValue({ filePath: null })
     render(<CreateVmPage />)
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'MyVM' },
@@ -64,17 +68,16 @@ describe('step 1 next button', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('is disabled when ISO path is filled but VM name is empty', () => {
+  it('is disabled when ISO path is filled but VM name is empty', async () => {
     render(<CreateVmPage />)
-    fireEvent.change(screen.getByPlaceholderText(/Click to browse/i), {
-      target: { value: ISO_PATH },
-    })
+    fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
+    await act(async () => {})
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
-  it('is enabled when both VM name and ISO path are filled', () => {
+  it('is enabled when both VM name and ISO path are filled', async () => {
     render(<CreateVmPage />)
-    fillStep1()
+    await fillStep1()
     expect(screen.getByRole('button', { name: 'Next' })).not.toBeDisabled()
   })
 })
@@ -90,25 +93,25 @@ describe('step indicator', () => {
     expect(screen.getByText('Confirm')).toBeInTheDocument()
   })
 
-  it('advances to step 2 after clicking Next on a valid step 1', () => {
+  it('advances to step 2 after clicking Next on a valid step 1', async () => {
     render(<CreateVmPage />)
-    fillStep1()
+    await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.queryByPlaceholderText(/e\.g\. FedoraBox/i)).not.toBeInTheDocument()
     expect(screen.getByText('RAM (MB)')).toBeInTheDocument()
   })
 
-  it('can navigate back from step 2 to step 1', () => {
+  it('can navigate back from step 2 to step 1', async () => {
     render(<CreateVmPage />)
-    fillStep1()
+    await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByPlaceholderText(/e\.g\. FedoraBox/i)).toBeInTheDocument()
   })
 
-  it('shows "Review" as the next-button label on step 3', () => {
+  it('shows "Review" as the next-button label on step 3', async () => {
     render(<CreateVmPage />)
-    fillStep1()
+    await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 3
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
@@ -116,16 +119,17 @@ describe('step indicator', () => {
 
   it('shows the confirm summary on step 4', async () => {
     await renderAndFlush()
-    fillStep1()
+    await fillStep1()
     navigateToConfirm()
     expect(screen.getByText('MyVM')).toBeInTheDocument()
-    expect(screen.getByText(ISO_PATH)).toBeInTheDocument()
+    // Confirm page displays only the filename, not the full path
+    expect(screen.getByText(ISO_FILENAME)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create VM' })).toBeInTheDocument()
   })
 
-  it('preserves field values when navigating back from step 2', () => {
+  it('preserves field values when navigating back from step 2', async () => {
     render(<CreateVmPage />)
-    fillStep1('TestVM')
+    await fillStep1('TestVM')
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Back' })) // -> step 1
     expect(screen.getByPlaceholderText(/e\.g\. FedoraBox/i)).toHaveValue('TestVM')
@@ -161,7 +165,7 @@ describe('name conflict', () => {
 
   it('shows "Recreate VM" button on confirm page when name conflicts', async () => {
     render(<CreateVmPage />)
-    fillStep1('FedoraBox')
+    await fillStep1('FedoraBox')
     await waitFor(() => expect(screen.getByText(/already exists/i)).toBeInTheDocument())
     navigateToConfirm()
     expect(screen.getByRole('button', { name: 'Recreate VM' })).toBeInTheDocument()
