@@ -10,6 +10,7 @@ This is a PowerShell automation project for VirtualBox. A PowerShell automation 
 - PowerShell scripts — Pester v5 (`host/virtualbox-sanity-checks.Tests.ps1`)
 - Bash scripts — bats-core (`vm/tests/*.bats`; run on Linux / WSL)
 - React components — Vitest + React Testing Library (`app/src/__tests__/*.test.tsx`; run via `npm test` in `app/`)
+- Electron main process — Vitest (`app/electron/__tests__/*.test.js`; run via `npm test` in `app/`)
 
 Always use error handling in scripts.
 

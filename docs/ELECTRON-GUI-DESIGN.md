@@ -13,6 +13,7 @@
 | VM control | VBoxManage.exe |
 | Unit tests (PS1) | Pester v5 |
 | Unit tests (Bash) | bats-core |
+| Unit tests (Electron main) | Vitest (node environment) |
 | Unit tests (React) | Vitest + React Testing Library |
 | Guest scripts | Bash |
 
@@ -29,6 +30,9 @@ app/
     logger.js                    <- file logger; writes gui.log to %APPDATA%\FedoraBoxAutomation\logs\
     script-runner.js             <- spawn, stream, and kill logic
     scripts.js                   <- single source of truth for all .ps1 paths
+    __tests__/
+      ipc-handlers.test.js       <- unit tests for parseVmList, parseChecksOutput, get-downloads-path
+      script-runner.test.js      <- unit tests for splitChunk, hasActiveScript, killActiveScript
   src/                           <- React renderer files
     index.html
     index.tsx                    <- React entry point
@@ -43,8 +47,16 @@ app/
     components/
       NavBar.tsx                 <- My VMs / Setup / Create VM / Docs navigation
       CheckCard.tsx              <- pass/warn/fail result card
+    __tests__/
+      CheckCard.test.tsx
+      SetupPage.test.tsx
+      CreateVmPage.test.tsx
+      setup.ts                   <- jest-dom matchers setup
+  __mocks__/
+    electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
   package.json                   <- main: "electron/main.js"
-  vite.config.ts                 <- Vite bundles the React renderer
+  vite.config.ts                 <- Vite + jsdom config for React tests
+  vitest.workspace.ts            <- splits tests: react (jsdom) vs electron (node)
   tailwind.config.js
   postcss.config.js
   tsconfig.json
@@ -52,6 +64,7 @@ app/
 
 - **Main process** (`main.js`): Node.js running inside Electron. Uses `child_process.spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', script])` to run each `.ps1`. Streams `stdout`/`stderr` line-by-line over IPC to the renderer.
 - **Renderer**: React + TypeScript, bundled by Vite. Each pipeline step is a page component managed by React state.
+- **Security boundary** (`preload.js`): Runs in a privileged context before the renderer loads. Uses Electron's `contextBridge` to expose a safe, explicit `window.electronAPI` object to React. The renderer can only call the methods listed in `preload.js` — it has no direct access to Node.js or Electron APIs.
 - **IPC channels** (request/response via `ipcMain.handle` / `ipcRenderer.invoke`):
   - `is-dev` — returns true when running via `npm run dev`
   - `read-doc` — reads a markdown file from `docs/` and returns its content
@@ -71,6 +84,21 @@ app/
 
 ---
 
+## How to Run
+
+All commands run from the `app/` directory.
+
+| Command | What it does |
+|---------|-------------|
+| `npm run dev` | Starts Vite dev server + Electron with hot reload. DevTools open automatically. |
+| `npm start` | Production build (`vite build`) then launches Electron with `NODE_ENV=production`. |
+| `npm test` | Runs all Vitest suites once (Electron node + React jsdom). |
+| `npm run test:watch` | Same but re-runs on file change — useful during development. |
+
+In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`. Electron waits for that port to be ready (`wait-on`) before opening the window, so the React renderer gets full hot-module replacement.
+
+---
+
 ## Screens / Pipeline Steps
 
 | # | Screen | Script | Key inputs |
@@ -86,45 +114,11 @@ A top navigation bar shows which page is active.
 
 ## Sanity Checks — JSON Output for the GUI
 
-Add a `-Json` switch to `virtualbox-sanity-checks.ps1` so the GUI receives
-structured data instead of plain text.
+`virtualbox-sanity-checks.ps1` accepts a `-Json` switch. When set, it writes a JSON array to stdout instead of coloured text. The `run-sanity-checks` IPC handler always passes this flag.
 
-```powershell
-param([switch]$Json)
-```
+Each element has four fields: `id`, `label`, `status` (`"pass"` | `"warn"` | `"fail"`), and `detail`. The GUI renders each as a `CheckCard` and shows a summary bar at the bottom that counts pass/warn/fail. A "Proceed anyway" button appears when only warnings are present.
 
-Each check emits one result object:
-
-```json
-{
-  "id":     "ram",
-  "label":  "RAM (Memory)",
-  "status": "pass",
-  "detail": "16 GB total, 8200 MB free"
-}
-```
-
-Status values: `"pass"` | `"warn"` | `"fail"`
-
-The full output is a JSON array written to stdout when `-Json` is passed:
-
-```json
-[
-  { "id": "os",       "label": "Operating System",         "status": "pass", "detail": "Windows 11 64-bit build 26200" },
-  { "id": "ram",      "label": "RAM (Memory)",             "status": "pass", "detail": "16 GB total, 8200 MB free" },
-  { "id": "disk",     "label": "Disk Space (C:)",          "status": "pass", "detail": "120 GB free of 500 GB" },
-  { "id": "cpu",      "label": "CPU Virtualisation",       "status": "pass", "detail": "Intel Core i7, VT-x enabled" },
-  { "id": "hyperv",   "label": "Hyper-V",                  "status": "pass", "detail": "Not enabled" },
-  { "id": "whp",      "label": "Windows Hypervisor Platform", "status": "pass", "detail": "Not enabled" },
-  { "id": "vmp",      "label": "Virtual Machine Platform", "status": "pass", "detail": "Not enabled" },
-  { "id": "secboot",  "label": "Secure Boot",              "status": "warn", "detail": "Enabled — OK for VirtualBox 7+" },
-  { "id": "vboxinst", "label": "Existing VirtualBox",      "status": "warn", "detail": "VirtualBox 7.1.4 already installed" }
-]
-```
-
-The GUI renders each result as a card with a green/yellow/red status icon.
-A summary bar at the bottom counts pass/warn/fail and shows a
-"Proceed anyway" button when only warnings are present.
+`parseChecksOutput` in `ipc-handlers.js` handles two edge cases: DISM progress noise lines that appear before the JSON, and the PowerShell `ConvertTo-Json` quirk that emits a bare object instead of a one-element array when there is only one result.
 
 ---
 
@@ -213,6 +207,25 @@ bats vm/tests/
 
 `FEDORA_BOX_LOG` — an environment variable added to `common.sh` — lets tests
 redirect the tee output to a writable temp path instead of `/var/log/`.
+
+---
+
+### Electron main process — `app/electron/__tests__/*.test.js`
+
+Uses **Vitest** in the `node` environment (no DOM). `vitest.workspace.ts` splits the suite into two projects so each runs with the right environment:
+
+```
+vitest.workspace.ts
+  react    -> src/__tests__/**   environment: jsdom   (inherits vitest.config.ts)
+  electron -> electron/__tests__/**  environment: node
+```
+
+`__mocks__/electron.js` provides a minimal stub (`ipcMain.handle`, `app.getPath`) used by the React tests. The Electron tests cannot use `vi.mock('electron')` to reach transitive CJS `require()` calls, so the `get-downloads-path` handler test injects a stub directly into `require.cache` before reloading the module.
+
+| Test file | Module under test | Key behaviours covered |
+|-----------|------------------|----------------------|
+| `ipc-handlers.test.js` | `ipc-handlers.js` | `parseVmList` — single/multiple VMs, spaces in names, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-element array, bare-object guard, missing array error, stderr in error message; `get-downloads-path` handler returns OS downloads path |
+| `script-runner.test.js` | `script-runner.js` | `splitChunk` — LF and CRLF splitting, empty/whitespace filtering, trailing newline, stderr tagging, Buffer input; `hasActiveScript` — false when idle; `killActiveScript` — no-op when no script running |
 
 ---
 
@@ -479,8 +492,14 @@ function handleIpc(channel, handler) {
 }
 ```
 
-Logs go to `%APPDATA%\FedoraBoxAutomation\logs\gui.log`. In dev mode they also
-appear in the VS Code Debug Console. `logger.js` handles both destinations.
+Two log files are written to `%APPDATA%\FedoraBoxAutomation\logs\`:
+
+| File | Written by | Content |
+|------|-----------|---------|
+| `gui.log` | `logger.js` | Every IPC call and reply, plus any errors from the main process |
+| `host.log` | PowerShell `Start-Transcript` | Full transcript of every `.ps1` script run |
+
+In dev mode `gui.log` entries also appear in the VS Code Debug Console. `logger.js` handles both destinations.
 
 ### Separate dev and prod behaviour with an isDev flag
 
