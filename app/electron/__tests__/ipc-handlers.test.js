@@ -157,3 +157,68 @@ describe('get-downloads-path handler', () => {
     expect(downloadsHandler).toBeDefined()
   })
 })
+
+// ── open-log-dir handler ─────────────────────────────────────────────────────
+
+describe('open-log-dir handler', () => {
+  let openLogDirHandler
+  const mockOpenPath = vi.fn().mockResolvedValue('')  // '' means success in shell.openPath
+
+  beforeAll(() => {
+    const mockHandle = vi.fn()
+
+    const electronId = require.resolve('electron')
+    const handlersId = require.resolve('../ipc-handlers')
+
+    require.cache[electronId] = {
+      id: electronId, filename: electronId, loaded: true,
+      exports: {
+        ipcMain:  { handle: mockHandle },
+        app:      { getPath: vi.fn() },
+        dialog:   {},
+        shell:    { openPath: mockOpenPath },
+      },
+    }
+
+    delete require.cache[handlersId]
+    const { registerIpcHandlers } = require('../ipc-handlers')
+    registerIpcHandlers({ webContents: { send: vi.fn() } })
+
+    const call = mockHandle.mock.calls.find(([ch]) => ch === 'open-log-dir')
+    openLogDirHandler = call[1]
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('electron')]
+    delete require.cache[require.resolve('../ipc-handlers')]
+  })
+
+  it('returns ok: true when shell.openPath succeeds', async () => {
+    mockOpenPath.mockResolvedValue('')
+    const result = await openLogDirHandler({}, 'app')
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('calls shell.openPath with a path containing "FedoraBoxAutomation" for "app"', async () => {
+    mockOpenPath.mockResolvedValue('')
+    await openLogDirHandler({}, 'app')
+    expect(mockOpenPath).toHaveBeenCalledWith(expect.stringContaining('FedoraBoxAutomation'))
+  })
+
+  it('calls shell.openPath with a path containing "VirtualBox VMs" for "vbox"', async () => {
+    mockOpenPath.mockResolvedValue('')
+    await openLogDirHandler({}, 'vbox')
+    expect(mockOpenPath).toHaveBeenCalledWith(expect.stringContaining('VirtualBox VMs'))
+  })
+
+  it('returns ok: false when shell.openPath returns an error string', async () => {
+    mockOpenPath.mockResolvedValue('No such file or directory')
+    const result = await openLogDirHandler({}, 'app')
+    expect(result).toEqual({ ok: false, error: 'No such file or directory' })
+  })
+
+  it('returns ok: false for an unknown "which" value', async () => {
+    const result = await openLogDirHandler({}, 'unknown')
+    expect(result.ok).toBe(false)
+  })
+})

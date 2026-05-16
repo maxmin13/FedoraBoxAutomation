@@ -84,6 +84,22 @@ export default function LogsPage() {
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
+
+        <p className="text-zinc-500 text-xs uppercase tracking-wider mt-6 mb-3">Open folder</p>
+        <button
+          onClick={() => window.electronAPI.openLogDir('app')}
+          className="w-full text-left px-3 py-2 rounded text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+        >
+          App logs
+          <span className="block text-xs text-zinc-600 mt-0.5">gui.log &amp; host.log</span>
+        </button>
+        <button
+          onClick={() => window.electronAPI.openLogDir('vbox')}
+          className="mt-1 w-full text-left px-3 py-2 rounded text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+        >
+          VirtualBox VMs
+          <span className="block text-xs text-zinc-600 mt-0.5">per-VM Logs\ subfolders</span>
+        </button>
       </aside>
 
       {/* Log content */}

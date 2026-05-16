@@ -50,6 +50,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reads one of the app log files ('gui.log' or 'host.log') and returns its content
   readLog: (name) => ipcRenderer.invoke('read-log', name),
 
+  // Opens a log folder in the native file explorer.
+  // 'app' -> %APPDATA%\FedoraBoxAutomation\logs; 'vbox' -> %USERPROFILE%\VirtualBox VMs
+  openLogDir: (which) => ipcRenderer.invoke('open-log-dir', which),
+
   // ── Error logging ─────────────────────────────────────────
   // Forwards uncaught renderer errors (from the React error boundary) to the main process log
   logError: (message, stack) => ipcRenderer.invoke('log-error', message, stack),

@@ -11,7 +11,7 @@
 //  events to the renderer as the script produces lines.
 // ============================================================
 
-const { ipcMain, app, dialog } = require('electron')
+const { ipcMain, app, dialog, shell } = require('electron')
 const { execSync } = require('child_process')
 const { inspect } = require('util')
 const path = require('path')
@@ -326,6 +326,25 @@ function registerIpcHandlers(win) {
       log.error(`[ipc][read-log] ${name}:`, error.message)
       return { ok: false, error: error.message }
     }
+  })
+
+  // ── open-log-dir ──────────────────────────────────────────
+  // Opens a log folder in the native file explorer.
+  // 'app'  -> %APPDATA%\FedoraBoxAutomation\logs  (gui.log + host.log)
+  // 'vbox' -> %USERPROFILE%\VirtualBox VMs         (per-VM Logs\ subfolders)
+  handleIpc('open-log-dir', async (_event, which) => {
+    const dirs = {
+      app: path.join(
+        process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+        'FedoraBoxAutomation',
+        'logs'
+      ),
+      vbox: path.join(os.homedir(), 'VirtualBox VMs'),
+    }
+    const dir = dirs[which]
+    if (!dir) return { ok: false, error: `Unknown log dir: ${which}` }
+    const err = await shell.openPath(dir)
+    return err ? { ok: false, error: err } : { ok: true }
   })
 
   // ── log-error ─────────────────────────────────────────────
