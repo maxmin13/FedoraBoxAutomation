@@ -6,32 +6,32 @@ const EXISTING_VMS = [
   { name: 'FedoraBox', uuid: 'uuid-1', running: false },
 ]
 
-const DOWNLOADS = 'C:\\Users\\test\\Downloads'
+const ISO_PATH = 'C:\\Users\\test\\Downloads\\fedora.iso'
 
 beforeEach(() => {
   window.electronAPI = {
-    listVms:          vi.fn().mockResolvedValue({ ok: true, vms: [] }),
-    createVm:         vi.fn().mockResolvedValue({ ok: true }),
-    onScriptLine:     vi.fn().mockReturnValue(() => {}),
-    onScriptDone:     vi.fn().mockReturnValue(() => {}),
-    getDownloadsPath: vi.fn().mockResolvedValue({ path: DOWNLOADS }),
+    listVms:      vi.fn().mockResolvedValue({ ok: true, vms: [] }),
+    createVm:     vi.fn().mockResolvedValue({ ok: true }),
+    onScriptLine: vi.fn().mockReturnValue(() => {}),
+    onScriptDone: vi.fn().mockReturnValue(() => {}),
+    pickIso:      vi.fn().mockResolvedValue({ filePath: null }),
   } as unknown as typeof window.electronAPI
 })
 
 // ── Wizard navigation helpers ────────────────────────────────────────────────
 
-// Renders the page and flushes all initial async calls (listVms, getDownloadsPath).
+// Renders the page and flushes all initial async calls (listVms).
 async function renderAndFlush() {
   render(<CreateVmPage />)
   await act(async () => {})
 }
 
-function fillStep1(vmName = 'MyVM', isoFilename = 'fedora.iso') {
+function fillStep1(vmName = 'MyVM', isoFullPath = ISO_PATH) {
   fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
     target: { value: vmName },
   })
-  fireEvent.change(screen.getByPlaceholderText(/Fedora-Workstation-Live/i), {
-    target: { value: isoFilename },
+  fireEvent.change(screen.getByPlaceholderText(/Click to browse/i), {
+    target: { value: isoFullPath },
   })
 }
 
@@ -41,9 +41,9 @@ function navigateToConfirm() {
   fireEvent.click(screen.getByRole('button', { name: 'Review' })) // step 3 -> 4
 }
 
-async function submitForm(vmName = 'MyVM', isoFilename = 'fedora.iso') {
+async function submitForm(vmName = 'MyVM', isoFullPath = ISO_PATH) {
   await renderAndFlush()
-  fillStep1(vmName, isoFilename)
+  fillStep1(vmName, isoFullPath)
   navigateToConfirm()
   fireEvent.click(screen.getByRole('button', { name: /create vm|recreate vm/i }))
 }
@@ -66,8 +66,8 @@ describe('step 1 next button', () => {
 
   it('is disabled when ISO path is filled but VM name is empty', () => {
     render(<CreateVmPage />)
-    fireEvent.change(screen.getByPlaceholderText(/Fedora-Workstation-Live/i), {
-      target: { value: 'fedora.iso' },
+    fireEvent.change(screen.getByPlaceholderText(/Click to browse/i), {
+      target: { value: ISO_PATH },
     })
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
@@ -119,7 +119,7 @@ describe('step indicator', () => {
     fillStep1()
     navigateToConfirm()
     expect(screen.getByText('MyVM')).toBeInTheDocument()
-    expect(screen.getByText('fedora.iso')).toBeInTheDocument()
+    expect(screen.getByText(ISO_PATH)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create VM' })).toBeInTheDocument()
   })
 
@@ -184,7 +184,7 @@ describe('running state', () => {
     await submitForm()
     await waitFor(() => {
       expect(window.electronAPI.createVm).toHaveBeenCalledWith(
-        expect.objectContaining({ vmName: 'MyVM', isoPath: `${DOWNLOADS}\\fedora.iso` })
+        expect.objectContaining({ vmName: 'MyVM', isoPath: ISO_PATH })
       )
     })
   })
@@ -202,24 +202,6 @@ describe('running state', () => {
     act(() => { emitLine!({ text: 'Creating virtual disk...', source: 'stdout' }) })
 
     expect(screen.getByText('Creating virtual disk...')).toBeInTheDocument()
-  })
-})
-
-// ── Downloads path unavailable ───────────────────────────────────────────────
-
-describe('downloads path unavailable', () => {
-  beforeEach(() => {
-    window.electronAPI.getDownloadsPath = vi.fn().mockResolvedValue({ path: '' })
-  })
-
-  it('uses the filename alone as isoPath when downloadsDir is empty', async () => {
-    window.electronAPI.createVm = vi.fn().mockReturnValue(new Promise(() => {}))
-    await submitForm()
-    await waitFor(() => {
-      expect(window.electronAPI.createVm).toHaveBeenCalledWith(
-        expect.objectContaining({ isoPath: 'fedora.iso' })
-      )
-    })
   })
 })
 

@@ -11,7 +11,7 @@
 //  events to the renderer as the script produces lines.
 // ============================================================
 
-const { ipcMain, app } = require('electron')
+const { ipcMain, app, dialog } = require('electron')
 const { execSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
@@ -277,6 +277,22 @@ function registerIpcHandlers(win) {
 
       runScript(SCRIPTS.installVirtualBox, [], onLine, onDone)
     })
+  })
+
+  // ── pick-iso ──────────────────────────────────────────────
+  // Opens a native file picker filtered to .iso files.
+  // Returns { filePath: string } or { filePath: null } if the user cancelled.
+  handleIpc('pick-iso', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Fedora ISO',
+      defaultPath: app.getPath('downloads'),
+      filters: [
+        { name: 'ISO images', extensions: ['iso'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    })
+    return { filePath: result.canceled ? null : result.filePaths[0] }
   })
 
   // ── log-error ─────────────────────────────────────────────

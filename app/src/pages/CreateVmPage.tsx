@@ -11,11 +11,10 @@ const NIC_TYPES  = ['nat', 'bridged', 'host-only', 'none']
 
 export default function CreateVmPage() {
   // Form fields
-  const [vmName,       setVmName]       = useState('')
-  const [vmFolder,     setVmFolder]     = useState('')
-  const [downloadsDir, setDownloadsDir] = useState('')
-  const [isoFilename,  setIsoFilename]  = useState('')
-  const [ramMB,      setRamMB]      = useState(4096)
+  const [vmName,   setVmName]   = useState('')
+  const [vmFolder, setVmFolder] = useState('')
+  const [isoPath,  setIsoPath]  = useState('')
+  const [ramMB,    setRamMB]    = useState(4096)
   const [cpus,       setCpus]       = useState(4)
   const [diskMB,     setDiskMB]     = useState(40000)
   const [diskType,   setDiskType]   = useState('VDI')
@@ -43,20 +42,11 @@ export default function CreateVmPage() {
     window.electronAPI.listVms().then((result) => {
       if (result.ok) setExistingNames(result.vms.map((v) => v.name))
     })
-    window.electronAPI.getDownloadsPath().then((result) => {
-      setDownloadsDir(result.path)
-    })
   }, [])
-
-  // Full ISO path: Downloads folder + filename the user typed.
-  // Falls back to filename alone if the downloads dir hasn't loaded yet.
-  const isoPath = downloadsDir && isoFilename.trim()
-    ? `${downloadsDir}\\${isoFilename.trim()}`
-    : isoFilename.trim()
 
   const trimmedName  = vmName.trim()
   const nameConflict = trimmedName !== '' && existingNames.includes(trimmedName)
-  const step1Valid   = trimmedName !== '' && isoFilename.trim() !== ''
+  const step1Valid   = trimmedName !== '' && isoPath.trim() !== ''
 
   async function handleCreate() {
     setPageState('running')
@@ -241,21 +231,17 @@ export default function CreateVmPage() {
             <label className="block text-sm font-medium text-zinc-300 mb-1">
               Fedora ISO Path <span className="text-red-400">*</span>
             </label>
-            <div className="flex rounded border border-zinc-600 overflow-hidden focus-within:border-blue-500">
-              <span
-                className="px-3 py-2 bg-zinc-800 text-zinc-500 text-sm border-r border-zinc-600 max-w-[220px] truncate shrink-0"
-                title={downloadsDir}
-              >
-                {downloadsDir ? `${downloadsDir}\\` : '…\\'}
-              </span>
-              <input
-                type="text"
-                value={isoFilename}
-                onChange={(e) => setIsoFilename(e.target.value)}
-                placeholder="Fedora-Workstation-Live-x86_64-40-1.14.iso"
-                className="flex-1 min-w-0 px-3 py-2 bg-zinc-700 text-zinc-100 text-sm placeholder-zinc-500 focus:outline-none"
-              />
-            </div>
+            <input
+              type="text"
+              value={isoPath}
+              onChange={(e) => setIsoPath(e.target.value)}
+              onClick={async () => {
+                const result = await window.electronAPI.pickIso()
+                if (result.filePath) setIsoPath(result.filePath)
+              }}
+              placeholder="Click to browse for the ISO file"
+              className={ic + ' cursor-pointer'}
+            />
           </div>
 
           <div>
@@ -421,7 +407,7 @@ export default function CreateVmPage() {
             {/* Identity — full width */}
             <ConfirmSection title="Identity">
               <ConfirmRow label="VM Name"   value={trimmedName} />
-              <ConfirmRow label="ISO File"  value={isoFilename.trim() || '—'} />
+              <ConfirmRow label="ISO File"  value={isoPath.trim() || '—'} />
               <ConfirmRow label="VM Folder" value={vmFolder.trim() || '(VirtualBox default)'} />
             </ConfirmSection>
             {/* Hardware + Options — two columns */}
