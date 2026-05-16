@@ -6,7 +6,8 @@ const SAMPLE_CONTENT = '2026-05-16 10:00:00 [info] [ipc] recv list-vms\n2026-05-
 
 beforeEach(() => {
   window.electronAPI = {
-    readLog: vi.fn().mockResolvedValue({ ok: true, content: SAMPLE_CONTENT }),
+    readLog:    vi.fn().mockResolvedValue({ ok: true, content: SAMPLE_CONTENT }),
+    openLogDir: vi.fn().mockResolvedValue({ ok: true }),
   } as unknown as typeof window.electronAPI
 })
 
@@ -77,6 +78,26 @@ describe('LogsPage', () => {
 
       await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledTimes(2))
       expect(window.electronAPI.readLog).toHaveBeenLastCalledWith('gui.log')
+    })
+  })
+
+  describe('open folder buttons', () => {
+    it('shows the App logs and VirtualBox VMs folder buttons', () => {
+      render(<LogsPage />)
+      expect(screen.getByRole('button', { name: /app logs/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /virtualbox vms/i })).toBeInTheDocument()
+    })
+
+    it('calls openLogDir("app") when App logs is clicked', () => {
+      render(<LogsPage />)
+      fireEvent.click(screen.getByRole('button', { name: /app logs/i }))
+      expect(window.electronAPI.openLogDir).toHaveBeenCalledWith('app')
+    })
+
+    it('calls openLogDir("vbox") when VirtualBox VMs is clicked', () => {
+      render(<LogsPage />)
+      fireEvent.click(screen.getByRole('button', { name: /virtualbox vms/i }))
+      expect(window.electronAPI.openLogDir).toHaveBeenCalledWith('vbox')
     })
   })
 

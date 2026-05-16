@@ -80,6 +80,7 @@ app/
   - `get-downloads-path` — returns the OS downloads folder path (used to pre-fill the ISO picker)
   - `pick-iso` — opens a native file picker filtered to `.iso` files; returns `{ filePath }` or `{ filePath: null }` if cancelled
   - `read-log` — reads the last 500 lines of `gui.log` or `host.log` from `%APPDATA%\FedoraBoxAutomation\logs\`; returns `{ ok, content }`; excluded from IPC logging to prevent a feedback loop
+  - `open-log-dir` — opens a log folder in the native file explorer; `'app'` opens `%APPDATA%\FedoraBoxAutomation\logs\`; `'vbox'` opens `%USERPROFILE%\VirtualBox VMs`; uses `shell.openPath()`
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
@@ -109,7 +110,7 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 | 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM |
 | 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — shows pass/warn/fail cards with fix actions; analysis results persist when navigating away and back |
 | 3 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
-| 4 | **Logs** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button |
+| 4 | **Logs** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
 | 5 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
 
 A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
@@ -230,7 +231,7 @@ vitest.workspace.ts
 
 | Test file | Module under test | Key behaviours covered |
 |-----------|------------------|----------------------|
-| `ipc-handlers.test.js` | `ipc-handlers.js` | `parseVmList` — single/multiple VMs, spaces in names, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-element array, bare-object guard, missing array error, stderr in error message; `get-downloads-path` handler returns OS downloads path |
+| `ipc-handlers.test.js` | `ipc-handlers.js` | `parseVmList` — single/multiple VMs, spaces in names, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-element array, bare-object guard, missing array error, stderr in error message; `get-downloads-path` handler returns OS downloads path; `open-log-dir` handler — success, correct paths for `'app'` and `'vbox'`, error string from `shell.openPath`, unknown key |
 | `script-runner.test.js` | `script-runner.js` | `splitChunk` — LF and CRLF splitting, empty/whitespace filtering, trailing newline, stderr tagging, Buffer input; `hasActiveScript` — false when idle; `killActiveScript` — no-op when no script running |
 
 ---
@@ -251,7 +252,7 @@ npm test
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, cards rendered, summary counts, "Ready"/"Fix" banners, error message |
 | `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
-| `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading |
+| `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading, "App logs" and "VirtualBox VMs" folder buttons visible, each calls `openLogDir` with the correct key |
 
 ---
 
