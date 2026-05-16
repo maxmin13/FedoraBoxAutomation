@@ -148,7 +148,7 @@ Invoke-Pester -Path ".\host\virtualbox-sanity-checks.Tests.ps1" -Output Detailed
 | Total RAM | >= 8 GB | 4 to 8 GB | < 4 GB |
 | Free RAM | >= 5120 MB | 3072 to 5119 MB | < 3072 MB |
 | Disk free (C:) | >= 30 GB | 10 to 29 GB | < 10 GB |
-| CPU virtualisation | Enabled | — | Disabled |
+| CPU virtualisation | Enabled | Disabled (check unreliable, may be false negative) | — |
 | Hyper-V | Not enabled | Enabled | — |
 | Windows Hypervisor Platform | Not enabled | Enabled | — |
 | Virtual Machine Platform (WSL2) | Not enabled | Enabled | — |
