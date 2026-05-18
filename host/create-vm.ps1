@@ -56,62 +56,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
-New-Item -ItemType Directory -Force $logDir | Out-Null
-Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
-
-function Write-Header {
-    param([string]$Text)
-    $line = "-" * 60
-    Write-Host ""
-    Write-Host $line -ForegroundColor Cyan
-    Write-Host "  $Text" -ForegroundColor Cyan
-    Write-Host $line -ForegroundColor Cyan
-}
-
-function Read-YesNo {
-    param(
-        [string]$Prompt,
-        [bool]$Default = $true
-    )
-    $hint = if ($Default) { "Y/n" } else { "y/N" }
-    while ($true) {
-        $raw = Read-Host "$Prompt [$hint]"
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $Default }
-        switch ($raw.Trim().ToLower()) {
-            { $_ -in "y","yes" } { return $true }
-            { $_ -in "n","no"  } { return $false }
-        }
-        Write-Host "  Please answer y or n." -ForegroundColor Yellow
-    }
-}
-
-function Find-VBoxManage {
-    $candidates = @(
-        "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe",
-        "C:\Program Files (x86)\Oracle\VirtualBox\VBoxManage.exe"
-    )
-    foreach ($c in $candidates) {
-        if (Test-Path $c) { return $c }
-    }
-    $found = Get-Command "VBoxManage.exe" -ErrorAction SilentlyContinue
-    if ($found) { return $found.Source }
-    return $null
-}
-
-function Invoke-VBox {
-    param([string[]]$VBoxArgs)
-    $argText = $VBoxArgs -join ' '
-    Write-Host "Running: $($script:vbox) $argText" -ForegroundColor DarkGray
-
-    $result = & $script:vbox @VBoxArgs
-    $exitCode = $LASTEXITCODE
-    $output = if ($result -is [array]) { $result -join "`n" } else { [string]$result }
-    if ($exitCode -ne 0) {
-        throw "VBoxManage error (exit code $exitCode): $output"
-    }
-    return $output
-}
+. "$PSScriptRoot\common.ps1"
+Start-Log
 
 function Get-VBoxGuestAdditionsIso {
     $base = Split-Path -Parent $script:vbox

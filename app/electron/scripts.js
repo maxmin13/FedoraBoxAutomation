@@ -12,6 +12,7 @@ const SCRIPTS = {
   createVm: path.join(HOST_DIR, 'create-vm.ps1'),
   provisionVm: path.join(HOST_DIR, 'provision-vm.ps1'),
   cleanup: path.join(HOST_DIR, 'cleanup.ps1'),
+  shareFolder: path.join(HOST_DIR, 'share-folder.ps1'),
 }
 
 module.exports = SCRIPTS

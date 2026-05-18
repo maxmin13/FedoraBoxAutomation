@@ -16,9 +16,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
 
-$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
-New-Item -ItemType Directory -Force $logDir | Out-Null
-Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+. "$PSScriptRoot\common.ps1"
+Start-Log
 
 # Collect all check results in this list.
 # Each entry is a hashtable with id, label, status, and detail.

@@ -7,17 +7,18 @@ interface NavBarProps {
   currentPage: Page
   onNavigate: (page: Page) => void
   isDev: boolean
+  scriptRunning?: boolean
 }
 
 const NAV_ITEMS: { page: Page; label: string; devOnly?: boolean }[] = [
   { page: 'landing', label: 'My VMs' },
   { page: 'setup', label: 'Setup' },
   { page: 'create-vm', label: 'Create VM' },
-  { page: 'logs', label: 'Logs' },
+  { page: 'logs', label: 'Console' },
   { page: 'docs', label: 'Docs', devOnly: true },
 ]
 
-export default function NavBar({ currentPage, onNavigate, isDev }: NavBarProps) {
+export default function NavBar({ currentPage, onNavigate, isDev, scriptRunning = false }: NavBarProps) {
   // Hide dev-only items in production; show everything in development
   const visibleItems = NAV_ITEMS.filter((item) => !item.devOnly || isDev)
 
@@ -44,7 +45,8 @@ export default function NavBar({ currentPage, onNavigate, isDev }: NavBarProps) 
           <button
             key={item.page}
             onClick={() => onNavigate(item.page)}
-            className={buttonClass}
+            disabled={scriptRunning}
+            className={buttonClass + (scriptRunning ? ' opacity-50 cursor-not-allowed' : '')}
           >
             {item.label}
           </button>

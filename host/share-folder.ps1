@@ -14,77 +14,18 @@
     powershell -ExecutionPolicy Bypass -File ".\share-folder.ps1" -VmName "FedoraVM" -HostPath "C:\Shared" -MountPoint "/home/maxmin/shared"
 #>
 param(
-    [string]$VmName     = '',
-    [string]$HostPath   = '',
-    [string]$MountPoint = ''
+    [string]$VmName          = '',
+    [string]$HostPath        = '',
+    [string]$MountPoint      = '',
+    [string]$VmUser          = '',
+    [string]$VmPass          = '',
+    [string]$LoginUser       = '',
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = 'Stop'
 
-function Write-Header {
-    param([string]$Text)
-    $line = "-" * 60
-    Write-Host ""
-    Write-Host $line -ForegroundColor Cyan
-    Write-Host "  $Text" -ForegroundColor Cyan
-    Write-Host $line -ForegroundColor Cyan
-}
-
-function Read-YesNo {
-    param([string]$Prompt, [bool]$Default = $true)
-    $hint = if ($Default) { "Y/n" } else { "y/N" }
-    while ($true) {
-        $raw = Read-Host "$Prompt [$hint]"
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $Default }
-        switch ($raw.Trim().ToLower()) {
-            { $_ -in "y","yes" } { return $true }
-            { $_ -in "n","no"  } { return $false }
-        }
-        Write-Host "  Please answer y or n." -ForegroundColor Yellow
-    }
-}
-
-function Find-VBoxManage {
-    foreach ($c in @("C:\Program Files\Oracle\VirtualBox\VBoxManage.exe","C:\Program Files (x86)\Oracle\VirtualBox\VBoxManage.exe")) {
-        if (Test-Path $c) { return $c }
-    }
-    $found = Get-Command "VBoxManage.exe" -ErrorAction SilentlyContinue
-    if ($found) { return $found.Source }
-    return $null
-}
-
-function Invoke-VBox {
-    param([string[]]$VBoxArgs)
-    Write-Host "Running: $($script:vbox) $($VBoxArgs -join ' ')" -ForegroundColor DarkGray
-    $result = & $script:vbox @VBoxArgs
-    $output = if ($result -is [array]) { $result -join "`n" } else { [string]$result }
-    if ($LASTEXITCODE -ne 0) { throw "VBoxManage error (exit $LASTEXITCODE): $output" }
-    return $output
-}
-
-function Get-CredentialFile {
-    param([string]$VmName)
-    $dir = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
-    return Join-Path $dir "$VmName.cred"
-}
-
-function Save-VmCredentials {
-    param([string]$VmName, [string]$User, [string]$Pass, [string]$LoginUser = '')
-    $path = Get-CredentialFile $VmName
-    $dir  = Split-Path $path -Parent
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    "$User`n$Pass`n$LoginUser" | Set-Content -Path $path -Encoding UTF8
-    Write-Host "  Credentials saved." -ForegroundColor DarkGray
-}
-
-function Get-VmCredentials {
-    param([string]$VmName)
-    $path = Get-CredentialFile $VmName
-    if (-not (Test-Path $path)) { return $null }
-    $lines = Get-Content $path -Encoding UTF8
-    if ($lines.Count -lt 2) { return $null }
-    return @{ User = $lines[0]; Pass = $lines[1]; LoginUser = if ($lines.Count -ge 3) { $lines[2] } else { '' } }
-}
+. "$PSScriptRoot\common.ps1"
 
 function Test-GuestReady {
     param([string]$VmName, [string]$User, [string]$Pass)
@@ -199,7 +140,11 @@ $runningVms = & $script:vbox list runningvms 2>$null | ForEach-Object { if ($_ -
 if ($runningVms -contains $vmName) {
     Write-Host ""
     Write-Host "  '$vmName' is currently running. Permanent shares cannot be modified while the VM is on." -ForegroundColor Yellow
-    if (-not (Read-YesNo "Shut down '$vmName' now and continue?" $false)) { Write-Host "  Aborted." -ForegroundColor Red; exit 1 }
+    if ($NonInteractive) {
+        Write-Host "  Non-interactive mode: shutting down '$vmName' automatically." -ForegroundColor Cyan
+    } elseif (-not (Read-YesNo "Shut down '$vmName' now and continue?" $false)) {
+        Write-Host "  Aborted." -ForegroundColor Red; exit 1
+    }
     Write-Host "  Sending ACPI shutdown..." -ForegroundColor Cyan
     Invoke-VBox @('controlvm', $vmName, 'acpipowerbutton')
     Write-Host "  Waiting for VM to stop..." -ForegroundColor Cyan
@@ -240,6 +185,9 @@ try {
         if (-not $removed) {
             Write-Host ""
             Write-Host "  The VirtualBox GUI window for '$vmName' is holding the session lock." -ForegroundColor Yellow
+            if ($NonInteractive) {
+                throw "sharedfolder remove failed: session lock still held"
+            }
             Write-Host "  Close the VirtualBox window for '$vmName', then press Enter to retry." -ForegroundColor Yellow
             Read-Host | Out-Null
             $ErrorActionPreference = 'SilentlyContinue'
@@ -265,6 +213,9 @@ try {
     if (-not $added) {
         Write-Host ""
         Write-Host "  The VirtualBox GUI window for '$vmName' is holding the session lock." -ForegroundColor Yellow
+        if ($NonInteractive) {
+            throw "sharedfolder add failed: session lock still held"
+        }
         Write-Host "  Close the VirtualBox window for '$vmName', then press Enter to retry." -ForegroundColor Yellow
         Read-Host | Out-Null
         $ErrorActionPreference = 'SilentlyContinue'
@@ -280,28 +231,35 @@ try {
     Write-Host "  Host path  : $hostPath" -ForegroundColor Cyan
     Write-Host "  Mount point: $mountPoint (available after VM starts)" -ForegroundColor Cyan
 
-    $saved     = Get-VmCredentials -VmName $vmName
-    $vmUser    = $null
-    $vmPass    = $null
-    $loginUser = ''
-
-    if ($saved) {
-        $desc = "user: $($saved.User)$(if ($saved.LoginUser) { ", desktop: $($saved.LoginUser)" })"
-        Write-Host "  Saved credentials found ($desc)." -ForegroundColor DarkGray
-        if (Read-YesNo "Use saved credentials?") {
-            $vmUser = $saved.User; $vmPass = $saved.Pass; $loginUser = $saved.LoginUser
+    if (-not [string]::IsNullOrWhiteSpace($VmUser)) {
+        $vmUser    = $VmUser.Trim()
+        $vmPass    = $VmPass
+        $loginUser = $LoginUser.Trim()
+        Write-Host "  Using supplied credentials (user: $vmUser, desktop: $loginUser)." -ForegroundColor DarkGray
+    } else {
+        $saved = Get-VmCredentials -VmName $vmName
+        if ($saved) {
+            $desc = "user: $($saved.User)$(if ($saved.LoginUser) { ", desktop: $($saved.LoginUser)" })"
+            Write-Host "  Saved credentials found ($desc)." -ForegroundColor DarkGray
+            if (-not $NonInteractive -and (Read-YesNo "Use saved credentials?")) {
+                $vmUser = $saved.User; $vmPass = $saved.Pass; $loginUser = $saved.LoginUser
+            } elseif ($NonInteractive) {
+                $vmUser = $saved.User; $vmPass = $saved.Pass; $loginUser = $saved.LoginUser
+            }
         }
-    }
 
-    if (-not $vmUser) {
-        $vmUser = (Read-Host "VM root username").Trim()
-        $vmPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-            [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host "VM root password" -AsSecureString)))
-    }
+        if (-not $vmUser) {
+            if ($NonInteractive) { throw "No credentials supplied or saved for '$vmName'." }
+            $vmUser = (Read-Host "VM root username").Trim()
+            $vmPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host "VM root password" -AsSecureString)))
+        }
 
-    while ([string]::IsNullOrWhiteSpace($loginUser)) {
-        $loginUser = (Read-Host "Desktop username to add to vboxsf").Trim()
-        if ([string]::IsNullOrWhiteSpace($loginUser)) { Write-Host "  Username cannot be empty." -ForegroundColor Yellow }
+        while ([string]::IsNullOrWhiteSpace($loginUser)) {
+            if ($NonInteractive) { throw "No desktop username supplied for '$vmName'." }
+            $loginUser = (Read-Host "Desktop username to add to vboxsf").Trim()
+            if ([string]::IsNullOrWhiteSpace($loginUser)) { Write-Host "  Username cannot be empty." -ForegroundColor Yellow }
+        }
     }
 
     Write-Host "  Starting VM '$vmName'..." -ForegroundColor Cyan
@@ -327,20 +285,35 @@ try {
 
     Write-Host "  Adding '$loginUser' to vboxsf group..." -ForegroundColor Cyan
     $ErrorActionPreference = 'SilentlyContinue'
-    $result   = & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "usermod -aG vboxsf $loginUser" 2>&1
+    & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "usermod -aG vboxsf $loginUser" 2>&1 | Out-Null
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
     if ($exitCode -ne 0) {
-        Write-Host "  ERROR: usermod failed (exit $exitCode): $result" -ForegroundColor Red
-        Write-Host "  Run manually: sudo usermod -aG vboxsf $loginUser" -ForegroundColor Cyan
+        Write-Host "  ERROR: Could not add '$loginUser' to vboxsf group. VM setup may be incomplete - make sure Guest Additions are fully installed inside the VM." -ForegroundColor Red
         exit 1
     }
 
-    Save-VmCredentials -VmName $vmName -User $vmUser -Pass $vmPass -LoginUser $loginUser
-
     Write-Host "  '$loginUser' added to vboxsf group." -ForegroundColor Green
-    Write-Host "  Reboot the VM for the change to take effect. Share will be at $mountPoint" -ForegroundColor Cyan
+
+    Write-Host "  Creating mount point '$mountPoint'..." -ForegroundColor Cyan
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "mkdir -p $mountPoint" 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+
+    Write-Host "  Mounting '$shareName' at '$mountPoint'..." -ForegroundColor Cyan
+    $ErrorActionPreference = 'SilentlyContinue'
+    $mountOut  = & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "mount -t vboxsf $shareName $mountPoint" 2>&1
+    $mountCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+
+    if ($mountCode -eq 0) {
+        Write-Host "  Share mounted at $mountPoint" -ForegroundColor Green
+        Write-Host "  Reboot the VM to apply the vboxsf group change for '$loginUser'." -ForegroundColor Cyan
+    } else {
+        Write-Host "  WARNING: mount failed (exit $mountCode): $mountOut" -ForegroundColor Yellow
+        Write-Host "  Run manually inside the VM: sudo mount -t vboxsf $shareName $mountPoint" -ForegroundColor Cyan
+    }
 
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red

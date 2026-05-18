@@ -69,6 +69,54 @@ function handleIpc(channel, handler) {
   })
 }
 
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the named VM is currently in the running state.
+ * Returns false if the VM is stopped or VBoxManage throws (e.g. VM not found).
+ *
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isVmRunning(name) {
+  try {
+    const info = execSync(
+      `VBoxManage showvminfo "${name}" --machinereadable`,
+      { encoding: 'utf8' }
+    )
+    return /^VMState="running"/m.test(info)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Runs a PowerShell script, streams each line to the renderer via IPC,
+ * and resolves with the exit code and all collected lines once the script exits.
+ *
+ * @param {Electron.BrowserWindow} win
+ * @param {string}   scriptPath
+ * @param {string[]} args
+ * @returns {Promise<{ exitCode: number, lines: { text: string, source: string }[] }>}
+ */
+function streamScript(win, scriptPath, args) {
+  return new Promise((resolve) => {
+    const lines = []
+    runScript(
+      scriptPath,
+      args,
+      (line) => {
+        win.webContents.send('script-line', line)
+        lines.push(line)
+      },
+      (exitCode) => {
+        win.webContents.send('script-done', exitCode)
+        resolve({ exitCode, lines })
+      }
+    )
+  })
+}
+
 /**
  * Registers all IPC handlers. Called once from main.js after the window is created.
  * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
@@ -130,21 +178,12 @@ function registerIpcHandlers(win) {
   // Starts a stopped VM with a GUI window. Idempotent: returns ok if already running.
   handleIpc('start-vm', async (_event, name) => {
     try {
-      const info = execSync(
-        `VBoxManage showvminfo "${name}" --machinereadable`,
-        { encoding: 'utf8' }
-      )
-
-      if (/^VMState="running"/m.test(info)) {
+      if (isVmRunning(name)) {
         log.info(`[ipc][start-vm] "${name}" already running — skipping`)
         return { ok: true }
       }
-
       log.info(`[ipc][start-vm] starting "${name}"`)
-      execSync(
-        `VBoxManage startvm "${name}" --type gui`,
-        { encoding: 'utf8' }
-      )
+      execSync(`VBoxManage startvm "${name}" --type gui`, { encoding: 'utf8' })
       return { ok: true }
     } catch (error) {
       log.error(`[ipc][start-vm] "${name}":`, error.message)
@@ -156,20 +195,8 @@ function registerIpcHandlers(win) {
   // Tries graceful ACPI shutdown first; falls back to hard poweroff if VM is still
   // running after 60 s.
   handleIpc('stop-vm', async (_event, name) => {
-    function vmRunning() {
-      try {
-        const info = execSync(
-          `VBoxManage showvminfo "${name}" --machinereadable`,
-          { encoding: 'utf8' }
-        )
-        return /^VMState="running"/m.test(info)
-      } catch {
-        return false
-      }
-    }
-
     try {
-      if (!vmRunning()) {
+      if (!isVmRunning(name)) {
         log.info(`[ipc][stop-vm] "${name}" already stopped — skipping`)
         return { ok: true }
       }
@@ -180,7 +207,7 @@ function registerIpcHandlers(win) {
       const deadline = Date.now() + 60_000
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 1000))
-        if (!vmRunning()) {
+        if (!isVmRunning(name)) {
           log.info(`[ipc][stop-vm] "${name}" stopped (ACPI)`)
           return { ok: true }
         }
@@ -252,75 +279,40 @@ function registerIpcHandlers(win) {
 
   // ── run-sanity-checks ─────────────────────────────────────
   // Runs the sanity check script with -Json flag and returns structured results.
-  // The script writes a JSON array to stdout; we collect all lines then parse.
-  handleIpc('run-sanity-checks', () => {
-    return new Promise((resolve) => {
-      const stdoutLines = []
-      const stderrLines = []
-
-      function onLine(line) {
-        win.webContents.send('script-line', line)
-        if (line.source === 'stdout') {
-          stdoutLines.push(line.text)
-        } else {
-          stderrLines.push(line.text)
-        }
-      }
-
-      function onDone(exitCode) {
-        win.webContents.send('script-done', exitCode)
-
-        try {
-          const checks = parseChecksOutput(stdoutLines, stderrLines)
-          resolve({ ok: true, checks })
-        } catch (parseError) {
-          log.error('[ipc][run-sanity-checks] parse failed:', parseError.message)
-          resolve({
-            ok: false,
-            error: 'Could not parse check results: ' + parseError.message,
-            checks: [],
-          })
-        }
-      }
-
-      runScript(SCRIPTS.sanityChecks, ['-Json'], onLine, onDone)
-    })
+  handleIpc('run-sanity-checks', async () => {
+    const { lines } = await streamScript(win, SCRIPTS.sanityChecks, ['-Json'])
+    const stdoutLines = lines.filter(l => l.source === 'stdout').map(l => l.text)
+    const stderrLines = lines.filter(l => l.source === 'stderr').map(l => l.text)
+    try {
+      const checks = parseChecksOutput(stdoutLines, stderrLines)
+      return { ok: true, checks }
+    } catch (parseError) {
+      log.error('[ipc][run-sanity-checks] parse failed:', parseError.message)
+      return { ok: false, error: 'Could not parse check results: ' + parseError.message, checks: [] }
+    }
   })
 
   // ── create-vm ─────────────────────────────────────────────
   // Creates a new Fedora VM from the supplied parameters.
   // Streams output to the renderer; returns ok when the script exits 0.
-  handleIpc('create-vm', (_event, params) => {
-    return new Promise((resolve) => {
-      function onLine(line) {
-        win.webContents.send('script-line', line)
-      }
-
-      function onDone(exitCode) {
-        win.webContents.send('script-done', exitCode)
-        resolve({ ok: exitCode === 0 })
-      }
-
-      const psArgs = [
-        '-vmName', params.vmName,
-        '-isoPath', params.isoPath,
-        '-ramMB', String(params.ramMB),
-        '-cpus', String(params.cpus),
-        '-diskMB', String(params.diskMB),
-        '-diskType', params.diskType,
-        '-vramMB', String(params.vramMB),
-        '-nicType', params.nicType,
-        '-attachGuestAdditions', params.attachGuestAdditions ? 'yes' : 'no',
-        '-startVm', params.startVm ? 'yes' : 'no',
-        '-forceRecreate', params.forceRecreate ? 'yes' : 'no',
-        '-NonInteractive',
-      ]
-      if (params.vmFolder) {
-        psArgs.push('-vmFolder', params.vmFolder)
-      }
-
-      runScript(SCRIPTS.createVm, psArgs, onLine, onDone)
-    })
+  handleIpc('create-vm', async (_event, params) => {
+    const psArgs = [
+      '-vmName', params.vmName,
+      '-isoPath', params.isoPath,
+      '-ramMB', String(params.ramMB),
+      '-cpus', String(params.cpus),
+      '-diskMB', String(params.diskMB),
+      '-diskType', params.diskType,
+      '-vramMB', String(params.vramMB),
+      '-nicType', params.nicType,
+      '-attachGuestAdditions', params.attachGuestAdditions ? 'yes' : 'no',
+      '-startVm', params.startVm ? 'yes' : 'no',
+      '-forceRecreate', params.forceRecreate ? 'yes' : 'no',
+      '-NonInteractive',
+    ]
+    if (params.vmFolder) psArgs.push('-vmFolder', params.vmFolder)
+    const { exitCode } = await streamScript(win, SCRIPTS.createVm, psArgs)
+    return { ok: exitCode === 0 }
   })
 
   // ── load-vm-credentials ──────────────────────────────────
@@ -346,58 +338,31 @@ function registerIpcHandlers(win) {
   // Runs share-folder.ps1 non-interactively with the supplied parameters.
   // Streams output to the renderer; returns ok when the script exits 0.
   // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
-  handleIpc('run-share-folder', (_event, params) => {
-    return new Promise((resolve) => {
-      const collectedLines = []
-
-      function onLine(line) {
-        win.webContents.send('script-line', line)
-        collectedLines.push(line)
-      }
-
-      function onDone(exitCode) {
-        win.webContents.send('script-done', exitCode)
-        if (exitCode === 0) {
-          resolve({ ok: true })
-          return
-        }
-        // Find the last explicit ERROR: line; fall back to the last non-empty line
-        const errorLines = collectedLines.filter(l => /^\s*ERROR:/i.test(l.text))
-        const lastLine = errorLines.length > 0
-          ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
-          : (collectedLines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
-        resolve({ ok: false, errorDetail: lastLine })
-      }
-
-      const psArgs = [
-        '-VmName',    params.vmName,
-        '-HostPath',  params.hostPath,
-        '-MountPoint', params.mountPoint,
-        '-VmUser',    params.vmUser,
-        '-VmPass',    params.vmPass,
-        '-LoginUser', params.loginUser,
-        '-NonInteractive',
-      ]
-
-      runScript(SCRIPTS.shareFolder, psArgs, onLine, onDone)
-    })
+  handleIpc('run-share-folder', async (_event, params) => {
+    const psArgs = [
+      '-VmName',    params.vmName,
+      '-HostPath',  params.hostPath,
+      '-MountPoint', params.mountPoint,
+      '-VmUser',    params.vmUser,
+      '-VmPass',    params.vmPass,
+      '-LoginUser', params.loginUser,
+      '-NonInteractive',
+    ]
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareFolder, psArgs)
+    if (exitCode === 0) return { ok: true }
+    // Find the last explicit ERROR: line; fall back to the last non-empty line
+    const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
+    const lastLine = errorLines.length > 0
+      ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
+      : (lines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
+    return { ok: false, errorDetail: lastLine }
   })
 
   // ── install-virtualbox ────────────────────────────────────
   // Runs the VirtualBox installer script and streams output to the renderer.
-  handleIpc('install-virtualbox', () => {
-    return new Promise((resolve) => {
-      function onLine(line) {
-        win.webContents.send('script-line', line)
-      }
-
-      function onDone(exitCode) {
-        win.webContents.send('script-done', exitCode)
-        resolve({ ok: exitCode === 0 })
-      }
-
-      runScript(SCRIPTS.installVirtualBox, [], onLine, onDone)
-    })
+  handleIpc('install-virtualbox', async () => {
+    const { exitCode } = await streamScript(win, SCRIPTS.installVirtualBox, [])
+    return { ok: exitCode === 0 }
   })
 
   // ── pick-folder ───────────────────────────────────────────
@@ -435,12 +400,7 @@ function registerIpcHandlers(win) {
     if (!allowed.has(name)) {
       return { ok: false, error: `Unknown log file: ${name}` }
     }
-    const logPath = path.join(
-      process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-      'FedoraBoxAutomation',
-      'logs',
-      name
-    )
+    const logPath = path.join(log.LOG_DIR, name)
     try {
       const raw = await fs.promises.readFile(logPath, 'utf8')
       const lines = raw.split('\n')
@@ -461,11 +421,7 @@ function registerIpcHandlers(win) {
   // 'vbox' -> %USERPROFILE%\VirtualBox VMs         (per-VM Logs\ subfolders)
   handleIpc('open-log-dir', async (_event, which) => {
     const dirs = {
-      app: path.join(
-        process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-        'FedoraBoxAutomation',
-        'logs'
-      ),
+      app: log.LOG_DIR,
       vbox: path.join(os.homedir(), 'VirtualBox VMs'),
     }
     const dir = dirs[which]

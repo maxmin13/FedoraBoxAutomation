@@ -13,60 +13,9 @@
 
 $ErrorActionPreference = 'Stop'
 
+. "$PSScriptRoot\common.ps1"
+
 # --- Helpers ------------------------------------------------------------------
-
-function Write-Header {
-    param([string]$Text)
-    $line = "-" * 60
-    Write-Host ""
-    Write-Host $line -ForegroundColor Cyan
-    Write-Host "  $Text" -ForegroundColor Cyan
-    Write-Host $line -ForegroundColor Cyan
-}
-
-function Read-YesNo {
-    param([string]$Prompt, [bool]$Default = $true)
-    $hint = if ($Default) { "Y/n" } else { "y/N" }
-    while ($true) {
-        $raw = Read-Host "$Prompt [$hint]"
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $Default }
-        switch ($raw.Trim().ToLower()) {
-            { $_ -in "y","yes" } { return $true }
-            { $_ -in "n","no"  } { return $false }
-        }
-        Write-Host "  Please answer y or n." -ForegroundColor Yellow
-    }
-}
-
-function Get-CredentialFile {
-    param([string]$VmName)
-    $dir = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    return Join-Path $dir "$VmName.cred"
-}
-
-function Save-VmCredentials {
-    param([string]$VmName, [string]$User, [string]$Pass, [string]$LoginUser = '')
-    $path = Get-CredentialFile -VmName $VmName
-    "$User`n$Pass`n$LoginUser" | Set-Content -Path $path -Encoding UTF8
-    Write-Host "  Credentials saved for future runs." -ForegroundColor DarkGray
-}
-
-function Get-VmCredentials {
-    param([string]$VmName)
-    $path = Get-CredentialFile -VmName $VmName
-    if (Test-Path $path) {
-        $lines = Get-Content $path -Encoding UTF8
-        if ($lines.Count -ge 2) {
-            return @{
-                User      = $lines[0]
-                Pass      = $lines[1]
-                LoginUser = if ($lines.Count -ge 3) { $lines[2] } else { '' }
-            }
-        }
-    }
-    return $null
-}
 
 function Test-GuestCredentials {
     $testArgs = @(
@@ -85,19 +34,6 @@ function Test-GuestCredentials {
     } finally {
         $ErrorActionPreference = 'Stop'
     }
-}
-
-function Find-VBoxManage {
-    $candidates = @(
-        "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe",
-        "C:\Program Files (x86)\Oracle\VirtualBox\VBoxManage.exe"
-    )
-    foreach ($c in $candidates) {
-        if (Test-Path $c) { return $c }
-    }
-    $found = Get-Command "VBoxManage.exe" -ErrorAction SilentlyContinue
-    if ($found) { return $found.Source }
-    return $null
 }
 
 function Send-ScriptToGuest {
@@ -321,11 +257,7 @@ while (-not $credVerified) {
         Write-Host "       rpm -q kernel-devel-`$(uname -r)" -ForegroundColor White
         Write-Host "     If not installed, reboot the VM then reinstall Guest Additions." -ForegroundColor White
         Write-Host "  5. Try restarting the VM and running this script again." -ForegroundColor White
-        $credFile = Get-CredentialFile -VmName $script:vmName
-        if (Test-Path $credFile) {
-            Remove-Item $credFile -Force
-            Write-Host "  Saved credentials deleted." -ForegroundColor DarkGray
-        }
+        Remove-VmCredentials -VmName $script:vmName
         $script:vmUser = $null
         $script:vmPass = $null
         if (-not (Read-YesNo "Try again?" $true)) { exit 1 }

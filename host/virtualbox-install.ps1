@@ -5,9 +5,8 @@
 
 $ErrorActionPreference = 'Stop'
 
-$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
-New-Item -ItemType Directory -Force $logDir | Out-Null
-Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+. "$PSScriptRoot\common.ps1"
+Start-Log
 
 $sep = "=" * 55
 

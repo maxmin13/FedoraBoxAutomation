@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { CreateVmParams } from '../electron.d'
+import LogPanel from '../components/LogPanel'
+import ProgressBar from '../components/ProgressBar'
 
 type PageState = 'idle' | 'running' | 'done' | 'next-steps'
 type Step = 1 | 2 | 3 | 4
@@ -9,7 +11,7 @@ type Step = 1 | 2 | 3 | 4
 const DISK_TYPES = ['VDI', 'VMDK', 'VHD']
 const NIC_TYPES  = ['nat', 'bridged', 'host-only', 'none']
 
-export default function CreateVmPage() {
+export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (running: boolean) => void }) {
   // Form fields
   const [vmName,   setVmName]   = useState('')
   const [vmFolder, setVmFolder] = useState('')
@@ -23,10 +25,15 @@ export default function CreateVmPage() {
   const [attachGA,   setAttachGA]   = useState(true)
   const [startAfter, setStartAfter] = useState(false)
 
+  // Credentials — saved automatically to .credentials.json on successful creation
+  const vmUser = 'root'
+  const [vmPass,    setVmPass]    = useState('')
+  const [loginUser, setLoginUser] = useState('')
+
   // Wizard + execution state
   const [step,          setStep]          = useState<Step>(1)
   const [pageState,     setPageState]     = useState<PageState>('idle')
-  const [logLines,      setLogLines]      = useState<string[]>([])
+  const [logLines,      setLogLines]      = useState<{ text: string; source: 'stdout' | 'stderr' }[]>([])
   const [success,       setSuccess]       = useState<boolean | null>(null)
   const [existingNames, setExistingNames] = useState<string[]>([])
   const [showLog,       setShowLog]       = useState(false)
@@ -36,6 +43,10 @@ export default function CreateVmPage() {
     if (pageState === 'done') {
       resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+  }, [pageState])
+
+  useEffect(() => {
+    onScriptRunning(pageState === 'running')
   }, [pageState])
 
   useEffect(() => {
@@ -55,7 +66,7 @@ export default function CreateVmPage() {
     setShowLog(true)
 
     const unsub = window.electronAPI.onScriptLine((line) => {
-      setLogLines((prev) => [...prev, line.text])
+      setLogLines((prev) => [...prev, line])
     })
 
     const params: CreateVmParams = {
@@ -78,6 +89,10 @@ export default function CreateVmPage() {
     setSuccess(result.ok)
     setPageState('done')
     setShowLog(false)
+
+    if (result.ok && (vmUser || vmPass || loginUser)) {
+      window.electronAPI.saveVmCredentials(trimmedName, vmUser, vmPass, loginUser)
+    }
   }
 
   const ic =
@@ -97,7 +112,7 @@ export default function CreateVmPage() {
             <LogPanel
               title="Script output"
               showLog={showLog}
-              logLines={logLines}
+              lines={logLines}
               onToggle={() => setShowLog((v) => !v)}
             />
           </>
@@ -114,7 +129,7 @@ export default function CreateVmPage() {
             <LogPanel
               title="Script output"
               showLog={showLog}
-              logLines={logLines}
+              lines={logLines}
               onToggle={() => setShowLog((v) => !v)}
             />
             <div className="flex justify-end">
@@ -138,7 +153,7 @@ export default function CreateVmPage() {
             <LogPanel
               title="Script output"
               showLog={showLog}
-              logLines={logLines}
+              lines={logLines}
               onToggle={() => setShowLog((v) => !v)}
             />
           </>
@@ -256,6 +271,34 @@ export default function CreateVmPage() {
               value={vmFolder}
               onChange={(e) => setVmFolder(e.target.value)}
               placeholder="Leave empty to use the default VirtualBox VMs folder"
+              className={ic}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">
+              VM root password{' '}
+              <span className="text-zinc-500 font-normal">(optional — set inside the VM later)</span>
+            </label>
+            <input
+              type="password"
+              value={vmPass}
+              onChange={(e) => setVmPass(e.target.value)}
+              placeholder="Root password you will set in the VM"
+              className={ic}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">
+              Desktop username{' '}
+              <span className="text-zinc-500 font-normal">(optional — the account you create during Fedora setup)</span>
+            </label>
+            <input
+              type="text"
+              value={loginUser}
+              onChange={(e) => setLoginUser(e.target.value)}
+              placeholder="e.g. fedora"
               className={ic}
             />
           </div>
@@ -550,42 +593,6 @@ function ConfirmRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-interface LogPanelProps {
-  title:    string
-  showLog:  boolean
-  logLines: string[]
-  onToggle: () => void
-}
-
-function LogPanel({ title, showLog, logLines, onToggle }: LogPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (showLog && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [logLines, showLog])
-
-  return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
-      >
-        <span className="text-zinc-400 text-xs font-medium uppercase tracking-wide">{title}</span>
-        <span className="text-zinc-500 text-xs">{showLog ? 'Hide' : 'Show'}</span>
-      </button>
-      {showLog && (
-        <div ref={scrollRef} className="px-4 pb-4 font-mono text-xs text-zinc-400 max-h-64 overflow-y-auto space-y-0.5">
-          {logLines.map((line, i) => (
-            <div key={i}>{line}</div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface NextStepProps {
   number:   number
@@ -607,13 +614,6 @@ function NextStep({ number, title, children }: NextStepProps) {
   )
 }
 
-function ProgressBar() {
-  return (
-    <div className="w-full h-2 bg-zinc-700 rounded-full overflow-hidden">
-      <div className="h-full w-1/3 bg-blue-500 rounded-full animate-slide" />
-    </div>
-  )
-}
 
 function CodeBlock({ lines }: { lines: string[] }) {
   return (

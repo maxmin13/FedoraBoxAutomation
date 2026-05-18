@@ -17,6 +17,15 @@ export interface CreateVmParams {
   forceRecreate: boolean
 }
 
+export interface ShareFolderParams {
+  vmName: string
+  hostPath: string
+  mountPoint: string
+  vmUser: string
+  vmPass: string
+  loginUser: string
+}
+
 export interface CheckResult {
   id: string
   label: string
@@ -39,6 +48,10 @@ declare global {
   interface Window {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
+      checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
+      runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+      loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
+      saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>
@@ -52,6 +65,7 @@ declare global {
       openLogDir: (which: 'app' | 'vbox') => Promise<{ ok: boolean; error?: string }>
       isDev: () => Promise<boolean>
       getDownloadsPath: () => Promise<{ path: string }>
+      pickFolder: () => Promise<{ folderPath: string | null }>
       pickIso: () => Promise<{ filePath: string | null }>
       logError: (message: string, stack: string) => Promise<void>
     }

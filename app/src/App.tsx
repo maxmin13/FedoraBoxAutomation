@@ -15,27 +15,36 @@ export type Page = 'landing' | 'setup' | 'create-vm' | 'docs' | 'logs'
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
+  const [landingKey, setLandingKey] = useState(0)
   const [isDev, setIsDev] = useState(false)
+  const [scriptRunning, setScriptRunning] = useState(false)
 
   useEffect(() => {
     window.electronAPI.isDev().then(setIsDev)
   }, [])
 
+  function handleNavigate(page: Page) {
+    if (page === 'landing' && currentPage === 'landing') {
+      setLandingKey((k) => k + 1)
+    }
+    setCurrentPage(page)
+  }
+
   return (
     <div className="flex flex-col h-screen">
       {/* Navigation bar — always visible at the top */}
-      <NavBar currentPage={currentPage} onNavigate={setCurrentPage} isDev={isDev} />
+      <NavBar currentPage={currentPage} onNavigate={handleNavigate} isDev={isDev} scriptRunning={scriptRunning} />
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-y-auto p-6">
         <ErrorBoundary>
-          {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
+          {currentPage === 'landing' && <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={setScriptRunning} />}
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
             <SetupPage />
           </div>
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <CreateVmPage />
+            <CreateVmPage onScriptRunning={setScriptRunning} />
           </div>
           {currentPage === 'docs' && <DocsPage />}
           {currentPage === 'logs' && <LogsPage />}

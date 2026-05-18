@@ -4,12 +4,15 @@
 import { useEffect, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
+import VmDetailPage from './VmDetailPage'
+import VmRunningBadge from '../components/VmRunningBadge'
 
 interface LandingPageProps {
   onNavigate: (page: Page) => void
+  onScriptRunning: (running: boolean) => void
 }
 
-export default function LandingPage({ onNavigate }: LandingPageProps) {
+export default function LandingPage({ onNavigate, onScriptRunning }: LandingPageProps) {
   // The list of VMs returned by VBoxManage
   const [vms, setVms] = useState<Vm[]>([])
 
@@ -18,6 +21,9 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
 
   // Error message to show if VBoxManage is not available
   const [error, setError] = useState<string | null>(null)
+
+  // VM currently open in the detail view (null = show grid)
+  const [selectedVm, setSelectedVm] = useState<Vm | null>(null)
 
   // Load VMs when the component first mounts
   useEffect(() => {
@@ -42,6 +48,10 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
     }
 
     setLoading(false)
+  }
+
+  if (selectedVm) {
+    return <VmDetailPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} />
   }
 
   return (
@@ -103,7 +113,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
       {!loading && vms.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {vms.map((vm) => (
-            <VmCard key={vm.uuid} vm={vm} onRefresh={loadVms} />
+            <VmCard key={vm.uuid} vm={vm} onRefresh={loadVms} onEdit={() => setSelectedVm(vm)} />
           ))}
         </div>
       )}
@@ -117,9 +127,10 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
 interface VmCardProps {
   vm: Vm
   onRefresh: () => void
+  onEdit: () => void
 }
 
-function VmCard({ vm, onRefresh }: VmCardProps) {
+function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -173,15 +184,7 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
       <div className="flex items-center justify-between">
         <span className="text-zinc-100 font-medium truncate">{vm.name}</span>
 
-        {vm.running ? (
-          <span className="text-xs bg-green-800 text-green-200 px-2 py-0.5 rounded-full shrink-0">
-            Running
-          </span>
-        ) : (
-          <span className="text-xs bg-zinc-700 text-zinc-400 px-2 py-0.5 rounded-full shrink-0">
-            Stopped
-          </span>
-        )}
+        <VmRunningBadge running={vm.running} />
       </div>
 
       {/* UUID in small muted text */}
@@ -235,6 +238,14 @@ function VmCard({ vm, onRefresh }: VmCardProps) {
             Delete
           </button>
         )}
+
+        <button
+          onClick={onEdit}
+          disabled={busy}
+          className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm disabled:opacity-50 ml-auto"
+        >
+          Edit
+        </button>
       </div>
     </div>
   )

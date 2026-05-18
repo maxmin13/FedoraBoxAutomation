@@ -30,6 +30,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Runs create-vm.ps1 with the supplied parameters; streams output to the renderer
   createVm: (params) => ipcRenderer.invoke('create-vm', params),
 
+  // ── Shared folder ─────────────────────────────────────────
+  // Checks whether a VM is running and has Guest Additions installed
+  checkVmReady: (vmName) => ipcRenderer.invoke('check-vm-ready', vmName),
+
+  // Runs share-folder.ps1 and streams output to the renderer
+  runShareFolder: (params) => ipcRenderer.invoke('run-share-folder', params),
+
+  // Reads saved credentials for a VM
+  loadVmCredentials: (vmName) => ipcRenderer.invoke('load-vm-credentials', vmName),
+
+  // Saves credentials for a VM (called automatically after VM creation)
+  saveVmCredentials: (vmName, user, pass, loginUser) =>
+    ipcRenderer.invoke('save-vm-credentials', { vmName, user, pass, loginUser }),
+
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results
   runSanityChecks: () => ipcRenderer.invoke('run-sanity-checks'),
@@ -42,7 +56,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reads a markdown file from the docs/ folder and returns its content as a string
   readDoc: (filename) => ipcRenderer.invoke('read-doc', filename),
 
-  // ── File picker ───────────────────────────────────────────
+  // ── File / folder pickers ─────────────────────────────────
+  // Opens a native OS folder picker; returns the chosen path or null
+  pickFolder: () => ipcRenderer.invoke('pick-folder'),
+
   // Opens a native OS file picker filtered to .iso files; returns the chosen path or null
   pickIso: () => ipcRenderer.invoke('pick-iso'),
 

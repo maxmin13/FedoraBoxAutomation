@@ -9,38 +9,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-function Write-Header {
-    param([string]$Text)
-    $line = "-" * 60
-    Write-Host ""
-    Write-Host $line -ForegroundColor Cyan
-    Write-Host "  $Text" -ForegroundColor Cyan
-    Write-Host $line -ForegroundColor Cyan
-}
-
-function Find-VBoxManage {
-    foreach ($c in @("C:\Program Files\Oracle\VirtualBox\VBoxManage.exe","C:\Program Files (x86)\Oracle\VirtualBox\VBoxManage.exe")) {
-        if (Test-Path $c) { return $c }
-    }
-    $found = Get-Command "VBoxManage.exe" -ErrorAction SilentlyContinue
-    if ($found) { return $found.Source }
-    return $null
-}
-
-function Get-CredentialFile {
-    param([string]$VmName)
-    $dir = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
-    return Join-Path $dir "$VmName.cred"
-}
-
-function Get-VmCredentials {
-    param([string]$VmName)
-    $path = Get-CredentialFile $VmName
-    if (-not (Test-Path $path)) { return $null }
-    $lines = Get-Content $path -Encoding UTF8
-    if ($lines.Count -lt 2) { return $null }
-    return @{ User = $lines[0]; Pass = $lines[1]; LoginUser = if ($lines.Count -ge 3) { $lines[2] } else { '' } }
-}
+. "$PSScriptRoot\common.ps1"
 
 # ---------------------------------------------------------------------------
 

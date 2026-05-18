@@ -42,6 +42,7 @@ function write(level, args) {
 }
 
 module.exports = {
+  LOG_DIR,
   info:  (...args) => write('info',  args),
   warn:  (...args) => write('warn',  args),
   error: (...args) => write('error', args),

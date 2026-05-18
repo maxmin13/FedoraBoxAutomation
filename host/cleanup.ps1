@@ -5,49 +5,75 @@
 
 .DESCRIPTION
     Performs two cleanup steps:
-      1. Unregisters and deletes the named failed VM (Fedora-44) including its disk files.
+      1. Unregisters and deletes the named VM including its disk files.
       2. Unregisters all inaccessible VMs whose configuration files are already missing,
          so they no longer clutter the VirtualBox Manager list.
 
     ISO files are not affected by this script.
 
+.PARAMETER VmName
+    Name of the VM to delete. When supplied the interactive prompt is skipped.
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File ".\cleanup.ps1"
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File ".\cleanup.ps1" -VmName "Fedora-44"
 #>
+param(
+    [string]$VmName = ''
+)
 
 $ErrorActionPreference = 'Stop'
 
-$logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
-New-Item -ItemType Directory -Force $logDir | Out-Null
-Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+. "$PSScriptRoot\common.ps1"
+Start-Log
 
 try {
-    # Unregister and delete the failed VM
-    $vmName     = "Fedora-44"
-    $vboxManage = "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
+    Write-Header "VirtualBox Cleanup"
 
-    $vmList = & $vboxManage list vms 2>$null
-    if ($vmList -match [regex]::Escape("`"$vmName`"")) {
-        try {
-            & $vboxManage unregistervm $vmName --delete
-            Write-Host "VM '$vmName' deleted." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to delete VM '$vmName': $_" -ForegroundColor Red
+    $script:vbox = Find-VBoxManage
+    if (-not $script:vbox) { Write-Host "  ERROR: VBoxManage.exe not found." -ForegroundColor Red; exit 1 }
+    Write-Host "  VBoxManage: $script:vbox" -ForegroundColor DarkGray
+
+    $registeredVms = & $script:vbox list vms 2>$null | ForEach-Object { if ($_ -match '"(.+)"') { $Matches[1] } }
+
+    if ([string]::IsNullOrWhiteSpace($VmName)) {
+        if ($registeredVms) {
+            Write-Host ""
+            Write-Host "  Registered VMs:" -ForegroundColor DarkGray
+            $registeredVms | ForEach-Object { Write-Host "    - $_" -ForegroundColor DarkGray }
+        }
+        while ($true) {
+            Write-Host ""
+            $vmName = (Read-Host "VM name to delete").Trim()
+            if ([string]::IsNullOrWhiteSpace($vmName)) { Write-Host "  VM name cannot be empty." -ForegroundColor Yellow; continue }
+            break
         }
     } else {
-        Write-Host "VM '$vmName' not found, skipping." -ForegroundColor Yellow
+        $vmName = $VmName.Trim()
+        Write-Host "  VM name: $vmName" -ForegroundColor DarkGray
     }
 
-    # Remove stale inaccessible VM registrations (files already gone)
+    $vmList = & $script:vbox list vms 2>$null
+    if ($vmList -match [regex]::Escape("`"$vmName`"")) {
+        try {
+            & $script:vbox unregistervm $vmName --delete
+            Write-Host "  VM '$vmName' deleted." -ForegroundColor Green
+        } catch {
+            Write-Host "  Failed to delete VM '$vmName': $_" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "  VM '$vmName' not found, skipping." -ForegroundColor Yellow
+    }
+
     Write-Host ""
-    Write-Host "Checking for inaccessible VMs..." -ForegroundColor Cyan
-    $inaccessible = & $vboxManage list vms 2>$null | Where-Object { $_ -match '^"<inaccessible>"' }
+    Write-Host "  Checking for inaccessible VMs..." -ForegroundColor Cyan
+    $inaccessible = & $script:vbox list vms 2>$null | Where-Object { $_ -match '^"<inaccessible>"' }
     if ($inaccessible) {
         foreach ($entry in $inaccessible) {
             if ($entry -match '\{([^}]+)\}') {
                 $uuid = $Matches[1]
                 try {
-                    & $vboxManage unregistervm $uuid 2>$null
+                    & $script:vbox unregistervm $uuid 2>$null
                     Write-Host "  Removed inaccessible VM {$uuid}." -ForegroundColor Green
                 } catch {
                     Write-Host "  Failed to remove {$uuid}: $_" -ForegroundColor Red
@@ -59,9 +85,9 @@ try {
     }
 
     Write-Host ""
-    Write-Host "Cleanup complete." -ForegroundColor Green
+    Write-Host "  Cleanup complete." -ForegroundColor Green
 } catch {
-    Write-Host "ERROR: Cleanup failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  ERROR: Cleanup failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 } finally {
     Stop-Transcript | Out-Null
