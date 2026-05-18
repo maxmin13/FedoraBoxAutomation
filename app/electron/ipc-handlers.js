@@ -24,6 +24,23 @@ const log = require('./logger')
 // The docs/ folder sits two levels above app/electron/
 const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 
+// Credentials store — single JSON file at repo root, keyed by VM name
+const CREDS_FILE = path.join(__dirname, '..', '..', '.credentials.json')
+
+async function readCredsStore() {
+  try {
+    const text = await fs.promises.readFile(CREDS_FILE, 'utf8')
+    // PowerShell 5.1 writes UTF-8 with BOM (U+FEFF); strip it before parsing
+    return JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text)
+  } catch {
+    return {}
+  }
+}
+
+async function writeCredsStore(store) {
+  await fs.promises.writeFile(CREDS_FILE, JSON.stringify(store, null, 2), 'utf8')
+}
+
 // Channels excluded from IPC logging.
 // 'is-dev' is polled on every page load; 'read-log' returns the full file
 // content — logging it back to the log file would create a feedback loop.
@@ -181,15 +198,55 @@ function registerIpcHandlers(win) {
 
   // ── delete-vm ─────────────────────────────────────────────
   // Unregisters the VM and deletes all associated files (VDI, snapshots, etc.).
-  // Only safe to call when the VM is stopped.
+  // Only safe to call when the VM is stopped. Also removes saved credentials.
   handleIpc('delete-vm', async (_event, name) => {
     try {
       log.info(`[ipc][delete-vm] deleting "${name}"`)
       execSync(`VBoxManage unregistervm "${name}" --delete`, { encoding: 'utf8' })
+
+      const store = await readCredsStore()
+      if (name in store) {
+        delete store[name]
+        await writeCredsStore(store)
+        log.info(`[ipc][delete-vm] removed credentials for "${name}"`)
+      }
+
       return { ok: true }
     } catch (error) {
       log.error(`[ipc][delete-vm] "${name}":`, error.message)
       return { ok: false, error: error.message }
+    }
+  })
+
+  // ── check-vm-ready ───────────────────────────────────────
+  // Returns running state and Guest Additions status for a VM.
+  // Used by ShareFolderPage to show a readiness banner before running share-folder.ps1.
+  handleIpc('check-vm-ready', async (_event, vmName) => {
+    try {
+      const info = execSync(
+        `VBoxManage showvminfo "${vmName}" --machinereadable`,
+        { encoding: 'utf8' }
+      )
+      const running = /^VMState="running"/m.test(info)
+      if (!running) {
+        return { ok: true, running: false, guestAdditions: false }
+      }
+      try {
+        const gaOutput = execSync(
+          `VBoxManage guestproperty get "${vmName}" /VirtualBox/GuestAdd/Version`,
+          { encoding: 'utf8' }
+        )
+        const match = gaOutput.match(/Value:\s*(.+)/i)
+        if (match) {
+          return { ok: true, running: true, guestAdditions: true, version: match[1].trim() }
+        }
+      } catch {
+        // guestproperty throws when Guest Additions are not installed
+      }
+      return { ok: true, running: true, guestAdditions: false }
+    } catch (error) {
+      log.error(`[ipc][check-vm-ready] "${vmName}":`, error.message)
+      return { ok: false, running: false, guestAdditions: false, error: error.message }
     }
   })
 
@@ -266,6 +323,66 @@ function registerIpcHandlers(win) {
     })
   })
 
+  // ── load-vm-credentials ──────────────────────────────────
+  // Reads .credentials.json keyed by VM name.
+  // Returns { ok, user, pass, loginUser } or { ok: false } if not found.
+  handleIpc('load-vm-credentials', async (_event, vmName) => {
+    const store = await readCredsStore()
+    const entry = store[vmName]
+    if (!entry) return { ok: false }
+    return { ok: true, user: entry.user ?? '', pass: entry.pass ?? '', loginUser: entry.loginUser ?? '' }
+  })
+
+  // ── save-vm-credentials ──────────────────────────────────
+  // Persists credentials for a VM. Called automatically after VM creation.
+  handleIpc('save-vm-credentials', async (_event, { vmName, user, pass, loginUser }) => {
+    const store = await readCredsStore()
+    store[vmName] = { user, pass, loginUser }
+    await writeCredsStore(store)
+    return { ok: true }
+  })
+
+  // ── run-share-folder ─────────────────────────────────────
+  // Runs share-folder.ps1 non-interactively with the supplied parameters.
+  // Streams output to the renderer; returns ok when the script exits 0.
+  // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
+  handleIpc('run-share-folder', (_event, params) => {
+    return new Promise((resolve) => {
+      const collectedLines = []
+
+      function onLine(line) {
+        win.webContents.send('script-line', line)
+        collectedLines.push(line)
+      }
+
+      function onDone(exitCode) {
+        win.webContents.send('script-done', exitCode)
+        if (exitCode === 0) {
+          resolve({ ok: true })
+          return
+        }
+        // Find the last explicit ERROR: line; fall back to the last non-empty line
+        const errorLines = collectedLines.filter(l => /^\s*ERROR:/i.test(l.text))
+        const lastLine = errorLines.length > 0
+          ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
+          : (collectedLines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
+        resolve({ ok: false, errorDetail: lastLine })
+      }
+
+      const psArgs = [
+        '-VmName',    params.vmName,
+        '-HostPath',  params.hostPath,
+        '-MountPoint', params.mountPoint,
+        '-VmUser',    params.vmUser,
+        '-VmPass',    params.vmPass,
+        '-LoginUser', params.loginUser,
+        '-NonInteractive',
+      ]
+
+      runScript(SCRIPTS.shareFolder, psArgs, onLine, onDone)
+    })
+  })
+
   // ── install-virtualbox ────────────────────────────────────
   // Runs the VirtualBox installer script and streams output to the renderer.
   handleIpc('install-virtualbox', () => {
@@ -281,6 +398,16 @@ function registerIpcHandlers(win) {
 
       runScript(SCRIPTS.installVirtualBox, [], onLine, onDone)
     })
+  })
+
+  // ── pick-folder ───────────────────────────────────────────
+  // Opens a native folder picker. Returns { folderPath: string | null }.
+  handleIpc('pick-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select folder',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    return { folderPath: result.canceled ? null : result.filePaths[0] }
   })
 
   // ── pick-iso ──────────────────────────────────────────────

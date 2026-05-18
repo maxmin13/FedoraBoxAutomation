@@ -9,14 +9,18 @@ const EXISTING_VMS = [
 const ISO_PATH     = 'C:\\Users\\test\\Downloads\\fedora.iso'
 const ISO_FILENAME = 'fedora.iso'
 
+let onScriptRunning: ReturnType<typeof vi.fn>
+
 beforeEach(() => {
+  onScriptRunning = vi.fn()
   window.electronAPI = {
-    listVms:      vi.fn().mockResolvedValue({ ok: true, vms: [] }),
-    createVm:     vi.fn().mockResolvedValue({ ok: true }),
-    onScriptLine: vi.fn().mockReturnValue(() => {}),
-    onScriptDone: vi.fn().mockReturnValue(() => {}),
+    listVms:            vi.fn().mockResolvedValue({ ok: true, vms: [] }),
+    createVm:           vi.fn().mockResolvedValue({ ok: true }),
+    saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
+    onScriptLine:       vi.fn().mockReturnValue(() => {}),
+    onScriptDone:       vi.fn().mockReturnValue(() => {}),
     // Default: clicking the ISO input fills in ISO_PATH
-    pickIso:      vi.fn().mockResolvedValue({ filePath: ISO_PATH }),
+    pickIso:            vi.fn().mockResolvedValue({ filePath: ISO_PATH }),
   } as unknown as typeof window.electronAPI
 })
 
@@ -24,7 +28,7 @@ beforeEach(() => {
 
 // Renders the page and flushes all initial async calls (listVms).
 async function renderAndFlush() {
-  render(<CreateVmPage />)
+  render(<CreateVmPage onScriptRunning={onScriptRunning} />)
   await act(async () => {})
 }
 
@@ -48,20 +52,24 @@ async function submitForm(vmName = 'MyVM') {
   await renderAndFlush()
   await fillStep1(vmName)
   navigateToConfirm()
-  fireEvent.click(screen.getByRole('button', { name: /create vm|recreate vm/i }))
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /create vm|recreate vm/i }))
+  })
 }
 
 // ── Step 1 — Next button state ───────────────────────────────────────────────
 
 describe('step 1 next button', () => {
-  it('is disabled when both VM name and ISO path are empty', () => {
-    render(<CreateVmPage />)
+  it('is disabled when both VM name and ISO path are empty', async () => {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('is disabled when VM name is filled but ISO path is empty', async () => {
     window.electronAPI.pickIso = vi.fn().mockResolvedValue({ filePath: null })
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'MyVM' },
     })
@@ -69,14 +77,14 @@ describe('step 1 next button', () => {
   })
 
   it('is disabled when ISO path is filled but VM name is empty', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
     await act(async () => {})
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('is enabled when both VM name and ISO path are filled', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1()
     expect(screen.getByRole('button', { name: 'Next' })).not.toBeDisabled()
   })
@@ -85,8 +93,9 @@ describe('step 1 next button', () => {
 // ── Step indicator ───────────────────────────────────────────────────────────
 
 describe('step indicator', () => {
-  it('shows all four step labels', () => {
-    render(<CreateVmPage />)
+  it('shows all four step labels', async () => {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
     expect(screen.getByText('Identity')).toBeInTheDocument()
     expect(screen.getByText('Hardware')).toBeInTheDocument()
     expect(screen.getByText('Options')).toBeInTheDocument()
@@ -94,7 +103,7 @@ describe('step indicator', () => {
   })
 
   it('advances to step 2 after clicking Next on a valid step 1', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.queryByPlaceholderText(/e\.g\. FedoraBox/i)).not.toBeInTheDocument()
@@ -102,7 +111,7 @@ describe('step indicator', () => {
   })
 
   it('can navigate back from step 2 to step 1', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
@@ -110,7 +119,7 @@ describe('step indicator', () => {
   })
 
   it('shows "Review" as the next-button label on step 3', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 3
@@ -128,7 +137,7 @@ describe('step indicator', () => {
   })
 
   it('preserves field values when navigating back from step 2', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1('TestVM')
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Back' })) // -> step 1
@@ -144,7 +153,8 @@ describe('name conflict', () => {
   })
 
   it('shows a warning on step 1 when the VM name matches an existing VM', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'FedoraBox' },
     })
@@ -154,17 +164,17 @@ describe('name conflict', () => {
   })
 
   it('shows no warning for a name that does not conflict', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'NewVM' },
     })
-    await waitFor(() => expect(window.electronAPI.listVms).toHaveBeenCalled())
     await act(async () => {})
     expect(screen.queryByText(/already exists/i)).not.toBeInTheDocument()
   })
 
   it('shows "Recreate VM" button on confirm page when name conflicts', async () => {
-    render(<CreateVmPage />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await fillStep1('FedoraBox')
     await waitFor(() => expect(screen.getByText(/already exists/i)).toBeInTheDocument())
     navigateToConfirm()
