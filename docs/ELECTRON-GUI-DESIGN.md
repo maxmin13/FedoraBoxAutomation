@@ -45,8 +45,10 @@ app/
       CreateVmPage.tsx           <- form to configure and create a new Fedora VM
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
+      VmDetailPage.tsx           <- sub-page for a selected VM: provision, share folder, logs
+      ShareFolderPage.tsx        <- shared folder management for a selected VM
     components/
-      NavBar.tsx                 <- My VMs / Setup / Create VM / Logs / Docs navigation
+      NavBar.tsx                 <- My VMs / Setup / Create VM / Console / Docs navigation
       CheckCard.tsx              <- pass/warn/fail result card
     __tests__/
       CheckCard.test.tsx
@@ -82,6 +84,11 @@ app/
   - `read-log` — reads the last 500 lines of `gui.log` or `host.log` from `%APPDATA%\FedoraBoxAutomation\logs\`; returns `{ ok, content }`; excluded from IPC logging to prevent a feedback loop
   - `open-log-dir` — opens a log folder in the native file explorer; `'app'` opens `%APPDATA%\FedoraBoxAutomation\logs\`; `'vbox'` opens `%USERPROFILE%\VirtualBox VMs`; uses `shell.openPath()`
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
+  - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are installed; returns `{ ok, running, guestAdditions, version? }`
+  - `load-vm-credentials` — reads credentials for a named VM from `.credentials.json`; returns `{ ok, username?, password?, desktopUsername? }`
+  - `save-vm-credentials` — writes credentials for a named VM to `.credentials.json`; returns `{ ok }`
+  - `run-share-folder` — runs `share-folder.ps1` with the given VM name and folder path; streams output; returns `{ ok }`
+  - `pick-folder` — opens a native folder picker; returns `{ folderPath }` or `{ folderPath: null }` if cancelled
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
   - `script-done` — exit code when the script finishes
@@ -110,7 +117,7 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 | 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM |
 | 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
 | 3 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
-| 4 | **Logs** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
+| 4 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
 | 5 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
 
 A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
@@ -291,7 +298,7 @@ easy to read and learn, no separate CSS files to maintain.
 
 ### Layout
 
-- Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Logs, Docs); Docs is hidden in production; active tab highlighted
+- Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Console, Docs); Docs is hidden in production; active tab highlighted
 - Main content area: SetupPage and CreateVmPage fill the viewport with `h-full` and manage their own internal layout (no outer scroll); other pages scroll through the main area as needed
 - SetupPage uses a left/right split — left panel is a fixed-width check list, right panel fills remaining width with detail + fix content; both panels use `overflow-hidden` so no scrollbars appear at the fixed 1100×750 window size
 
