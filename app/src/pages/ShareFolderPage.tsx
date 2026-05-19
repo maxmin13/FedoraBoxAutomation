@@ -57,6 +57,9 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
       setLines((prev) => [...prev, line])
     )
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+      if (exitCode === 0) {
+        window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
+      }
       setSuccess(exitCode === 0)
       setPageState('done')
       setShowLog(false)

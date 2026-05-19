@@ -17,3 +17,5 @@
 ## Freeze the menus while an operation is running
 
 ## while an operation is running add a progress bar on the page
+
+## check .credentials.json in the root folder, and check .credentials folder
