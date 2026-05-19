@@ -347,6 +347,16 @@ try {
     Write-Host "         systemctl status vboxadd           # service should be active" -ForegroundColor DarkGray
     Write-Host "         ls /lib/modules/`$(uname -r)/misc/vbox*.ko*  # .ko files must exist for the running kernel" -ForegroundColor DarkGray
     Write-Host "         modinfo vboxguest | grep ^version  # GA version should match your VirtualBox host version" -ForegroundColor DarkGray
+    Write-Host "    If something went wrong (e.g. modules did not compile):" -ForegroundColor White
+    Write-Host "         # 1. Fix the root cause:" -ForegroundColor DarkGray
+    Write-Host "         #    - If kernel was updated but not rebooted: reboot first, then continue." -ForegroundColor DarkGray
+    Write-Host "         #    - If kernel-devel was missing: sudo dnf install -y kernel-devel-`$(uname -r)" -ForegroundColor DarkGray
+    Write-Host "         # 2. Re-mount the Guest Additions ISO (mount is lost after reboot):" -ForegroundColor DarkGray
+    Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
+    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
+    Write-Host "         # 3. Re-run the installer:" -ForegroundColor DarkGray
+    Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
+    Write-Host "         sudo reboot" -ForegroundColor DarkGray
     Write-Host "    3. Run provision-vm.ps1 to install software." -ForegroundColor White
     Write-Host ""
 
