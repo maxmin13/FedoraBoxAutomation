@@ -351,6 +351,8 @@ try {
     Write-Host "         ls /lib/modules/`$(uname -r)/misc/vbox*.ko*  # .ko files must exist for the running kernel" -ForegroundColor DarkGray
     Write-Host "         modinfo vboxguest | grep ^version  # GA version should match your VirtualBox host version" -ForegroundColor DarkGray
     Write-Host "         groups <your-username>              # output should include vboxsf" -ForegroundColor DarkGray
+    Write-Host "         # Verify root password is set (required for share-folder.ps1 guestcontrol):" -ForegroundColor DarkGray
+    Write-Host "         su - root                           # should prompt for password and succeed; type exit to return" -ForegroundColor DarkGray
     Write-Host "    If something went wrong (e.g. modules did not compile):" -ForegroundColor White
     Write-Host "         # 1. Fix the root cause:" -ForegroundColor DarkGray
     Write-Host "         #    - If kernel was updated but not rebooted: reboot first, then continue." -ForegroundColor DarkGray
