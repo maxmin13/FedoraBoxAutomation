@@ -44,6 +44,26 @@ export interface Vm {
   running: boolean
 }
 
+export interface SharedFolder {
+  name: string
+  hostPath: string
+}
+
+export interface VmInfo {
+  osType: string
+  state: string
+  ramMB: number
+  cpus: number
+  vramMB: number
+  diskCapacityMB: number | null
+  diskType: string | null
+  nic: string
+  mac: string
+  sharedFolders: SharedFolder[]
+  gaVersion: string | null
+  logSyncPath: string | null
+}
+
 export interface ScriptLine {
   text: string
   source: 'stdout' | 'stderr'
@@ -53,6 +73,7 @@ declare global {
   interface Window {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
+      getVmInfo: (vmName: string) => Promise<({ ok: true } & VmInfo) | { ok: false; error?: string }>
       checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
       runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>

@@ -387,6 +387,93 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── get-vm-info ───────────────────────────────────────────
+  // Returns all displayable VM parameters parsed from showvminfo --machinereadable,
+  // plus disk capacity from showmediuminfo and GA version from guestproperty.
+  handleIpc('get-vm-info', async (_event, vmName) => {
+    try {
+      const raw = execSync(
+        `VBoxManage showvminfo "${vmName}" --machinereadable`,
+        { encoding: 'utf8' }
+      )
+
+      // Parse key="value" lines; strip trailing \r per CLAUDE.md warning.
+      // VirtualBox machinereadable format escapes backslashes as \\, so unescape them.
+      const kv = {}
+      for (const line of raw.split('\n')) {
+        const m = line.replace(/\r$/, '').match(/^([^=]+)="(.*)"$/)
+        if (m) kv[m[1]] = m[2].replace(/\\\\/g, '\\')
+      }
+
+      // Shared folders: SharedFolderNameMachineMapping1..N + SharedFolderPathMachineMapping1..N
+      const sharedFolders = []
+      let i = 1
+      while (kv[`SharedFolderNameMachineMapping${i}`]) {
+        sharedFolders.push({
+          name: kv[`SharedFolderNameMachineMapping${i}`],
+          hostPath: kv[`SharedFolderPathMachineMapping${i}`] ?? '',
+        })
+        i++
+      }
+
+      // Disk info — find the first *-ImageUUID-* key to get the medium UUID
+      let diskCapacityMB = null
+      let diskType = null
+      const diskUuidKey = Object.keys(kv).find(k => k.includes('ImageUUID'))
+      if (diskUuidKey) {
+        try {
+          const medInfo = execSync(
+            `VBoxManage showmediuminfo disk "${kv[diskUuidKey]}"`,
+            { encoding: 'utf8' }
+          )
+          const capMatch = medInfo.match(/^Capacity:\s*([\d,]+)\s*MBytes/im)
+          if (capMatch) diskCapacityMB = parseInt(capMatch[1].replace(/,/g, ''), 10)
+          const varMatch = medInfo.match(/^Format variant:\s*(.+)/im)
+          if (varMatch) diskType = /fixed/i.test(varMatch[1]) ? 'fixed' : 'dynamic'
+        } catch { /* no disk attached or showmediuminfo unavailable */ }
+      }
+
+      // Log sync destination: <VM folder>\guest-logs
+      let logSyncPath = null
+      if (kv['CfgFile']) {
+        logSyncPath = path.join(path.dirname(kv['CfgFile']), 'guest-logs')
+      }
+
+      // Guest Additions version — only queryable when the VM is running
+      let gaVersion = null
+      const running = /^running$/i.test(kv['VMState'] ?? '')
+      if (running) {
+        try {
+          const gaOut = execSync(
+            `VBoxManage guestproperty get "${vmName}" /VirtualBox/GuestAdd/Version`,
+            { encoding: 'utf8' }
+          )
+          const m = gaOut.match(/Value:\s*(.+)/i)
+          if (m) gaVersion = m[1].trim()
+        } catch { /* Guest Additions not installed */ }
+      }
+
+      return {
+        ok: true,
+        osType:        kv['ostype']        ?? 'Unknown',
+        state:         kv['VMState']       ?? 'unknown',
+        ramMB:         parseInt(kv['memory'] ?? '0', 10),
+        cpus:          parseInt(kv['cpus']   ?? '1', 10),
+        vramMB:        parseInt(kv['vram']   ?? '0', 10),
+        nic:           kv['nic1']          ?? 'null',
+        mac:           kv['macaddress1']   ?? '',
+        diskCapacityMB,
+        diskType,
+        sharedFolders,
+        gaVersion,
+        logSyncPath,
+      }
+    } catch (error) {
+      log.error(`[ipc][get-vm-info] "${vmName}":`, error.message)
+      return { ok: false, error: error.message }
+    }
+  })
+
   // ── run-share-logs ────────────────────────────────────────
   // Runs share-logs.ps1 non-interactively. Streams output to the renderer.
   // On failure, errorDetail contains the last ERROR:-prefixed line from the script.

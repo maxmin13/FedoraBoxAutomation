@@ -244,7 +244,7 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
           disabled={busy}
           className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm disabled:opacity-50 ml-auto"
         >
-          Edit
+          Detail
         </button>
       </div>
     </div>

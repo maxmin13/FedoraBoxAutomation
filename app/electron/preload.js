@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Returns a list of all registered VMs with their running state
   listVms: () => ipcRenderer.invoke('list-vms'),
 
+  // Returns all displayable parameters for a single VM (hardware, network, shared folders, etc.)
+  getVmInfo: (vmName) => ipcRenderer.invoke('get-vm-info', vmName),
+
   // ── VM control ───────────────────────────────────────────
   // Starts a stopped VM (headless mode)
   startVm: (name) => ipcRenderer.invoke('start-vm', name),

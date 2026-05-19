@@ -13,6 +13,7 @@ beforeEach(() => {
     deleteVm:          vi.fn().mockResolvedValue({ ok: true }),
     loadVmCredentials: vi.fn().mockResolvedValue({ ok: false }),
     checkVmReady:      vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false }),
+    getVmInfo:         vi.fn().mockResolvedValue({ ok: false, error: 'not needed' }),
     onScriptLine:      vi.fn().mockReturnValue(() => {}),
     onScriptDone:      vi.fn().mockReturnValue(() => {}),
   } as unknown as typeof window.electronAPI
@@ -191,10 +192,10 @@ describe('delete confirmation', () => {
 // ── VM detail navigation ──────────────────────────────────────────────────────
 
 describe('VM detail navigation', () => {
-  it('opens VmEditPage when the Edit button is clicked', async () => {
+  it('opens VmEditPage when the Detail button is clicked', async () => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
     await renderAndFlush()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Detail' }))
     await act(async () => {})
     // VmEditPage shows the VM name as a heading
     expect(screen.getByRole('heading', { name: 'FedoraBox', level: 1 })).toBeInTheDocument()
@@ -203,7 +204,7 @@ describe('VM detail navigation', () => {
   it('returns to the VM grid when Back is clicked in the detail view', async () => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
     await renderAndFlush()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Detail' }))
     await act(async () => {})
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     await act(async () => {})
