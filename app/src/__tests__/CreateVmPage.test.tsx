@@ -57,6 +57,40 @@ async function submitForm(vmName = 'MyVM') {
   })
 }
 
+// ── Step 2 — Next button validation ─────────────────────────────────────────
+
+describe('step 2 next button', () => {
+  async function goToStep2() {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await fillStep1()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  }
+
+  it('is enabled with default hardware values', async () => {
+    await goToStep2()
+    expect(screen.getByRole('button', { name: 'Next' })).not.toBeDisabled()
+  })
+
+  it('is disabled when RAM is below minimum', async () => {
+    await goToStep2()
+    // spinbutton order: RAM, CPUs, Disk Size, Video RAM
+    fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '0' } })
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+
+  it('is disabled when disk size is below minimum', async () => {
+    await goToStep2()
+    fireEvent.change(screen.getAllByRole('spinbutton')[2], { target: { value: '0' } })
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+
+  it('is disabled when CPUs is 0', async () => {
+    await goToStep2()
+    fireEvent.change(screen.getAllByRole('spinbutton')[1], { target: { value: '0' } })
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+})
+
 // ── Step 1 — Next button state ───────────────────────────────────────────────
 
 describe('step 1 next button', () => {

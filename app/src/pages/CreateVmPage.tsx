@@ -58,6 +58,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
   const trimmedName  = vmName.trim()
   const nameConflict = trimmedName !== '' && existingNames.includes(trimmedName)
   const step1Valid   = trimmedName !== '' && isoPath.trim() !== ''
+  const step2Valid   = ramMB >= 1024 && cpus >= 1 && cpus <= 32 && diskMB >= 10000 && vramMB >= 16 && vramMB <= 256
 
   async function handleCreate() {
     setPageState('running')
@@ -486,7 +487,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
       {/* Pinned footer nav */}
       <div className="shrink-0 pt-3">
         {step === 1 && <StepNav onBack={null} onNext={() => setStep(2)} nextEnabled={step1Valid} />}
-        {step === 2 && <StepNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextEnabled={true} />}
+        {step === 2 && <StepNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextEnabled={step2Valid} />}
         {step === 3 && <StepNav onBack={() => setStep(2)} onNext={() => setStep(4)} nextEnabled={true} nextLabel="Review" />}
         {step === 4 && (
           <div className="flex items-center justify-between">
