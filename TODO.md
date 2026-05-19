@@ -13,8 +13,6 @@
 
 ## check every page if all components fit into it
 
-## ~~new functionality gui share logs~~ (done)
-
 ## make the bar determinate (actual % from script output), which would require adding progress markers to the .ps1 scripts and parsing them in the IPC layer. That would make the bars genuinely useful
 
 ## test what happens when the user creates a new vm, enters 'maxmin' as login name, but then he is finalizing vm creation in Virtual Box he creates a login user with the name of 'artur'
