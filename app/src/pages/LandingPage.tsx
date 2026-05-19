@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
-import VmDetailPage from './VmDetailPage'
+import VmEditPage from './VmEditPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface LandingPageProps {
@@ -51,7 +51,7 @@ export default function LandingPage({ onNavigate, onScriptRunning }: LandingPage
   }
 
   if (selectedVm) {
-    return <VmDetailPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} />
+    return <VmEditPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} />
   }
 
   return (

@@ -191,7 +191,7 @@ describe('delete confirmation', () => {
 // ── VM detail navigation ──────────────────────────────────────────────────────
 
 describe('VM detail navigation', () => {
-  it('opens VmDetailPage when the Edit button is clicked', async () => {
+  it('opens VmEditPage when the Edit button is clicked', async () => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))

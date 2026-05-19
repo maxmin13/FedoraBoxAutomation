@@ -45,7 +45,7 @@ app/
       CreateVmPage.tsx           <- form to configure and create a new Fedora VM
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
-      VmDetailPage.tsx           <- sub-page for a selected VM: provision, share folder, logs
+      VmEditPage.tsx             <- sub-page for a selected VM: provision, share folder, logs
       ShareFolderPage.tsx        <- shared folder management for a selected VM
     components/
       NavBar.tsx                 <- My VMs / Setup / Create VM / Console / Docs navigation

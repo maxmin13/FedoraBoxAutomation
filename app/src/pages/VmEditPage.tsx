@@ -4,7 +4,7 @@ import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
-interface VmDetailPageProps {
+interface VmEditPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
@@ -12,7 +12,7 @@ interface VmDetailPageProps {
 
 type View = 'detail' | 'share-folder' | 'share-logs'
 
-export default function VmDetailPage({ vm, onBack, onScriptRunning }: VmDetailPageProps) {
+export default function VmEditPage({ vm, onBack, onScriptRunning }: VmEditPageProps) {
   const [view, setView] = useState<View>('detail')
 
   if (view === 'share-folder') {
