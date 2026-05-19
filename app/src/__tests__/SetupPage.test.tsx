@@ -28,17 +28,17 @@ describe('SetupPage', () => {
 
   describe('idle state', () => {
     it('shows the Run Analysis button', () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
     })
 
     it('Run Analysis button is enabled initially', () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       expect(screen.getByRole('button', { name: 'Run Analysis' })).not.toBeDisabled()
     })
 
     it('shows the idle prompt before any analysis has run', () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       expect(screen.getByText(/click "run analysis"/i)).toBeInTheDocument()
     })
   })
@@ -46,7 +46,7 @@ describe('SetupPage', () => {
   describe('running state', () => {
     it('disables the button and changes its label while the script is running', async () => {
       window.electronAPI.runSanityChecks = vi.fn().mockReturnValue(new Promise(() => {}))
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
@@ -58,7 +58,7 @@ describe('SetupPage', () => {
 
   describe('results state', () => {
     it('renders a card for each check result', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -70,7 +70,7 @@ describe('SetupPage', () => {
     })
 
     it('shows the correct pass count in the summary bar', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -79,7 +79,7 @@ describe('SetupPage', () => {
     })
 
     it('shows the correct fail count in the summary bar', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -94,7 +94,7 @@ describe('SetupPage', () => {
       ]
       window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: true, checks: withWarn })
 
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -103,7 +103,7 @@ describe('SetupPage', () => {
     })
 
     it('shows "0 warnings" (plural) when no checks produce a warning', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -112,7 +112,7 @@ describe('SetupPage', () => {
     })
 
     it('shows "Fix the failed items" when any check is failing', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -124,7 +124,7 @@ describe('SetupPage', () => {
       const allPassing = SAMPLE_CHECKS.map((c) => ({ ...c, status: 'pass' as const }))
       window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: true, checks: allPassing })
 
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -133,7 +133,7 @@ describe('SetupPage', () => {
     })
 
     it('re-enables the Run Analysis button after completion', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
 
@@ -141,7 +141,7 @@ describe('SetupPage', () => {
     })
 
     it('allows running analysis again after results are shown', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
 
@@ -161,7 +161,7 @@ describe('SetupPage', () => {
       })
       window.electronAPI.runSanityChecks = vi.fn().mockReturnValue(new Promise(() => {}))
 
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => expect(screen.getByText('Analysing host...')).toBeInTheDocument())
@@ -180,7 +180,7 @@ describe('SetupPage', () => {
         checks: [],
       })
 
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -191,7 +191,7 @@ describe('SetupPage', () => {
     it('shows "Analysis failed" when result.ok is false with no error field', async () => {
       window.electronAPI.runSanityChecks = vi.fn().mockResolvedValue({ ok: false, checks: [] })
 
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -203,7 +203,7 @@ describe('SetupPage', () => {
 
   describe('detail panel', () => {
     it('auto-selects the first failing check and shows its detail after analysis', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
       await waitFor(() => {
@@ -213,7 +213,7 @@ describe('SetupPage', () => {
     })
 
     it('shows the detail text for the selected check in the right panel', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
 
@@ -224,7 +224,7 @@ describe('SetupPage', () => {
     })
 
     it('shows "No action needed" when a passing check is selected', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
 
@@ -234,7 +234,7 @@ describe('SetupPage', () => {
     })
 
     it('switches the right panel when a different check row is clicked', async () => {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByText('Operating System')).toBeInTheDocument())
 
@@ -252,7 +252,7 @@ describe('SetupPage', () => {
     // vboxinst is the only failing check in SAMPLE_CHECKS, so it is auto-selected
     // and the fix panel opens without any extra click.
     async function openVboxFixPanel() {
-      render(<SetupPage />)
+      render(<SetupPage onScriptRunning={vi.fn()} />)
       fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
       await waitFor(() => expect(screen.getByRole('button', { name: 'Install VirtualBox' })).toBeInTheDocument())
     }

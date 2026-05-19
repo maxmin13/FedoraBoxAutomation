@@ -160,11 +160,12 @@ describe('parseChecksOutput', () => {
 
 describe('get-downloads-path handler', () => {
   let downloadsHandler
+  let mockGetPath
   const DOWNLOADS = 'C:\\Users\\test\\Downloads'
 
   beforeAll(() => {
     const mockHandle = vi.fn()
-    const mockGetPath = vi.fn().mockReturnValue(DOWNLOADS)
+    mockGetPath = vi.fn().mockReturnValue(DOWNLOADS)
 
     const electronId = require.resolve('electron')
     const handlersId = require.resolve('../ipc-handlers')
@@ -197,9 +198,9 @@ describe('get-downloads-path handler', () => {
   })
 
   it('calls app.getPath with "downloads"', async () => {
+    mockGetPath.mockClear()
     await downloadsHandler({})
-    // The handler calls app.getPath('downloads') — verified via mockReturnValue above
-    expect(downloadsHandler).toBeDefined()
+    expect(mockGetPath).toHaveBeenCalledWith('downloads')
   })
 })
 
@@ -576,5 +577,243 @@ describe('read-log handler', () => {
     expect(lineCount).toBeLessThanOrEqual(500)
     expect(result.content).toContain('line 599')
     expect(result.content).not.toContain('line 0\n')
+  })
+})
+
+// ── list-vms handler ──────────────────────────────────────────────────────────
+
+describe('list-vms handler', () => {
+  let listVmsHandler
+  let mockExecSync
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    listVmsHandler = loadHandlers()('list-vms')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+  })
+
+  it('returns all VMs with the running field set correctly', async () => {
+    mockExecSync
+      .mockReturnValueOnce('"FedoraBox" {uuid-1}\n"OtherVM" {uuid-2}\n') // list vms
+      .mockReturnValueOnce('"FedoraBox" {uuid-1}\n')                       // list runningvms
+    const result = await listVmsHandler({})
+    expect(result.ok).toBe(true)
+    expect(result.vms).toEqual([
+      { name: 'FedoraBox', uuid: 'uuid-1', running: true },
+      { name: 'OtherVM',   uuid: 'uuid-2', running: false },
+    ])
+  })
+
+  it('marks no VMs as running when the runningvms list is empty', async () => {
+    mockExecSync
+      .mockReturnValueOnce('"FedoraBox" {uuid-1}\n')
+      .mockReturnValueOnce('')
+    const result = await listVmsHandler({})
+    expect(result.vms[0].running).toBe(false)
+  })
+
+  it('returns an empty vms array when no VMs are registered', async () => {
+    mockExecSync
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce('')
+    const result = await listVmsHandler({})
+    expect(result.ok).toBe(true)
+    expect(result.vms).toEqual([])
+  })
+
+  it('returns ok: false when VBoxManage throws', async () => {
+    mockExecSync.mockImplementationOnce(() => { throw new Error('VBoxManage not found') })
+    const result = await listVmsHandler({})
+    expect(result.ok).toBe(false)
+    expect(result.vms).toEqual([])
+  })
+})
+
+// ── start-vm handler ──────────────────────────────────────────────────────────
+
+describe('start-vm handler', () => {
+  let startVmHandler
+  let mockExecSync
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    startVmHandler = loadHandlers()('start-vm')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+  })
+
+  it('returns ok: true without calling startvm when VM is already running', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="running"\n') // isVmRunning
+    const result = await startVmHandler({}, 'FedoraBox')
+    expect(result).toEqual({ ok: true })
+    // Only the showvminfo call, not startvm
+    expect(mockExecSync).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls VBoxManage startvm --type gui when VM is stopped', async () => {
+    mockExecSync
+      .mockReturnValueOnce('VMState="poweroff"\n') // isVmRunning
+      .mockReturnValueOnce('')                      // startvm
+    const result = await startVmHandler({}, 'FedoraBox')
+    expect(result).toEqual({ ok: true })
+    expect(mockExecSync).toHaveBeenLastCalledWith(
+      expect.stringContaining('startvm'),
+      expect.anything()
+    )
+  })
+
+  it('returns ok: false when VBoxManage startvm throws', async () => {
+    mockExecSync
+      .mockReturnValueOnce('VMState="poweroff"\n')
+      .mockImplementationOnce(() => { throw new Error('VM not found') })
+    const result = await startVmHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/VM not found/)
+  })
+})
+
+// ── delete-vm handler ─────────────────────────────────────────────────────────
+
+describe('delete-vm handler', () => {
+  let deleteVmHandler
+  let mockExecSync
+  let mockReadFile, mockMkdir, mockWriteFile
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    mockReadFile  = vi.spyOn(fs.promises, 'readFile')
+    mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
+    mockWriteFile = vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
+    deleteVmHandler = loadHandlers()('delete-vm')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    mockReadFile.mockRestore()
+    mockMkdir.mockRestore()
+    mockWriteFile.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+    mockReadFile.mockReset()
+    mockWriteFile.mockClear()
+  })
+
+  it('calls VBoxManage unregistervm --delete', async () => {
+    mockExecSync.mockReturnValueOnce('')
+    mockReadFile.mockResolvedValueOnce('{}')
+    await deleteVmHandler({}, 'FedoraBox')
+    expect(mockExecSync).toHaveBeenCalledWith(
+      expect.stringContaining('unregistervm'),
+      expect.anything()
+    )
+  })
+
+  it('returns ok: true on success', async () => {
+    mockExecSync.mockReturnValueOnce('')
+    mockReadFile.mockResolvedValueOnce('{}')
+    const result = await deleteVmHandler({}, 'FedoraBox')
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('removes saved credentials for the deleted VM', async () => {
+    mockExecSync.mockReturnValueOnce('')
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({ FedoraBox: { user: 'root', pass: 'x', loginUser: 'y' } })
+    )
+    await deleteVmHandler({}, 'FedoraBox')
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    expect(written.FedoraBox).toBeUndefined()
+  })
+
+  it('returns ok: false when VBoxManage unregistervm throws', async () => {
+    mockExecSync.mockImplementationOnce(() => { throw new Error('VM is locked') })
+    const result = await deleteVmHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/VM is locked/)
+  })
+})
+
+// ── get-vm-guest-logs-path handler ────────────────────────────────────────────
+
+describe('get-vm-guest-logs-path handler', () => {
+  let getVmGuestLogsPathHandler
+  let mockExecSync
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    getVmGuestLogsPathHandler = loadHandlers()('get-vm-guest-logs-path')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+  })
+
+  it('returns a path ending in "guest-logs"', async () => {
+    mockExecSync.mockReturnValueOnce('CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\n')
+    const result = await getVmGuestLogsPathHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(true)
+    expect(result.path).toMatch(/guest-logs$/)
+  })
+
+  it('returns a path inside the VM folder', async () => {
+    mockExecSync.mockReturnValueOnce('CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\n')
+    const result = await getVmGuestLogsPathHandler({}, 'FedoraBox')
+    expect(result.path).toContain('FedoraBox')
+  })
+
+  it('returns ok: false when the CfgFile line is missing from showvminfo output', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="poweroff"\n')
+    const result = await getVmGuestLogsPathHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/config file/i)
+  })
+
+  it('returns ok: false when VBoxManage throws', async () => {
+    mockExecSync.mockImplementationOnce(() => { throw new Error('VBoxManage not found') })
+    const result = await getVmGuestLogsPathHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import VmEditPage from '../pages/VmEditPage'
 
 const STOPPED_VM = { name: 'FedoraBox', uuid: 'uuid-1', running: false }
@@ -7,13 +7,15 @@ const RUNNING_VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 
 beforeEach(() => {
   window.electronAPI = {
-    loadVmCredentials: vi.fn().mockResolvedValue({ ok: false }),
-    checkVmReady:      vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false }),
-    onScriptLine:      vi.fn().mockReturnValue(() => {}),
-    onScriptDone:      vi.fn().mockReturnValue(() => {}),
-    pickFolder:        vi.fn().mockResolvedValue({ folderPath: null }),
-    runShareFolder:    vi.fn().mockResolvedValue({ ok: true }),
-    saveVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
+    loadVmCredentials:  vi.fn().mockResolvedValue({ ok: false }),
+    checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false }),
+    getVmGuestLogsPath: vi.fn().mockResolvedValue({ ok: true, path: 'C:\\VMs\\FedoraBox\\guest-logs' }),
+    onScriptLine:       vi.fn().mockReturnValue(() => {}),
+    onScriptDone:       vi.fn().mockReturnValue(() => {}),
+    pickFolder:         vi.fn().mockResolvedValue({ folderPath: null }),
+    runShareFolder:     vi.fn().mockResolvedValue({ ok: true }),
+    runShareLogs:       vi.fn().mockResolvedValue({ ok: true }),
+    saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
   } as unknown as typeof window.electronAPI
 })
 
@@ -69,5 +71,23 @@ describe('VmEditPage', () => {
     render(<VmEditPage vm={STOPPED_VM} onBack={onBack} onScriptRunning={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(onBack).toHaveBeenCalled()
+  })
+
+  it('navigates to ShareLogsPage when "Set up log sync" is clicked', async () => {
+    render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    expect(screen.getByRole('heading', { name: /log sync/i })).toBeInTheDocument()
+  })
+
+  it('returns to the edit view when Back is clicked in ShareLogsPage', async () => {
+    render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    const backButtons = screen.getAllByRole('button', { name: /back/i })
+    fireEvent.click(backButtons[0])
+    await act(async () => {})
+    expect(screen.getByText('Log sync')).toBeInTheDocument()
+    expect(screen.getByText('Shared folder')).toBeInTheDocument()
   })
 })

@@ -33,15 +33,39 @@ describe('NavBar', () => {
     expect(onNavigate).toHaveBeenCalledWith('setup')
   })
 
-  it('disables all nav buttons when scriptRunning is true', () => {
+  it('disables non-Console nav buttons when scriptRunning is true', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} scriptRunning={true} />)
-    const buttons = screen.getAllByRole('button')
-    buttons.forEach((btn) => expect(btn).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'My VMs' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Setup' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create VM' })).toBeDisabled()
+  })
+
+  it('keeps Console accessible when scriptRunning is true', () => {
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} scriptRunning={true} />)
+    expect(screen.getByRole('button', { name: 'Console' })).not.toBeDisabled()
+  })
+
+  it('keeps the script-running page button accessible during a script run', () => {
+    render(<NavBar currentPage="create-vm" onNavigate={onNavigate} isDev={false} scriptRunning={true} scriptPage="create-vm" />)
+    expect(screen.getByRole('button', { name: 'Create VM' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Setup' })).toBeDisabled()
   })
 
   it('does not disable nav buttons when scriptRunning is false', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} scriptRunning={false} />)
     expect(screen.getByRole('button', { name: 'My VMs' })).not.toBeDisabled()
+  })
+
+  it('calls onNavigate with "logs" when Console is clicked', () => {
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Console' }))
+    expect(onNavigate).toHaveBeenCalledWith('logs')
+  })
+
+  it('calls onNavigate with "create-vm" when Create VM is clicked', () => {
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
+    expect(onNavigate).toHaveBeenCalledWith('create-vm')
   })
 
   it('applies active styling to the current page button', () => {

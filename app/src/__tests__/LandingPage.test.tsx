@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import LandingPage from '../pages/LandingPage'
 
 const STOPPED_VM = { name: 'FedoraBox', uuid: 'uuid-1', running: false }
@@ -196,7 +196,7 @@ describe('VM detail navigation', () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     await act(async () => {})
-    // VmDetailPage shows the VM name as a heading
+    // VmEditPage shows the VM name as a heading
     expect(screen.getByRole('heading', { name: 'FedoraBox', level: 1 })).toBeInTheDocument()
   })
 

@@ -8,6 +8,10 @@
 
 - [ ] Track completed creation steps per VM (e.g. Guest Additions installed, shared folder configured) and expose that state to other pages/functions
 - [ ] "What to do next" panel (next-steps UI) is missing the full post-install verification and recovery steps that the script already prints to host.log — add: `sudo usermod -aG vboxsf`, post-reboot GA checks (lsmod, systemctl, vboxadd-install.log, modinfo, groups, su - root), and the "if something went wrong" recovery block
+this status should be checked before edit a vm.
+how is it possible to say that the fedora operating system has been installed? or that the guest additions have been installed?
+these are steps that the user do inside the vm.
+how is it possible to assign a status to that?
 
 ## New VM detail page
 
