@@ -37,6 +37,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Runs share-folder.ps1 and streams output to the renderer
   runShareFolder: (params) => ipcRenderer.invoke('run-share-folder', params),
 
+  // Returns the default guest-logs path for a VM: <VM folder>\guest-logs
+  getVmGuestLogsPath: (vmName) => ipcRenderer.invoke('get-vm-guest-logs-path', vmName),
+
+  // Runs share-logs.ps1 and streams output to the renderer
+  runShareLogs: (params) => ipcRenderer.invoke('run-share-logs', params),
+
   // Reads saved credentials for a VM
   loadVmCredentials: (vmName) => ipcRenderer.invoke('load-vm-credentials', vmName),
 

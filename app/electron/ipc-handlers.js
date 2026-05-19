@@ -368,6 +368,39 @@ function registerIpcHandlers(win) {
     return { ok: false, errorDetail: lastLine }
   })
 
+  // ── get-vm-guest-logs-path ────────────────────────────────
+  // Resolves the default guest-logs folder for a VM: <VM folder>\guest-logs.
+  // The VM folder is read from VBoxManage showvminfo CfgFile line.
+  handleIpc('get-vm-guest-logs-path', async (_event, vmName) => {
+    try {
+      const info = execSync(
+        `VBoxManage showvminfo "${vmName}" --machinereadable`,
+        { encoding: 'utf8' }
+      )
+      const match = info.match(/^CfgFile="(.+)"/m)
+      if (!match) return { ok: false, error: 'Could not find VM config file path' }
+      const vmDir = path.dirname(match[1])
+      return { ok: true, path: path.join(vmDir, 'guest-logs') }
+    } catch (error) {
+      log.error(`[ipc][get-vm-guest-logs-path] "${vmName}":`, error.message)
+      return { ok: false, error: error.message }
+    }
+  })
+
+  // ── run-share-logs ────────────────────────────────────────
+  // Runs share-logs.ps1 non-interactively. Streams output to the renderer.
+  // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
+  handleIpc('run-share-logs', async (_event, params) => {
+    const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-NonInteractive']
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs)
+    if (exitCode === 0) return { ok: true }
+    const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
+    const lastLine = errorLines.length > 0
+      ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
+      : (lines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
+    return { ok: false, errorDetail: lastLine }
+  })
+
   // ── install-virtualbox ────────────────────────────────────
   // Runs the VirtualBox installer script and streams output to the renderer.
   handleIpc('install-virtualbox', async () => {

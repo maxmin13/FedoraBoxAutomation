@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Vm } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
+import ShareLogsPage from './ShareLogsPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface VmDetailPageProps {
@@ -9,13 +10,17 @@ interface VmDetailPageProps {
   onScriptRunning: (running: boolean) => void
 }
 
-type View = 'detail' | 'share-folder'
+type View = 'detail' | 'share-folder' | 'share-logs'
 
 export default function VmDetailPage({ vm, onBack, onScriptRunning }: VmDetailPageProps) {
   const [view, setView] = useState<View>('detail')
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={() => setView('detail')} onScriptRunning={onScriptRunning} />
+  }
+
+  if (view === 'share-logs') {
+    return <ShareLogsPage vm={vm} onBack={() => setView('detail')} onScriptRunning={onScriptRunning} />
   }
 
   return (
@@ -37,7 +42,10 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning }: VmDetailPa
             Sync <code className="text-zinc-300">/var/log</code> from the VM to a host
             folder every 30 seconds via a VirtualBox shared folder and rsync.
           </p>
-          <button className="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm">
+          <button
+            onClick={() => setView('share-logs')}
+            className="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm"
+          >
             Set up log sync
           </button>
         </div>

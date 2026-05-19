@@ -26,6 +26,11 @@ export interface ShareFolderParams {
   loginUser: string
 }
 
+export interface ShareLogsParams {
+  vmName: string
+  hostPath: string
+}
+
 export interface CheckResult {
   id: string
   label: string
@@ -50,6 +55,8 @@ declare global {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
       checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
       runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+      getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+      runShareLogs: (params: ShareLogsParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
