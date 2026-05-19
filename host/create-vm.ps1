@@ -340,6 +340,13 @@ try {
     Write-Host "         sudo reboot" -ForegroundColor DarkGray
     Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
     Write-Host "         sestatus" -ForegroundColor DarkGray
+    Write-Host "         # Verify Guest Additions installed correctly:" -ForegroundColor DarkGray
+    Write-Host "         cat /var/log/vboxadd-install.log   # installer output; confirm no errors" -ForegroundColor DarkGray
+    Write-Host "         cat /var/log/vboxadd-setup.log     # kernel module build log; check for compile errors" -ForegroundColor DarkGray
+    Write-Host "         lsmod | grep vbox                  # vboxguest, vboxsf, vboxvideo should appear" -ForegroundColor DarkGray
+    Write-Host "         systemctl status vboxadd           # service should be active" -ForegroundColor DarkGray
+    Write-Host "         ls /lib/modules/`$(uname -r)/misc/vbox*.ko*  # .ko files must exist for the running kernel" -ForegroundColor DarkGray
+    Write-Host "         modinfo vboxguest | grep ^version  # GA version should match your VirtualBox host version" -ForegroundColor DarkGray
     Write-Host "    3. Run provision-vm.ps1 to install software." -ForegroundColor White
     Write-Host ""
 
