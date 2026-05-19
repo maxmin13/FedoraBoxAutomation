@@ -82,7 +82,6 @@ function runScript(scriptPath, args, onLine, onDone) {
   // stdout: normal output lines from the script (Write-Host, Write-Output)
   activeChild.stdout.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stdout')) {
-      log.info(`[script][stdout] ${line.text}`)
       onLine(line)
     }
   })
@@ -90,7 +89,6 @@ function runScript(scriptPath, args, onLine, onDone) {
   // stderr: error output — PowerShell writes some warnings here too
   activeChild.stderr.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stderr')) {
-      log.warn(`[script][stderr] ${line.text}`)
       onLine(line)
     }
   })
