@@ -337,6 +337,9 @@ try {
     Write-Host "         rpm -q kernel-devel-`$(uname -r)  # DKMS builds GA modules against this -- must match running kernel" -ForegroundColor DarkGray
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
     Write-Host "         sudo passwd root" -ForegroundColor DarkGray
+    Write-Host "         sudo usermod -aG vboxsf <your-username>  # replace with your desktop login name" -ForegroundColor DarkGray
+    Write-Host "         # Adding the user to vboxsf now ensures shared folder access works after reboot." -ForegroundColor DarkGray
+    Write-Host "         # If skipped, share-folder.ps1 will do it via guestcontrol -- but only if the root password is set and Guest Additions are fully running." -ForegroundColor DarkGray
     Write-Host "         sudo reboot" -ForegroundColor DarkGray
     Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
     Write-Host "         sestatus" -ForegroundColor DarkGray
@@ -347,6 +350,7 @@ try {
     Write-Host "         systemctl status vboxadd           # service should be active" -ForegroundColor DarkGray
     Write-Host "         ls /lib/modules/`$(uname -r)/misc/vbox*.ko*  # .ko files must exist for the running kernel" -ForegroundColor DarkGray
     Write-Host "         modinfo vboxguest | grep ^version  # GA version should match your VirtualBox host version" -ForegroundColor DarkGray
+    Write-Host "         groups <your-username>              # output should include vboxsf" -ForegroundColor DarkGray
     Write-Host "    If something went wrong (e.g. modules did not compile):" -ForegroundColor White
     Write-Host "         # 1. Fix the root cause:" -ForegroundColor DarkGray
     Write-Host "         #    - If kernel was updated but not rebooted: reboot first, then continue." -ForegroundColor DarkGray
