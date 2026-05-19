@@ -13,8 +13,6 @@ how is it possible to say that the fedora operating system has been installed? o
 these are steps that the user do inside the vm.
 how is it possible to assign a status to that?
 
-## New VM detail page
-
 ## check every page if all components fit into it
 
 ## make the bar determinate (actual % from script output), which would require adding progress markers to the .ps1 scripts and parsing them in the IPC layer. That would make the bars genuinely useful
@@ -22,4 +20,8 @@ how is it possible to assign a status to that?
 ## test what happens when the user creates a new vm, enters 'maxmin' as login name, but then he is finalizing vm creation in Virtual Box he creates a login user with the name of 'artur'
 
 
+# the user should be prevented to share folder /var/logs, that is reserved for the share logs functionality
 
+# when the user click delete vm, there is a confirmatin message, would it be beter to add another confirmation with a pop-up windows with the name of the vm in big capital letters?
+
+# review the position of back buttons in the pages, also, is any one missing?
