@@ -48,6 +48,10 @@ async function writeCredsStore(store) {
 // content — logging it back to the log file would create a feedback loop.
 const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
 
+function truncate(str, max = 120) {
+  return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
+}
+
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
  * and console (development only, via logger).
@@ -58,13 +62,13 @@ const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] recv ${channel}`, args.length ? inspect(args, { depth: 3, breakLength: Infinity }) : '')
+      log.info(`[ipc] recv ${channel}`, args.length ? truncate(inspect(args, { depth: 3, breakLength: Infinity })) : '')
     }
 
     const result = await handler(event, ...args)
 
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] reply ${channel}`, inspect(result, { depth: 3, breakLength: Infinity }))
+      log.info(`[ipc] reply ${channel}`, truncate(inspect(result, { depth: 3, breakLength: Infinity })))
     }
 
     return result

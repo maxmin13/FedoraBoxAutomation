@@ -14,6 +14,15 @@ const LOG_DIR  = path.join(
 const LOG_FILE  = path.join(LOG_DIR, 'gui.log')
 const HOST_FILE = path.join(LOG_DIR, 'host.log')
 
+const MAX_GUI  = 2 * 1024 * 1024  // 2 MB — rotate gui.log
+const MAX_HOST = 5 * 1024 * 1024  // 5 MB — rotate host.log
+
+function rotate(file, maxBytes) {
+  try {
+    if (fs.statSync(file).size >= maxBytes) fs.renameSync(file, file + '.1')
+  } catch {}
+}
+
 try {
   fs.mkdirSync(LOG_DIR, { recursive: true })
 } catch {}
@@ -31,6 +40,7 @@ function format(level, args) {
 function write(level, args) {
   const line = format(level, args)
   try {
+    rotate(LOG_FILE, MAX_GUI)
     fs.appendFileSync(LOG_FILE, line, 'utf8')
   } catch {}
 
@@ -45,7 +55,10 @@ function write(level, args) {
 function writeHost(text) {
   const ts   = new Date().toISOString().replace('T', ' ').slice(0, 23)
   const line = `[${ts}] ${text}\n`
-  try { fs.appendFileSync(HOST_FILE, line, 'utf8') } catch {}
+  try {
+    rotate(HOST_FILE, MAX_HOST)
+    fs.appendFileSync(HOST_FILE, line, 'utf8')
+  } catch {}
 }
 
 module.exports = {
