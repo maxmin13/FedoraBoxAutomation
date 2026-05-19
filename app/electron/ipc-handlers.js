@@ -24,8 +24,9 @@ const log = require('./logger')
 // The docs/ folder sits two levels above app/electron/
 const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 
-// Credentials store — single JSON file at repo root, keyed by VM name
-const CREDS_FILE = path.join(__dirname, '..', '..', '.credentials.json')
+// Credentials store — JSON file inside .credentials/ at repo root, keyed by VM name
+const CREDS_DIR  = path.join(__dirname, '..', '..', '.credentials')
+const CREDS_FILE = path.join(CREDS_DIR, 'credentials.json')
 
 async function readCredsStore() {
   try {
@@ -38,6 +39,7 @@ async function readCredsStore() {
 }
 
 async function writeCredsStore(store) {
+  await fs.promises.mkdir(CREDS_DIR, { recursive: true })
   await fs.promises.writeFile(CREDS_FILE, JSON.stringify(store, null, 2), 'utf8')
 }
 

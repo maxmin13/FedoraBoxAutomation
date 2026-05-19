@@ -340,12 +340,12 @@ Use a `__mocks__/electron.js` stub and `vitest.workspace.ts` to run Electron tes
 
 Add a matching entry in `src/electron.d.ts` for every new `ipcMain.handle()` channel. React components depend on `window.electronAPI` being fully typed for autocomplete and compile-time checks.
 
-## Credentials (.credentials.json)
+## Credentials (.credentials/credentials.json)
 
-- Credentials are stored in a single `.credentials.json` file at the project root (alongside `.claude`, `.vscode`).
+- Credentials are stored in `.credentials/credentials.json` at the project root.
 - The file is a JSON object keyed by VM name: `{ "<vm-name>": { "username": "root", "password": "...", "desktopUsername": "..." } }`.
 - `ipc-handlers.js` reads and writes this file via the `load-vm-credentials` and `save-vm-credentials` IPC channels.
-- `.credentials.json` is gitignored.
+- The entire `.credentials/` folder is gitignored.
 
 ## Guest Control (provision-vm.ps1)
 

@@ -85,8 +85,8 @@ app/
   - `open-log-dir` — opens a log folder in the native file explorer; `'app'` opens `%APPDATA%\FedoraBoxAutomation\logs\`; `'vbox'` opens `%USERPROFILE%\VirtualBox VMs`; uses `shell.openPath()`
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
   - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are installed; returns `{ ok, running, guestAdditions, version? }`
-  - `load-vm-credentials` — reads credentials for a named VM from `.credentials.json`; returns `{ ok, username?, password?, desktopUsername? }`
-  - `save-vm-credentials` — writes credentials for a named VM to `.credentials.json`; returns `{ ok }`
+  - `load-vm-credentials` — reads credentials for a named VM from `.credentials/credentials.json`; returns `{ ok, username?, password?, desktopUsername? }`
+  - `save-vm-credentials` — writes credentials for a named VM to `.credentials/credentials.json`; returns `{ ok }`
   - `run-share-folder` — runs `share-folder.ps1` with the given VM name and folder path; streams output; returns `{ ok }`
   - `pick-folder` — opens a native folder picker; returns `{ folderPath }` or `{ folderPath: null }` if cancelled
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):

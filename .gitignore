@@ -5,8 +5,8 @@ app/out/
 app/.vite/
 
 # Credentials — never commit these
+.credentials/
 .credentials.json
-.credentials/*.cred
 
 # Environment variable files — may contain secrets
 .env

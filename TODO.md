@@ -18,4 +18,4 @@
 
 ## while an operation is running add a progress bar on the page
 
-## check .credentials.json in the root folder, and check .credentials folder
+## add snapshot in readme file

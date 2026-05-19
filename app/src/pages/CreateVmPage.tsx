@@ -25,7 +25,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
   const [attachGA,   setAttachGA]   = useState(true)
   const [startAfter, setStartAfter] = useState(false)
 
-  // Credentials — saved automatically to .credentials.json on successful creation
+  // Credentials — saved automatically to .credentials/credentials.json on successful creation
   const vmUser = 'root'
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')

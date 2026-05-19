@@ -58,12 +58,12 @@ function Invoke-VBox {
     return $output
 }
 
-# Credentials are stored in .credentials.json at the repo root, keyed by VM name.
+# Credentials are stored in .credentials/credentials.json at the repo root, keyed by VM name.
 # This matches the format used by the Electron GUI (ipc-handlers.js).
 
 function Get-VmCredentials {
     param([string]$VmName)
-    $path = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials.json"
+    $path = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials\credentials.json"
     if (-not (Test-Path $path)) { return $null }
     $store = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
     $prop  = $store.PSObject.Properties[$VmName]
@@ -74,7 +74,9 @@ function Get-VmCredentials {
 
 function Save-VmCredentials {
     param([string]$VmName, [string]$User, [string]$Pass, [string]$LoginUser = '')
-    $path  = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials.json"
+    $dir   = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials"
+    $path  = Join-Path $dir "credentials.json"
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
     $store = if (Test-Path $path) { Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json } else { [PSCustomObject]@{} }
     $entry = [PSCustomObject]@{ user = $User; pass = $Pass; loginUser = $LoginUser }
     if ($store.PSObject.Properties[$VmName]) {
@@ -88,7 +90,7 @@ function Save-VmCredentials {
 
 function Remove-VmCredentials {
     param([string]$VmName)
-    $path = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials.json"
+    $path = Join-Path (Split-Path $PSScriptRoot -Parent) ".credentials\credentials.json"
     if (-not (Test-Path $path)) { return }
     $store = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
     $store.PSObject.Properties.Remove($VmName)
