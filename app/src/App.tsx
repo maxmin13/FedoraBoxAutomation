@@ -41,7 +41,7 @@ export default function App() {
           {currentPage === 'landing' && <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={setScriptRunning} />}
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <SetupPage />
+            <SetupPage onScriptRunning={setScriptRunning} />
           </div>
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
             <CreateVmPage onScriptRunning={setScriptRunning} />

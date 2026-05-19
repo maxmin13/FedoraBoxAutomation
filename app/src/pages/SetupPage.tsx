@@ -4,7 +4,7 @@
 // Layout: header + summary bar (fixed), then a left/right split.
 // Left: compact check list. Right: detail + fix instructions for selected check.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { CheckResult } from '../electron.d'
 import ProgressBar from '../components/ProgressBar'
 
@@ -22,12 +22,16 @@ const STATUS_ICON: Record<CheckResult['status'], string> = {
   fail: 'XX',
 }
 
-export default function SetupPage() {
+export default function SetupPage({ onScriptRunning }: { onScriptRunning: (running: boolean) => void }) {
   const [pageState, setPageState] = useState<PageState>('idle')
   const [checks, setChecks] = useState<CheckResult[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [logLines, setLogLines] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    onScriptRunning(pageState === 'running')
+  }, [pageState])
 
   async function runAnalysis() {
     setPageState('running')
