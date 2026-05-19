@@ -16,6 +16,4 @@
 
 ## Freeze the menus while an operation is running
 
-## while an operation is running add a progress bar on the page
-
-## add snapshot in readme file
+## make the bar determinate (actual % from script output), which would require adding progress markers to the .ps1 scripts and parsing them in the IPC layer. That would make the bars genuinely useful

@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import type { CheckResult } from '../electron.d'
+import ProgressBar from '../components/ProgressBar'
 
 type PageState = 'idle' | 'running' | 'done'
 
@@ -84,6 +85,13 @@ export default function SetupPage() {
           {pageState === 'running' ? 'Running...' : 'Run Analysis'}
         </button>
       </div>
+
+      {/* Progress bar — shown while analysis is running */}
+      {pageState === 'running' && (
+        <div className="mb-4 shrink-0">
+          <ProgressBar />
+        </div>
+      )}
 
       {/* Summary bar */}
       {pageState === 'done' && checks.length > 0 && (
