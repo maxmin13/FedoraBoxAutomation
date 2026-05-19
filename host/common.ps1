@@ -41,9 +41,7 @@ function Find-VBoxManage {
 }
 
 function Start-Log {
-    $logDir = "$env:APPDATA\FedoraBoxAutomation\logs"
-    New-Item -ItemType Directory -Force $logDir | Out-Null
-    Start-Transcript -Path "$logDir\host.log" -Append -Force | Out-Null
+    # host.log is now written with timestamps by the Electron main process
 }
 
 function Invoke-VBox {

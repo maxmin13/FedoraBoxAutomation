@@ -103,6 +103,4 @@ try {
 } catch {
     Write-Host "`n[FAIL] VirtualBox installation failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
-} finally {
-    Stop-Transcript | Out-Null
 }

@@ -103,15 +103,19 @@ function isVmRunning(name) {
  */
 function streamScript(win, scriptPath, args) {
   return new Promise((resolve) => {
+    const scriptName = path.basename(scriptPath)
+    log.hostMark(`START ${scriptName}`)
     const lines = []
     runScript(
       scriptPath,
       args,
       (line) => {
         win.webContents.send('script-line', line)
+        log.hostLine(line.text)
         lines.push(line)
       },
       (exitCode) => {
+        log.hostMark(`END ${scriptName} exit=${exitCode}`)
         win.webContents.send('script-done', exitCode)
         resolve({ exitCode, lines })
       }

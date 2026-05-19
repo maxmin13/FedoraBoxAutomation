@@ -208,269 +208,273 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
     )
   }
 
-  // Wizard
+  // Wizard — h-full flex-col keeps header + nav pinned; form area scrolls if needed
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-3">
+    <div className="max-w-2xl mx-auto h-full flex flex-col">
+
+      {/* Pinned header */}
+      <div className="shrink-0 mb-3">
         <h1 className="text-2xl font-semibold text-zinc-100">Create VM</h1>
         <p className="text-zinc-400 text-sm mt-0.5">
           Configure and create a new Fedora VirtualBox VM.
         </p>
       </div>
 
-      <StepIndicator currentStep={step} />
+      <div className="shrink-0">
+        <StepIndicator currentStep={step} />
+      </div>
 
-      {/* Step 1 — Identity */}
-      {step === 1 && (
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              VM Name <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={vmName}
-              onChange={(e) => setVmName(e.target.value)}
-              placeholder="e.g. FedoraBox"
-              className={ic}
-            />
-            {nameConflict && (
-              <p className="text-yellow-400 text-xs mt-1">
-                A VM named "{trimmedName}" already exists — submitting will unregister and recreate
-                it (files kept).
-              </p>
-            )}
-          </div>
+      {/* Scrollable form area */}
+      <div className="flex-1 overflow-y-auto min-h-0">
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              Fedora ISO Path <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={isoPath ? isoPath.split(/[\\/]/).pop()! : ''}
-              readOnly
-              onClick={async () => {
-                const result = await window.electronAPI.pickIso()
-                if (result.filePath) setIsoPath(result.filePath)
-              }}
-              placeholder="Click to browse for the ISO file"
-              className={ic + ' cursor-pointer'}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              VM Folder{' '}
-              <span className="text-zinc-500 font-normal">
-                (optional — uses VirtualBox default)
-              </span>
-            </label>
-            <input
-              type="text"
-              value={vmFolder}
-              onChange={(e) => setVmFolder(e.target.value)}
-              placeholder="Leave empty to use the default VirtualBox VMs folder"
-              className={ic}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              VM root password{' '}
-              <span className="text-zinc-500 font-normal">(optional — set inside the VM later)</span>
-            </label>
-            <input
-              type="password"
-              value={vmPass}
-              onChange={(e) => setVmPass(e.target.value)}
-              placeholder="Root password you will set in the VM"
-              className={ic}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              Desktop username{' '}
-              <span className="text-zinc-500 font-normal">(optional — the account you create during Fedora setup)</span>
-            </label>
-            <input
-              type="text"
-              value={loginUser}
-              onChange={(e) => setLoginUser(e.target.value)}
-              placeholder="e.g. fedora"
-              className={ic}
-            />
-          </div>
-
-          <StepNav onBack={null} onNext={() => setStep(2)} nextEnabled={step1Valid} />
-        </div>
-      )}
-
-      {/* Step 2 — Hardware */}
-      {step === 2 && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">RAM (MB)</label>
-              <input
-                type="number"
-                value={ramMB}
-                onChange={(e) => setRamMB(Number(e.target.value))}
-                min={1024}
-                step={512}
-                className={ic}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">CPUs</label>
-              <input
-                type="number"
-                value={cpus}
-                onChange={(e) => setCpus(Number(e.target.value))}
-                min={1}
-                max={32}
-                className={ic}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Disk Size (MB)
-              </label>
-              <input
-                type="number"
-                value={diskMB}
-                onChange={(e) => setDiskMB(Number(e.target.value))}
-                min={10000}
-                step={1000}
-                className={ic}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Video RAM (MB)
-              </label>
-              <input
-                type="number"
-                value={vramMB}
-                onChange={(e) => setVramMB(Number(e.target.value))}
-                min={16}
-                max={256}
-                className={ic}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">Disk Type</label>
-            <select
-              value={diskType}
-              onChange={(e) => setDiskType(e.target.value)}
-              className={ic}
-            >
-              {DISK_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <StepNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextEnabled={true} />
-        </div>
-      )}
-
-      {/* Step 3 — Options */}
-      {step === 3 && (
-        <div className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1">
-              Network Adapter
-            </label>
-            <select
-              value={nicType}
-              onChange={(e) => setNicType(e.target.value)}
-              className={ic}
-            >
-              {NIC_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        {/* Step 1 — Identity */}
+        {step === 1 && (
           <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                VM Name <span className="text-red-400">*</span>
+              </label>
               <input
-                type="checkbox"
-                checked={attachGA}
-                onChange={(e) => setAttachGA(e.target.checked)}
-                className="accent-blue-500"
+                type="text"
+                value={vmName}
+                onChange={(e) => setVmName(e.target.value)}
+                placeholder="e.g. FedoraBox"
+                className={ic}
               />
-              <span className="text-sm text-zinc-300">Attach Guest Additions ISO</span>
-              <span className="text-xs text-zinc-500">
-                (recommended — needed for clipboard, drag-and-drop, and provisioning)
-              </span>
-            </label>
+              {nameConflict && (
+                <p className="text-yellow-400 text-xs mt-1">
+                  A VM named "{trimmedName}" already exists — submitting will unregister and recreate
+                  it (files kept).
+                </p>
+              )}
+            </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                Fedora ISO Path <span className="text-red-400">*</span>
+              </label>
               <input
-                type="checkbox"
-                checked={startAfter}
-                onChange={(e) => setStartAfter(e.target.checked)}
-                className="accent-blue-500"
+                type="text"
+                value={isoPath ? isoPath.split(/[\\/]/).pop()! : ''}
+                readOnly
+                onClick={async () => {
+                  const result = await window.electronAPI.pickIso()
+                  if (result.filePath) setIsoPath(result.filePath)
+                }}
+                placeholder="Click to browse for the ISO file"
+                className={ic + ' cursor-pointer'}
               />
-              <span className="text-sm text-zinc-300">Start VM after creation</span>
-            </label>
-          </div>
-
-          <StepNav
-            onBack={() => setStep(2)}
-            onNext={() => setStep(4)}
-            nextEnabled={true}
-            nextLabel="Review"
-          />
-        </div>
-      )}
-
-      {/* Step 4 — Confirm */}
-      {step === 4 && (
-        <div className="space-y-3">
-          {nameConflict && (
-            <div className="bg-yellow-900/40 border border-yellow-700 rounded-lg p-3">
-              <p className="text-yellow-300 text-sm">
-                A VM named "{trimmedName}" already exists. Submitting will unregister and recreate
-                it (files are kept).
-              </p>
             </div>
-          )}
 
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden divide-y divide-zinc-700">
-            {/* Identity — full width */}
-            <ConfirmSection title="Identity">
-              <ConfirmRow label="VM Name"   value={trimmedName} />
-              <ConfirmRow label="ISO File"  value={isoPath.trim() ? isoPath.trim().split(/[\\/]/).pop()! : '—'} />
-              <ConfirmRow label="VM Folder" value={vmFolder.trim() || '(VirtualBox default)'} />
-            </ConfirmSection>
-            {/* Hardware + Options — two columns */}
-            <div className="grid grid-cols-2 divide-x divide-zinc-700">
-              <ConfirmSection title="Hardware">
-                <ConfirmRow label="RAM"       value={`${ramMB} MB`} />
-                <ConfirmRow label="CPUs"      value={String(cpus)} />
-                <ConfirmRow label="Disk Size" value={`${diskMB} MB`} />
-                <ConfirmRow label="Video RAM" value={`${vramMB} MB`} />
-                <ConfirmRow label="Disk Type" value={diskType} />
-              </ConfirmSection>
-              <ConfirmSection title="Options">
-                <ConfirmRow label="Network"         value={nicType} />
-                <ConfirmRow label="Guest Additions" value={attachGA ? 'Attach' : 'Skip'} />
-                <ConfirmRow label="Start after"     value={startAfter ? 'Yes' : 'No'} />
-              </ConfirmSection>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                VM Folder{' '}
+                <span className="text-zinc-500 font-normal">
+                  (optional — uses VirtualBox default)
+                </span>
+              </label>
+              <input
+                type="text"
+                value={vmFolder}
+                onChange={(e) => setVmFolder(e.target.value)}
+                placeholder="Leave empty to use the default VirtualBox VMs folder"
+                className={ic}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                VM root password{' '}
+                <span className="text-zinc-500 font-normal">(optional — set inside the VM later)</span>
+              </label>
+              <input
+                type="password"
+                value={vmPass}
+                onChange={(e) => setVmPass(e.target.value)}
+                placeholder="Root password you will set in the VM"
+                className={ic}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                Desktop username{' '}
+                <span className="text-zinc-500 font-normal">(required for shared folder setup — the account you create during Fedora install)</span>
+              </label>
+              <input
+                type="text"
+                value={loginUser}
+                onChange={(e) => setLoginUser(e.target.value)}
+                placeholder="e.g. fedora"
+                className={ic}
+              />
             </div>
           </div>
+        )}
 
-          <div className="flex items-center justify-between pt-2">
+        {/* Step 2 — Hardware */}
+        {step === 2 && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">RAM (MB)</label>
+                <input
+                  type="number"
+                  value={ramMB}
+                  onChange={(e) => setRamMB(Number(e.target.value))}
+                  min={1024}
+                  step={512}
+                  className={ic}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">CPUs</label>
+                <input
+                  type="number"
+                  value={cpus}
+                  onChange={(e) => setCpus(Number(e.target.value))}
+                  min={1}
+                  max={32}
+                  className={ic}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">
+                  Disk Size (MB)
+                </label>
+                <input
+                  type="number"
+                  value={diskMB}
+                  onChange={(e) => setDiskMB(Number(e.target.value))}
+                  min={10000}
+                  step={1000}
+                  className={ic}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">
+                  Video RAM (MB)
+                </label>
+                <input
+                  type="number"
+                  value={vramMB}
+                  onChange={(e) => setVramMB(Number(e.target.value))}
+                  min={16}
+                  max={256}
+                  className={ic}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Disk Type</label>
+              <select
+                value={diskType}
+                onChange={(e) => setDiskType(e.target.value)}
+                className={ic}
+              >
+                {DISK_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3 — Options */}
+        {step === 3 && (
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">
+                Network Adapter
+              </label>
+              <select
+                value={nicType}
+                onChange={(e) => setNicType(e.target.value)}
+                className={ic}
+              >
+                {NIC_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={attachGA}
+                  onChange={(e) => setAttachGA(e.target.checked)}
+                  className="accent-blue-500"
+                />
+                <span className="text-sm text-zinc-300">Attach Guest Additions ISO</span>
+                <span className="text-xs text-zinc-500">
+                  (recommended — needed for clipboard, drag-and-drop, and provisioning)
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={startAfter}
+                  onChange={(e) => setStartAfter(e.target.checked)}
+                  className="accent-blue-500"
+                />
+                <span className="text-sm text-zinc-300">Start VM after creation</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4 — Confirm */}
+        {step === 4 && (
+          <div className="space-y-3">
+            {nameConflict && (
+              <div className="bg-yellow-900/40 border border-yellow-700 rounded-lg p-3">
+                <p className="text-yellow-300 text-sm">
+                  A VM named "{trimmedName}" already exists. Submitting will unregister and recreate
+                  it (files are kept).
+                </p>
+              </div>
+            )}
+
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden divide-y divide-zinc-700">
+              <ConfirmSection title="Identity">
+                <ConfirmRow label="VM Name"   value={trimmedName} />
+                <ConfirmRow label="ISO File"  value={isoPath.trim() ? isoPath.trim().split(/[\\/]/).pop()! : '—'} />
+                <ConfirmRow label="VM Folder" value={vmFolder.trim() || '(VirtualBox default)'} />
+              </ConfirmSection>
+              <div className="grid grid-cols-2 divide-x divide-zinc-700">
+                <ConfirmSection title="Hardware">
+                  <ConfirmRow label="RAM"       value={`${ramMB} MB`} />
+                  <ConfirmRow label="CPUs"      value={String(cpus)} />
+                  <ConfirmRow label="Disk Size" value={`${diskMB} MB`} />
+                  <ConfirmRow label="Video RAM" value={`${vramMB} MB`} />
+                  <ConfirmRow label="Disk Type" value={diskType} />
+                </ConfirmSection>
+                <ConfirmSection title="Options">
+                  <ConfirmRow label="Network"         value={nicType} />
+                  <ConfirmRow label="Guest Additions" value={attachGA ? 'Attach' : 'Skip'} />
+                  <ConfirmRow label="Start after"     value={startAfter ? 'Yes' : 'No'} />
+                </ConfirmSection>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Pinned footer nav */}
+      <div className="shrink-0 pt-3">
+        {step === 1 && <StepNav onBack={null} onNext={() => setStep(2)} nextEnabled={step1Valid} />}
+        {step === 2 && <StepNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextEnabled={true} />}
+        {step === 3 && <StepNav onBack={() => setStep(2)} onNext={() => setStep(4)} nextEnabled={true} nextLabel="Review" />}
+        {step === 4 && (
+          <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setStep(3)}
@@ -486,8 +490,9 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
               {nameConflict ? 'Recreate VM' : 'Create VM'}
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
     </div>
   )
 }

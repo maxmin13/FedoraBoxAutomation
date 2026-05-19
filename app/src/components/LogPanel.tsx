@@ -9,11 +9,11 @@ interface LogPanelProps {
 }
 
 export default function LogPanel({ lines, showLog, onToggle, title = 'Script output' }: LogPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
-    if (showLog && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (showLog) {
+      endRef.current?.scrollIntoView({ block: 'nearest' })
     }
   }, [lines, showLog])
 
@@ -28,12 +28,13 @@ export default function LogPanel({ lines, showLog, onToggle, title = 'Script out
         <span className="text-zinc-500 text-xs">{showLog ? 'Hide' : 'Show'}</span>
       </button>
       {showLog && (
-        <div ref={scrollRef} className="px-4 pb-4 font-mono text-xs max-h-64 overflow-y-auto space-y-0.5">
+        <div className="px-4 pb-4 font-mono text-xs max-h-64 overflow-y-auto space-y-0.5">
           {lines.map((line, i) => (
             <div key={i} className={line.source === 'stderr' ? 'text-red-400' : 'text-zinc-400'}>
               {line.text}
             </div>
           ))}
+          <div ref={endRef} />
         </div>
       )}
     </div>

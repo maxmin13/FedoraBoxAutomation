@@ -89,6 +89,4 @@ try {
 } catch {
     Write-Host "  ERROR: Cleanup failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
-} finally {
-    Stop-Transcript | Out-Null
 }

@@ -11,7 +11,8 @@ const LOG_DIR  = path.join(
   'FedoraBoxAutomation',
   'logs'
 )
-const LOG_FILE = path.join(LOG_DIR, 'gui.log')
+const LOG_FILE  = path.join(LOG_DIR, 'gui.log')
+const HOST_FILE = path.join(LOG_DIR, 'host.log')
 
 try {
   fs.mkdirSync(LOG_DIR, { recursive: true })
@@ -41,9 +42,17 @@ function write(level, args) {
   }
 }
 
+function writeHost(text) {
+  const ts   = new Date().toISOString().replace('T', ' ').slice(0, 23)
+  const line = `[${ts}] ${text}\n`
+  try { fs.appendFileSync(HOST_FILE, line, 'utf8') } catch {}
+}
+
 module.exports = {
   LOG_DIR,
-  info:  (...args) => write('info',  args),
-  warn:  (...args) => write('warn',  args),
-  error: (...args) => write('error', args),
+  info:     (...args) => write('info',  args),
+  warn:     (...args) => write('warn',  args),
+  error:    (...args) => write('error', args),
+  hostLine: (text) => writeHost(text),
+  hostMark: (text) => writeHost(`--- ${text} ---`),
 }

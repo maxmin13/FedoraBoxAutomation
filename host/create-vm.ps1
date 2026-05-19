@@ -332,6 +332,4 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
-} finally {
-    Stop-Transcript | Out-Null
 }

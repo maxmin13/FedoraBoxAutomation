@@ -328,4 +328,3 @@ if ($Json) {
     Write-Host ""
 }
 
-Stop-Transcript | Out-Null
