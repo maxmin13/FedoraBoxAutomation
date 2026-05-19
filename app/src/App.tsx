@@ -18,10 +18,17 @@ export default function App() {
   const [landingKey, setLandingKey] = useState(0)
   const [isDev, setIsDev] = useState(false)
   const [scriptRunning, setScriptRunning] = useState(false)
+  const [scriptPage, setScriptPage] = useState<Page | null>(null)
 
   useEffect(() => {
     window.electronAPI.isDev().then(setIsDev)
   }, [])
+
+  function handleScriptRunning(running: boolean) {
+    setScriptRunning(running)
+    if (running) setScriptPage(currentPage)
+    else setScriptPage(null)
+  }
 
   function handleNavigate(page: Page) {
     if (page === 'landing' && currentPage === 'landing') {
@@ -33,21 +40,23 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen">
       {/* Navigation bar — always visible at the top */}
-      <NavBar currentPage={currentPage} onNavigate={handleNavigate} isDev={isDev} scriptRunning={scriptRunning} />
+      <NavBar currentPage={currentPage} onNavigate={handleNavigate} isDev={isDev} scriptRunning={scriptRunning} scriptPage={scriptPage} />
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-y-auto p-6">
         <ErrorBoundary>
-          {currentPage === 'landing' && <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={setScriptRunning} />}
+          {currentPage === 'landing' && <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} />}
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <SetupPage onScriptRunning={setScriptRunning} />
+            <SetupPage onScriptRunning={handleScriptRunning} />
           </div>
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <CreateVmPage onScriptRunning={setScriptRunning} />
+            <CreateVmPage onScriptRunning={handleScriptRunning} />
           </div>
           {currentPage === 'docs' && <DocsPage />}
-          {currentPage === 'logs' && <LogsPage />}
+          <div style={{ display: currentPage === 'logs' ? undefined : 'none' }} className="h-full overflow-hidden">
+            <LogsPage />
+          </div>
         </ErrorBoundary>
       </main>
     </div>

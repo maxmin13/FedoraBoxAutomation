@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { ScriptLine } from '../electron.d'
 
 interface LogPanelProps {
@@ -11,7 +11,7 @@ interface LogPanelProps {
 export default function LogPanel({ lines, showLog, onToggle, title = 'Script output' }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (showLog && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }

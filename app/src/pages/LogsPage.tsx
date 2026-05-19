@@ -16,36 +16,52 @@ export default function LogsPage() {
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [syncEnabled, setSyncEnabled] = useState(false)
   const contentRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     loadLog(selectedLog)
   }, [selectedLog])
 
-  // Scroll to the bottom whenever content loads so the newest entries are visible
+  // Poll every 2.5 s while sync is on; restart when the selected log changes
+  useEffect(() => {
+    if (!syncEnabled) return
+    const name = selectedLog
+    const id = setInterval(async () => {
+      try {
+        const result = await window.electronAPI.readLog(name)
+        if (result.ok) setContent(result.content ?? '')
+      } catch {}
+    }, 2500)
+    return () => clearInterval(id)
+  }, [syncEnabled, selectedLog])
+
+  // Scroll to the bottom whenever content changes
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
   }, [content])
 
-  async function loadLog(name: LogName) {
-    setLoading(true)
-    setError(null)
-    setContent('')
+  async function loadLog(name: LogName, silent = false) {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+      setContent('')
+    }
 
     try {
       const result = await window.electronAPI.readLog(name)
 
       if (result.ok) {
         setContent(result.content ?? '')
-      } else {
+      } else if (!silent) {
         setError(result.error ?? 'Could not read log file')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unexpected error reading log')
+      if (!silent) setError(err instanceof Error ? err.message : 'Unexpected error reading log')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -84,6 +100,16 @@ export default function LogsPage() {
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
+
+        <label className="mt-3 flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={syncEnabled}
+            onChange={e => setSyncEnabled(e.target.checked)}
+            className="accent-indigo-500"
+          />
+          Sync
+        </label>
 
         <p className="text-zinc-500 text-xs uppercase tracking-wider mt-6 mb-3">Open folder</p>
         <button
