@@ -156,6 +156,15 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
               lines={logLines}
               onToggle={() => setShowLog((v) => !v)}
             />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPageState('idle')}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+              >
+                &larr; Try again
+              </button>
+            </div>
           </>
         )}
 

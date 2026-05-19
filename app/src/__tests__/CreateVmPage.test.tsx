@@ -268,6 +268,16 @@ describe('failure state', () => {
       expect(screen.getByRole('button', { name: /script output/i })).toBeInTheDocument()
     })
   })
+
+  it('returns to the wizard form when "Try again" is clicked after failure', async () => {
+    window.electronAPI.createVm = vi.fn().mockResolvedValue({ ok: false })
+    await submitForm()
+    await waitFor(() => expect(screen.getByText('VM creation failed.')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create VM' })).toBeInTheDocument())
+  })
 })
 
 // ── Log toggle ───────────────────────────────────────────────────────────────
