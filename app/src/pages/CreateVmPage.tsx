@@ -185,18 +185,24 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                 <CodeBlock
                   lines={[
                     'sudo dnf update -y',
+                    '# If the update installed a new kernel, reboot before continuing:',
+                    'sudo reboot',
+                    '# After reboot, confirm the running kernel:',
+                    'uname -r',
                     'sudo dnf install -y dkms kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2',
                     "sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config",
                     'sudo mkdir -p /mnt/ga',
                     'sudo mount /dev/sr1 /mnt/ga   # if it fails, try /dev/sr0 (run lsblk to check)',
+                    'rpm -q kernel-devel-$(uname -r)   # DKMS builds GA modules against this — must match running kernel',
                     'sudo /mnt/ga/VBoxLinuxAdditions.run',
+                    'sudo passwd root',
+                    'sudo reboot',
+                    '# After reboot, verify SELinux is disabled:',
+                    'sestatus',
                   ]}
                 />
               </NextStep>
-              <NextStep number={3} title="Set root password and reboot">
-                <CodeBlock lines={['sudo passwd root', 'sudo reboot']} />
-              </NextStep>
-              <NextStep number={4} title="Provision the VM">
+              <NextStep number={3} title="Provision the VM">
                 <p className="text-zinc-400 text-sm">
                   Now that Guest Additions are active, use the Provision page to install dev tools.
                 </p>

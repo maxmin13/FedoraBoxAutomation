@@ -107,12 +107,20 @@ function Add-VBoxGuestAdditionsIso {
     Write-Host "    1. Complete the Fedora OS installation and log in." -ForegroundColor Cyan
     Write-Host "    2. Open a terminal and run:" -ForegroundColor Cyan
     Write-Host "         sudo dnf update -y" -ForegroundColor White
+    Write-Host "         # If a new kernel was installed, reboot before continuing:" -ForegroundColor DarkGray
+    Write-Host "         sudo reboot" -ForegroundColor White
+    Write-Host "         # After reboot, confirm the running kernel:" -ForegroundColor DarkGray
+    Write-Host "         uname -r" -ForegroundColor White
     Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor White
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
+    Write-Host "         rpm -q kernel-devel-`$(uname -r)  # DKMS builds GA modules against this -- must match running kernel" -ForegroundColor DarkGray
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
-    Write-Host "    3. Reboot the VM when the installer finishes." -ForegroundColor Cyan
-    Write-Host "    4. Guest Additions will then be active (shared clipboard, better resolution, guest control)." -ForegroundColor Cyan
+    Write-Host "         sudo passwd root" -ForegroundColor White
+    Write-Host "         sudo reboot" -ForegroundColor White
+    Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
+    Write-Host "         sestatus" -ForegroundColor White
+    Write-Host "    3. Guest Additions will then be active (shared clipboard, better resolution, guest control)." -ForegroundColor Cyan
 }
 
 Write-Header "Fedora VM Creator"
@@ -318,15 +326,21 @@ try {
     Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
     Write-Host "    2. Install Guest Additions and disable SELinux:" -ForegroundColor White
     Write-Host "         sudo dnf update -y" -ForegroundColor DarkGray
+    Write-Host "         # If a new kernel was installed, reboot before continuing:" -ForegroundColor DarkGray
+    Write-Host "         sudo reboot" -ForegroundColor DarkGray
+    Write-Host "         # After reboot, confirm the running kernel:" -ForegroundColor DarkGray
+    Write-Host "         uname -r" -ForegroundColor DarkGray
     Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
     Write-Host "         sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor DarkGray
     Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
     Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
+    Write-Host "         rpm -q kernel-devel-`$(uname -r)  # DKMS builds GA modules against this -- must match running kernel" -ForegroundColor DarkGray
     Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
-    Write-Host "    3. Set root password and reboot:" -ForegroundColor White
     Write-Host "         sudo passwd root" -ForegroundColor DarkGray
     Write-Host "         sudo reboot" -ForegroundColor DarkGray
-    Write-Host "    4. Run provision-vm.ps1 to install software." -ForegroundColor White
+    Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
+    Write-Host "         sestatus" -ForegroundColor DarkGray
+    Write-Host "    3. Run provision-vm.ps1 to install software." -ForegroundColor White
     Write-Host ""
 
 } catch {
