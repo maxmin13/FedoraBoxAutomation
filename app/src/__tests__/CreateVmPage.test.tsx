@@ -130,7 +130,7 @@ describe('step indicator', () => {
   it('shows all four step labels', async () => {
     render(<CreateVmPage onScriptRunning={onScriptRunning} />)
     await act(async () => {})
-    expect(screen.getByText('Identity')).toBeInTheDocument()
+    expect(screen.getByText('Name')).toBeInTheDocument()
     expect(screen.getByText('Hardware')).toBeInTheDocument()
     expect(screen.getByText('Options')).toBeInTheDocument()
     expect(screen.getByText('Confirm')).toBeInTheDocument()

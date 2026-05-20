@@ -1,4 +1,4 @@
-// Create VM page — 3-step wizard (Identity -> Hardware -> Options) + confirmation.
+// Create VM page — 3-step wizard (Name -> Hardware -> Options) + confirmation.
 
 import { useState, useEffect, useRef } from 'react'
 import type { CreateVmParams } from '../electron.d'
@@ -24,11 +24,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
   const [nicType,    setNicType]    = useState('nat')
   const [attachGA,   setAttachGA]   = useState(true)
   const [startAfter, setStartAfter] = useState(false)
-
-  // Credentials — saved automatically to .credentials/credentials.json on successful creation
-  const vmUser = 'root'
-  const [vmPass,    setVmPass]    = useState('')
-  const [loginUser, setLoginUser] = useState('')
 
   // Wizard + execution state
   const [step,          setStep]          = useState<Step>(1)
@@ -91,9 +86,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
     setPageState('done')
     setShowLog(false)
 
-    if (result.ok && (vmUser || vmPass || loginUser)) {
-      window.electronAPI.saveVmCredentials(trimmedName, vmUser, vmPass, loginUser)
-    }
   }
 
   const ic =
@@ -243,7 +235,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
       {/* Scrollable form area */}
       <div className="flex-1 overflow-y-auto min-h-0">
 
-        {/* Step 1 — Identity */}
+        {/* Step 1 — Name */}
         {step === 1 && (
           <div className="space-y-3">
             <div>
@@ -298,33 +290,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                VM root password{' '}
-                <span className="text-zinc-500 font-normal">(optional — set inside the VM later)</span>
-              </label>
-              <input
-                type="password"
-                value={vmPass}
-                onChange={(e) => setVmPass(e.target.value)}
-                placeholder="Root password you will set in the VM"
-                className={ic}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Desktop username{' '}
-                <span className="text-zinc-500 font-normal">(required for shared folder setup — the account you create during Fedora install)</span>
-              </label>
-              <input
-                type="text"
-                value={loginUser}
-                onChange={(e) => setLoginUser(e.target.value)}
-                placeholder="e.g. fedora"
-                className={ic}
-              />
-            </div>
           </div>
         )}
 
@@ -459,7 +424,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
             )}
 
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden divide-y divide-zinc-700">
-              <ConfirmSection title="Identity">
+              <ConfirmSection title="Name">
                 <ConfirmRow label="VM Name"   value={trimmedName} />
                 <ConfirmRow label="ISO File"  value={isoPath.trim() ? isoPath.trim().split(/[\\/]/).pop()! : '—'} />
                 <ConfirmRow label="VM Folder" value={vmFolder.trim() || '(VirtualBox default)'} />
@@ -515,7 +480,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Identity', 'Hardware', 'Options', 'Confirm']
+const STEP_LABELS = ['Name', 'Hardware', 'Options', 'Confirm']
 
 function StepIndicator({ currentStep }: { currentStep: number }) {
   return (
