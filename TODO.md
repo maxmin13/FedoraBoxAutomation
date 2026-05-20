@@ -22,12 +22,7 @@ how is it possible to assign a status to that?
 
 # the user should be prevented to share folder /var/logs, that is reserved for the share logs functionality
 
-# when the user click delete vm, there is a confirmatin message, would it be beter to add another confirmation with a pop-up windows with the name of the vm in big capital letters?
+# when the user click delete vm, there is a confirmatin message, would it be beter to add another confirmation with a pop-up windows with the name of the vm in big visible letters?
 
 ## review next and back button position, validation, also all the other buttons, how to make them consistent
 
-# what happens if the user tries to share a dir that doesn't exist in the vm
-
-# change the folder permission of the vm shared folder to allow login user, not only root
-
-# i don't see the tooltip

@@ -306,18 +306,19 @@ try {
     & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "mkdir -p $mountPoint" 2>&1 | Out-Null
     $ErrorActionPreference = 'Stop'
 
-    Write-Host "  Mounting '$shareName' at '$mountPoint'..." -ForegroundColor Cyan
+    Write-Host "  Mounting '$shareName' at '$mountPoint' (owned by '$loginUser')..." -ForegroundColor Cyan
+    $mountCmd  = "uid=`$(id -u $loginUser 2>/dev/null); gid=`$(id -g $loginUser 2>/dev/null); mount -t vboxsf -o uid=`$uid,gid=`$gid $shareName $mountPoint"
     $ErrorActionPreference = 'SilentlyContinue'
-    $mountOut  = & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "mount -t vboxsf $shareName $mountPoint" 2>&1
+    $mountOut  = & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c $mountCmd 2>&1
     $mountCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
     if ($mountCode -eq 0) {
-        Write-Host "  Share mounted at $mountPoint" -ForegroundColor Green
-        Write-Host "  Reboot the VM to apply the vboxsf group change for '$loginUser'." -ForegroundColor Cyan
+        Write-Host "  Share mounted at $mountPoint (accessible by '$loginUser')." -ForegroundColor Green
+        Write-Host "  Reboot the VM to make the vboxsf group change permanent for '$loginUser'." -ForegroundColor Cyan
     } else {
         Write-Host "  WARNING: mount failed (exit $mountCode): $mountOut" -ForegroundColor Yellow
-        Write-Host "  Run manually inside the VM: sudo mount -t vboxsf $shareName $mountPoint" -ForegroundColor Cyan
+        Write-Host "  Run manually inside the VM: uid=`$(id -u $loginUser); gid=`$(id -g $loginUser); sudo mount -t vboxsf -o uid=`$uid,gid=`$gid $shareName $mountPoint" -ForegroundColor Cyan
     }
 
 } catch {
