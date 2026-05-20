@@ -37,6 +37,12 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
   const [view, setView]           = useState<View>('detail')
   const [info, setInfo]           = useState<VmInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [infoKey, setInfoKey]     = useState(0)
+
+  function backToDetail() {
+    setView('detail')
+    setInfoKey((k) => k + 1)
+  }
 
   useEffect(() => {
     setInfo(null)
@@ -49,14 +55,14 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
         setLoadError((result as { ok: false; error?: string }).error ?? 'Could not load VM info')
       }
     })
-  }, [vm.name, refreshKey])
+  }, [vm.name, refreshKey, infoKey])
 
   if (view === 'share-folder') {
-    return <ShareFolderPage vm={vm} onBack={() => setView('detail')} onScriptRunning={onScriptRunning} />
+    return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
   }
 
   if (view === 'share-logs') {
-    return <ShareLogsPage vm={vm} onBack={() => setView('detail')} onScriptRunning={onScriptRunning} />
+    return <ShareLogsPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
   }
 
   const diskValue = info?.diskCapacityMB != null
@@ -143,7 +149,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
                   </div>
                   {info.sharedFolders.map((sf) => (
                     <div key={sf.name} className="grid grid-cols-2 gap-3">
-                      <CopyCell value={sf.hostPath} />
+                      <CopyCell value={sf.hostPath} missing={!sf.existsOnHost} />
                       <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
                     </div>
                   ))}
@@ -201,7 +207,7 @@ function Section({
   )
 }
 
-function CopyCell({ label, value, copyable = true }: { label?: string; value: string; copyable?: boolean }) {
+function CopyCell({ label, value, copyable = true, missing = false }: { label?: string; value: string; copyable?: boolean; missing?: boolean }) {
   const [copied, setCopied] = useState(false)
 
   function handleCopy() {
@@ -214,7 +220,10 @@ function CopyCell({ label, value, copyable = true }: { label?: string; value: st
     <div className="min-w-0 group">
       {label && <p className="text-zinc-500 text-xs mb-0.5">{label}</p>}
       <div className="flex items-center gap-1 min-w-0">
-        <span className="text-zinc-300 font-mono text-xs truncate min-w-0">{value}</span>
+        {missing && (
+          <span className="shrink-0 text-amber-400 text-xs" title="Host folder not found">&#9888;</span>
+        )}
+        <span className={`font-mono text-xs truncate min-w-0 ${missing ? 'text-amber-400' : 'text-zinc-300'}`}>{value}</span>
         {copyable && (
           <button
             onClick={handleCopy}

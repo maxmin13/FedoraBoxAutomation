@@ -48,6 +48,7 @@ export interface SharedFolder {
   name: string
   hostPath: string
   mountPoint: string
+  existsOnHost: boolean
 }
 
 export interface VmInfo {

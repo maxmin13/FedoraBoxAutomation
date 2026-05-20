@@ -420,10 +420,12 @@ function registerIpcHandlers(win) {
       let i = 1
       while (kv[`SharedFolderNameMachineMapping${i}`]) {
         const name = kv[`SharedFolderNameMachineMapping${i}`]
+        const hostPath = kv[`SharedFolderPathMachineMapping${i}`] ?? ''
         sharedFolders.push({
           name,
-          hostPath: kv[`SharedFolderPathMachineMapping${i}`] ?? '',
+          hostPath,
           mountPoint: mountPointMap[name] ?? '',
+          existsOnHost: hostPath ? fs.existsSync(hostPath) : false,
         })
         i++
       }
