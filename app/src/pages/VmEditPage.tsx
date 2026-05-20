@@ -136,12 +136,18 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
               }
             >
               {info.sharedFolders.length > 0 ? (
-                info.sharedFolders.map((sf) => (
-                  <div key={sf.name} className="space-y-0.5">
-                    <Row label="Host folder" value={sf.hostPath} mono />
-                    <Row label="VM folder"   value={sf.mountPoint || '—'} mono={!!sf.mountPoint} />
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <span className="text-zinc-500 text-xs">Host folder</span>
+                    <span className="text-zinc-500 text-xs">VM folder</span>
                   </div>
-                ))
+                  {info.sharedFolders.map((sf) => (
+                    <div key={sf.name} className="grid grid-cols-2 gap-3">
+                      <CopyCell value={sf.hostPath} />
+                      <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-zinc-500 text-sm">None configured</p>
               )}
@@ -191,6 +197,33 @@ function Section({
         {action}
       </div>
       <div className="space-y-1">{children}</div>
+    </div>
+  )
+}
+
+function CopyCell({ label, value, copyable = true }: { label?: string; value: string; copyable?: boolean }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="min-w-0 group">
+      {label && <p className="text-zinc-500 text-xs mb-0.5">{label}</p>}
+      <div className="flex items-center gap-1 min-w-0">
+        <span className="text-zinc-300 font-mono text-xs truncate min-w-0">{value}</span>
+        {copyable && (
+          <button
+            onClick={handleCopy}
+            className="shrink-0 invisible group-hover:visible px-1.5 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white text-xs"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
