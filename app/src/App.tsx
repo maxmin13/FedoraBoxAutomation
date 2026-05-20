@@ -31,7 +31,7 @@ export default function App() {
   }
 
   function handleNavigate(page: Page) {
-    if (page === 'landing' && currentPage === 'landing') {
+    if (page === 'landing') {
       setLandingKey((k) => k + 1)
     }
     setCurrentPage(page)
@@ -55,7 +55,9 @@ export default function App() {
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
             <CreateVmPage onScriptRunning={handleScriptRunning} />
           </div>
-          {currentPage === 'docs' && <DocsPage />}
+          <div style={{ display: currentPage === 'docs' ? undefined : 'none' }} className="h-full overflow-hidden">
+            <DocsPage />
+          </div>
           <div style={{ display: currentPage === 'logs' ? undefined : 'none' }} className="h-full overflow-hidden">
             <LogsPage />
           </div>

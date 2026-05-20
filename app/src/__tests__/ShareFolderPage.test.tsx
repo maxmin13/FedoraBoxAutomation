@@ -233,3 +233,56 @@ describe('failure state', () => {
     expect(screen.getByRole('button', { name: 'Set up shared folder' })).toBeInTheDocument()
   })
 })
+
+// ── /var/log mount point validation ───────────────────────────────────────────
+
+describe('/var/log mount point validation', () => {
+  it('shows an error message when /var/log is entered as mount point', async () => {
+    await renderAndFlush()
+    fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/var/log' } })
+    expect(screen.getByText(/\/var\/log is a system directory/i)).toBeInTheDocument()
+  })
+
+  it('disables the run button when /var/log is the mount point', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+    })
+    await renderAndFlush()
+    await fillAllFields()
+    fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/var/log' } })
+    expect(screen.getByRole('button', { name: 'Set up shared folder' })).toBeDisabled()
+  })
+
+  it('also blocks /var/log/ with a trailing slash', async () => {
+    await renderAndFlush()
+    fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/var/log/' } })
+    expect(screen.getByText(/\/var\/log is a system directory/i)).toBeInTheDocument()
+  })
+})
+
+// ── onScriptRunning callback ───────────────────────────────────────────────────
+
+describe('onScriptRunning callback', () => {
+  it('calls onScriptRunning(true) when the script starts running', async () => {
+    const onScriptRunning = vi.fn()
+    window.electronAPI.runShareFolder = vi.fn().mockReturnValue(new Promise(() => {}))
+    render(<ShareFolderPage vm={VM} onBack={vi.fn()} onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
+    await fillAllFields()
+    fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    expect(onScriptRunning).toHaveBeenCalledWith(true)
+  })
+
+  it('calls onScriptRunning(false) when the script finishes', async () => {
+    const onScriptRunning = vi.fn()
+    wireRun(0)
+    render(<ShareFolderPage vm={VM} onBack={vi.fn()} onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
+    await fillAllFields()
+    fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await waitFor(() => {
+      expect(onScriptRunning).toHaveBeenCalledWith(false)
+    })
+  })
+})

@@ -144,7 +144,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm shrink-0"
+          className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
         >
           &larr; Back
         </button>
@@ -200,7 +200,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
         <button
           onClick={handleRun}
           disabled={!canRun}
-          className="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50"
+          className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Set up log sync
         </button>

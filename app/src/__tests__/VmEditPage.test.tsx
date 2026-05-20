@@ -187,4 +187,39 @@ describe('VmEditPage', () => {
     render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('VM not found')).toBeInTheDocument())
   })
+
+  it('shows VRAM in MB from getVmInfo', async () => {
+    render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('128 MB')).toBeInTheDocument())
+  })
+
+  it('shows the NIC type formatted for display (nat → NAT)', async () => {
+    render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('NAT')).toBeInTheDocument())
+  })
+
+  it('shows the MAC address formatted with colons', async () => {
+    render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('08:00:27:AA:BB:CC')).toBeInTheDocument())
+  })
+
+  it('shows the actual GA version when VM is running with Guest Additions', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
+      ...SAMPLE_INFO,
+      state: 'running',
+      gaVersion: '7.0.14',
+    })
+    render(<VmEditPage vm={RUNNING_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('7.0.14')).toBeInTheDocument())
+  })
+
+  it('shows "Not installed" when VM is running but Guest Additions are absent', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
+      ...SAMPLE_INFO,
+      state: 'running',
+      gaVersion: null,
+    })
+    render(<VmEditPage vm={RUNNING_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Not installed')).toBeInTheDocument())
+  })
 })

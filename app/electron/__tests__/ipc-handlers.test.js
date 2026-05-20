@@ -817,3 +817,358 @@ describe('get-vm-guest-logs-path handler', () => {
     expect(result.ok).toBe(false)
   })
 })
+
+// ── stop-vm handler ───────────────────────────────────────────────────────────
+
+describe('stop-vm handler', () => {
+  let stopVmHandler
+  let mockExecSync
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    stopVmHandler = loadHandlers()('stop-vm')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+  })
+
+  it('returns ok: true without calling ACPI when VM is already stopped', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="poweroff"\r\n')
+    const result = await stopVmHandler({}, 'FedoraBox')
+    expect(result).toEqual({ ok: true })
+    expect(mockExecSync).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends ACPI shutdown and returns ok when VM stops during polling', async () => {
+    vi.useFakeTimers()
+    try {
+      mockExecSync
+        .mockReturnValueOnce('VMState="running"\r\n')   // initial isVmRunning → running
+        .mockReturnValueOnce('')                          // acpipowerbutton
+        .mockReturnValueOnce('VMState="poweroff"\r\n')  // first poll → stopped
+      const promise = stopVmHandler({}, 'FedoraBox')
+      await vi.runAllTimersAsync()
+      const result = await promise
+      expect(result).toEqual({ ok: true })
+      expect(mockExecSync).toHaveBeenCalledWith(
+        expect.stringContaining('acpipowerbutton'), expect.anything()
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('falls back to forced poweroff when ACPI shutdown times out', async () => {
+    vi.useFakeTimers()
+    try {
+      mockExecSync
+        .mockReturnValueOnce('VMState="running"\r\n')  // initial isVmRunning
+        .mockReturnValueOnce('')                         // acpipowerbutton
+        .mockReturnValue('VMState="running"\r\n')        // all polls: still running
+      const promise = stopVmHandler({}, 'FedoraBox')
+      await vi.runAllTimersAsync()
+      const result = await promise
+      expect(result).toEqual({ ok: true })
+      expect(mockExecSync).toHaveBeenCalledWith(
+        expect.stringContaining('poweroff'), expect.anything()
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns ok: false when the acpipowerbutton command throws', async () => {
+    // isVmRunning has its own try/catch, so only errors outside it reach the outer catch.
+    // Throw on the acpipowerbutton call (second execSync), not the isVmRunning call.
+    mockExecSync
+      .mockReturnValueOnce('VMState="running"\r\n')                              // isVmRunning → running
+      .mockImplementationOnce(() => { throw new Error('VM is locked') })         // acpipowerbutton
+    const result = await stopVmHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/VM is locked/)
+  })
+})
+
+// ── get-vm-info handler ───────────────────────────────────────────────────────
+
+describe('get-vm-info handler', () => {
+  let getVmInfoHandler
+  let mockExecSync
+  let mockExistsSync
+
+  // Minimal machinereadable fixture for a stopped VM with a disk
+  const MR_STOPPED = [
+    'VMState="poweroff"\r',
+    'ostype="Fedora_64"\r',
+    'memory="4096"\r',
+    'cpus="2"\r',
+    'vram="128"\r',
+    'nic1="nat"\r',
+    'macaddress1="080027AABBCC"\r',
+    'CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\r',
+    'SATA-0-0-ImageUUID="disk-uuid-1234"\r',
+  ].join('\n')
+
+  const MR_RUNNING = MR_STOPPED.replace('VMState="poweroff"', 'VMState="running"')
+
+  // Minimal machinereadable fixture with a shared folder (no disk UUID)
+  const MR_WITH_SF = [
+    'VMState="poweroff"\r',
+    'ostype="Fedora_64"\r',
+    'memory="4096"\r',
+    'cpus="2"\r',
+    'vram="128"\r',
+    'nic1="nat"\r',
+    'macaddress1="080027AABBCC"\r',
+    'CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\r',
+    'SharedFolderNameMachineMapping1="vbox-share"\r',
+    'SharedFolderPathMachineMapping1="C:\\Work\\shared"\r',
+  ].join('\n')
+
+  const MEDIUM_INFO_DYNAMIC = 'Capacity: 51200 MBytes\nFormat variant: dynamic default\n'
+  const MEDIUM_INFO_FIXED   = 'Capacity: 20480 MBytes\nFormat variant: fixed\n'
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    mockExistsSync = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    getVmInfoHandler = loadHandlers()('get-vm-info')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    mockExistsSync.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExecSync.mockReset()
+  })
+
+  it('returns parsed basic fields (osType, state, ramMB, cpus, vramMB, nic, mac)', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_STOPPED)          // showvminfo --machinereadable
+      .mockReturnValueOnce('')                   // showvminfo plain (best-effort)
+      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC) // showmediuminfo
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(true)
+    expect(result.osType).toBe('Fedora_64')
+    expect(result.state).toBe('poweroff')
+    expect(result.ramMB).toBe(4096)
+    expect(result.cpus).toBe(2)
+    expect(result.vramMB).toBe(128)
+    expect(result.nic).toBe('nat')
+    expect(result.mac).toBe('080027AABBCC')
+  })
+
+  it('derives logSyncPath from the CfgFile directory', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_STOPPED)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.logSyncPath).toMatch(/FedoraBox/)
+    expect(result.logSyncPath).toMatch(/guest-logs/)
+  })
+
+  it('returns diskCapacityMB and diskType from showmediuminfo', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_STOPPED)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.diskCapacityMB).toBe(51200)
+    expect(result.diskType).toBe('dynamic')
+  })
+
+  it('returns diskType "fixed" when showmediuminfo reports fixed variant', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_STOPPED)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(MEDIUM_INFO_FIXED)
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.diskType).toBe('fixed')
+  })
+
+  it('returns shared folders with mountPoint merged from plain showvminfo', async () => {
+    const plainWithSf = "Name: 'vbox-share', Host path: 'C:\\Work\\shared' (machine mapping), writable, mount-point: '/mnt/shared'\n"
+    mockExecSync
+      .mockReturnValueOnce(MR_WITH_SF)
+      .mockReturnValueOnce(plainWithSf)
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.sharedFolders).toHaveLength(1)
+    expect(result.sharedFolders[0]).toMatchObject({
+      name:       'vbox-share',
+      hostPath:   'C:\\Work\\shared',
+      mountPoint: '/mnt/shared',
+    })
+  })
+
+  it('returns gaVersion from guestproperty when VM is running', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_RUNNING)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
+      .mockReturnValueOnce('Value: 7.0.14\n')  // guestproperty
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.gaVersion).toBe('7.0.14')
+  })
+
+  it('returns gaVersion: null when VM is stopped (skips guestproperty call)', async () => {
+    mockExecSync
+      .mockReturnValueOnce(MR_STOPPED)
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.gaVersion).toBeNull()
+    const cmdsCalled = mockExecSync.mock.calls.map(([cmd]) => cmd)
+    expect(cmdsCalled.some(c => c.includes('guestproperty'))).toBe(false)
+  })
+
+  it('returns ok: false when the main VBoxManage call throws', async () => {
+    mockExecSync.mockImplementationOnce(() => { throw new Error('VM not found') })
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/VM not found/)
+  })
+})
+
+// ── run-share-folder handler ──────────────────────────────────────────────────
+
+describe('run-share-folder handler', () => {
+  let runShareFolderHandler
+  let mockRunScript
+
+  const PARAMS = {
+    vmName:     'FedoraBox',
+    hostPath:   'C:\\Work\\shared',
+    mountPoint: '/mnt/shared',
+    vmUser:     'root',
+    vmPass:     'secret',
+    loginUser:  'fedora',
+  }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runShareFolderHandler = loadHandlers()('run-share-folder')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockRunScript.mockReset()
+  })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await runShareFolderHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns errorDetail from the last ERROR: prefixed line on failure', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'Starting setup...', source: 'stdout' })
+      onLine({ text: 'ERROR: guest control failed', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runShareFolderHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('guest control failed')
+  })
+
+  it('falls back to the last non-empty line when no ERROR: line exists', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'Starting setup...', source: 'stdout' })
+      onLine({ text: 'Mount failed unexpectedly', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runShareFolderHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('Mount failed unexpectedly')
+  })
+
+  it('returns errorDetail: null when there are no output lines', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(1))
+    const result = await runShareFolderHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBeNull()
+  })
+})
+
+// ── run-share-logs handler ────────────────────────────────────────────────────
+
+describe('run-share-logs handler', () => {
+  let runShareLogsHandler
+  let mockRunScript
+
+  const PARAMS = { vmName: 'FedoraBox', hostPath: 'C:\\VMs\\FedoraBox\\guest-logs' }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runShareLogsHandler = loadHandlers()('run-share-logs')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockRunScript.mockReset()
+  })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await runShareLogsHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns errorDetail from the last ERROR: prefixed line on failure', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'ERROR: rsync failed', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runShareLogsHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('rsync failed')
+  })
+
+  it('falls back to last non-empty line when no ERROR: line exists', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'Configuring rsync...', source: 'stdout' })
+      onLine({ text: 'crontab write failed', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runShareLogsHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('crontab write failed')
+  })
+})

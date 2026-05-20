@@ -80,7 +80,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
       <div className="flex items-center gap-3 mb-4">
         <button
           onClick={onBack}
-          className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm shrink-0"
+          className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
         >
           &larr; Back
         </button>
@@ -135,7 +135,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
               action={
                 <button
                   onClick={() => setView('share-folder')}
-                  className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm"
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Share
                 </button>
@@ -164,7 +164,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
               action={
                 <button
                   onClick={() => setView('share-logs')}
-                  className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm"
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Sync
                 </button>

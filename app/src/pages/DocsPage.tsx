@@ -51,21 +51,20 @@ export default function DocsPage() {
   }
 
   return (
-    <div className="flex gap-6 h-full">
+    <div className="flex h-full gap-0">
 
       {/* Sidebar — document list */}
-      <aside className="w-52 shrink-0">
+      <aside className="w-48 shrink-0 overflow-y-auto border-r border-zinc-700 pr-3 mr-5">
         <p className="text-zinc-500 text-xs uppercase tracking-wider mb-3">Documents</p>
         <nav className="space-y-1">
           {DOC_FILES.map((doc) => {
             const isActive = doc.filename === selectedFile
-
             return (
               <button
                 key={doc.filename}
                 onClick={() => setSelectedFile(doc.filename)}
                 className={[
-                  'w-full text-left px-3 py-2 rounded text-sm',
+                  'w-full text-left px-3 py-2 rounded text-sm transition-colors',
                   isActive
                     ? 'bg-zinc-700 text-zinc-100'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800',
@@ -79,7 +78,7 @@ export default function DocsPage() {
       </aside>
 
       {/* Main content — rendered markdown */}
-      <main className="flex-1 min-w-0 overflow-y-auto">
+      <main className="flex-1 min-w-0 overflow-y-auto pl-1">
         {loading && (
           <p className="text-zinc-500 text-sm">Loading...</p>
         )}
@@ -91,14 +90,10 @@ export default function DocsPage() {
         )}
 
         {!loading && !error && content && (
-          // prose classes from Tailwind Typography give markdown sensible styling.
-          // invert makes it work on a dark background.
-          <div className="prose prose-invert prose-sm max-w-none">
+          <div className="prose prose-invert prose-sm max-w-3xl">
             <Markdown
               remarkPlugins={[remarkGfm]}
               components={{
-                // Custom link handler: if the href is a known doc filename,
-                // switch the sidebar selection instead of following a URL.
                 a({ href, children }) {
                   const docFile = DOC_FILES.find((d) => d.filename === href)
                   if (docFile) {
@@ -111,7 +106,6 @@ export default function DocsPage() {
                       </button>
                     )
                   }
-                  // Non-doc links are rendered as plain text — no navigation inside Electron
                   return <span className="text-blue-400 underline">{children}</span>
                 },
               }}

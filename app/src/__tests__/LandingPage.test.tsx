@@ -159,25 +159,25 @@ describe('delete confirmation', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('shows Confirm Delete and Cancel after clicking Delete', async () => {
+  it('shows a delete confirmation modal after clicking Delete', async () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(screen.getByRole('button', { name: 'Confirm Delete' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete permanently' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
-  it('returns to the Delete button state when Cancel is clicked', async () => {
+  it('closes the modal and keeps the Delete button when Cancel is clicked', async () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirm Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete permanently' })).not.toBeInTheDocument()
   })
 
-  it('calls deleteVm with the VM name when Confirm Delete is clicked', async () => {
+  it('calls deleteVm with the VM name when Delete permanently is clicked', async () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }))
     await act(async () => {})
     expect(window.electronAPI.deleteVm).toHaveBeenCalledWith('FedoraBox')
   })

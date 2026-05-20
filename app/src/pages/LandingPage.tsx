@@ -74,7 +74,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
         <button
           onClick={loadVms}
           disabled={loading}
-          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded text-sm disabled:opacity-50"
+          className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
@@ -132,6 +132,55 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   )
 }
 
+// ── DeleteModal ────────────────────────────────────────────────────────────
+
+interface DeleteModalProps {
+  vmName: string
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function DeleteModal({ vmName, busy, onConfirm, onCancel }: DeleteModalProps) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-zinc-400 text-sm text-center mb-2">
+          Permanently delete this VM?
+        </p>
+        <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-2">
+          {vmName}
+        </p>
+        <p className="text-zinc-500 text-xs text-center mb-8">
+          All VM files will be removed from disk. This cannot be undone.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? 'Deleting...' : 'Delete permanently'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── VmCard ─────────────────────────────────────────────────────────────────
 // Displays a single VM with its name, state, and action buttons.
 
@@ -144,7 +193,7 @@ interface VmCardProps {
 function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   async function handleStart() {
     setBusy(true)
@@ -177,7 +226,7 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
   async function handleDelete() {
     setBusy(true)
     setError(null)
-    setConfirming(false)
+    setShowDeleteModal(false)
     try {
       const result = await window.electronAPI.deleteVm(vm.name)
       if (!result.ok) {
@@ -190,74 +239,65 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
   }
 
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
-      {/* VM name and running badge */}
-      <div className="flex items-center justify-between">
-        <span className="text-zinc-100 font-medium truncate">{vm.name}</span>
+    <>
+      {showDeleteModal && (
+        <DeleteModal
+          vmName={vm.name}
+          busy={busy}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
 
-        <VmRunningBadge running={vm.running} />
-      </div>
+      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
+        {/* VM name and running badge */}
+        <div className="flex items-center justify-between">
+          <span className="text-zinc-100 font-medium truncate">{vm.name}</span>
+          <VmRunningBadge running={vm.running} />
+        </div>
 
-      {/* UUID in small muted text */}
-      <p className="text-zinc-500 text-xs font-mono truncate">{vm.uuid}</p>
+        {/* UUID in small muted text */}
+        <p className="text-zinc-500 text-xs font-mono truncate">{vm.uuid}</p>
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p className="text-red-400 text-xs">{error}</p>}
 
-      {/* Action buttons */}
-      <div className="flex gap-2 mt-auto flex-wrap">
-        {vm.running ? (
-          <button
-            onClick={handleStop}
-            disabled={busy}
-            className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-sm disabled:opacity-50"
-          >
-            {busy ? 'Stopping...' : 'Stop'}
-          </button>
-        ) : (
-          <button
-            onClick={handleStart}
-            disabled={busy}
-            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50"
-          >
-            {busy ? 'Starting...' : 'Start'}
-          </button>
-        )}
-
-        {confirming ? (
-          <>
+        {/* Action buttons */}
+        <div className="flex gap-2 mt-auto flex-wrap">
+          {vm.running ? (
             <button
-              onClick={handleDelete}
+              onClick={handleStop}
               disabled={busy}
-              className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white rounded text-sm disabled:opacity-50"
+              className="px-3 py-1 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {busy ? 'Deleting...' : 'Confirm Delete'}
+              {busy ? 'Stopping...' : 'Stop'}
             </button>
+          ) : (
             <button
-              onClick={() => setConfirming(false)}
+              onClick={handleStart}
               disabled={busy}
-              className="px-3 py-1 bg-zinc-600 hover:bg-zinc-500 text-white rounded text-sm disabled:opacity-50"
+              className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              {busy ? 'Starting...' : 'Start'}
             </button>
-          </>
-        ) : (
+          )}
+
           <button
-            onClick={() => setConfirming(true)}
+            onClick={() => setShowDeleteModal(true)}
             disabled={vm.running || busy}
-            className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm disabled:opacity-50"
+            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Delete
           </button>
-        )}
 
-        <button
-          onClick={onEdit}
-          disabled={busy}
-          className="px-3 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white rounded text-sm disabled:opacity-50 ml-auto"
-        >
-          Detail
-        </button>
+          <button
+            onClick={onEdit}
+            disabled={busy}
+            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+          >
+            Detail
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
