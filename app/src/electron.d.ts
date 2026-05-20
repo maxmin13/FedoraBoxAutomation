@@ -47,6 +47,7 @@ export interface Vm {
 export interface SharedFolder {
   name: string
   hostPath: string
+  mountPoint: string
 }
 
 export interface VmInfo {

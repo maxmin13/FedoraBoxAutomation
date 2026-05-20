@@ -405,13 +405,25 @@ function registerIpcHandlers(win) {
         if (m) kv[m[1]] = m[2].replace(/\\\\/g, '\\')
       }
 
-      // Shared folders: SharedFolderNameMachineMapping1..N + SharedFolderPathMachineMapping1..N
+      // Shared folders: name + hostPath from machinereadable; mount-point from plain showvminfo
+      // (VBoxManage does not emit SharedFolderAutoMountPointMachineMapping in --machinereadable output)
+      const mountPointMap = {}
+      try {
+        const rawPlain = execSync(`VBoxManage showvminfo "${vmName}"`, { encoding: 'utf8' })
+        for (const line of rawPlain.split('\n')) {
+          const m = line.match(/Name:\s*'([^']+)'.*mount-point:\s*'([^']*)'/)
+          if (m) mountPointMap[m[1]] = m[2]
+        }
+      } catch (_) { /* best-effort */ }
+
       const sharedFolders = []
       let i = 1
       while (kv[`SharedFolderNameMachineMapping${i}`]) {
+        const name = kv[`SharedFolderNameMachineMapping${i}`]
         sharedFolders.push({
-          name: kv[`SharedFolderNameMachineMapping${i}`],
+          name,
           hostPath: kv[`SharedFolderPathMachineMapping${i}`] ?? '',
+          mountPoint: mountPointMap[name] ?? '',
         })
         i++
       }

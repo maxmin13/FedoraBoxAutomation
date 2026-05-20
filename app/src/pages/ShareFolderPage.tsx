@@ -94,7 +94,8 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
     'focus:outline-none focus:border-blue-500 ' +
     (value ? 'border-zinc-400' : 'border-zinc-600')
 
-  const canRun = pageState === 'idle' && !!hostPath && !!mountPoint && !!vmUser && !!vmPass && !!loginUser
+  const reservedMountPoint = mountPoint.trimEnd().replace(/\/+$/, '') === '/var/log'
+  const canRun = pageState === 'idle' && !!hostPath && !!mountPoint && !reservedMountPoint && !!vmUser && !!vmPass && !!loginUser
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -201,8 +202,11 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
               value={mountPoint}
               onChange={(e) => setMountPoint(e.target.value)}
               placeholder="/mnt/shared"
-              className={inputClass(mountPoint)}
+              className={inputClass(mountPoint) + (reservedMountPoint ? ' border-red-500' : '')}
             />
+            {reservedMountPoint && (
+              <p className="text-red-400 text-xs mt-1">/var/log is a system directory and cannot be used as a mount point.</p>
+            )}
           </div>
           <div>
             <label className="block text-zinc-400 text-xs mb-1">VM root username</label>

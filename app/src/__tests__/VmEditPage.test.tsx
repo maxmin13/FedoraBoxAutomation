@@ -170,15 +170,15 @@ describe('VmEditPage', () => {
     )
   })
 
-  it('shows shared folder name and host path when folders are configured', async () => {
+  it('shows host folder and VM mount point when folders are configured', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
       ...SAMPLE_INFO,
-      sharedFolders: [{ name: 'vbox-share', hostPath: 'C:\\Work\\shared' }],
+      sharedFolders: [{ name: 'vbox-share', hostPath: 'C:\\Work\\shared', mountPoint: '/home/user/shared' }],
     })
     render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByText('vbox-share')).toBeInTheDocument()
       expect(screen.getByText('C:\\Work\\shared')).toBeInTheDocument()
+      expect(screen.getByText('/home/user/shared')).toBeInTheDocument()
     })
   })
 

@@ -10,9 +10,10 @@ import VmRunningBadge from '../components/VmRunningBadge'
 interface LandingPageProps {
   onNavigate: (page: Page) => void
   onScriptRunning: (running: boolean) => void
+  isActive: boolean
 }
 
-export default function LandingPage({ onNavigate, onScriptRunning }: LandingPageProps) {
+export default function LandingPage({ onNavigate, onScriptRunning, isActive }: LandingPageProps) {
   // The list of VMs returned by VBoxManage
   const [vms, setVms] = useState<Vm[]>([])
 
@@ -25,10 +26,15 @@ export default function LandingPage({ onNavigate, onScriptRunning }: LandingPage
   // VM currently open in the detail view (null = show grid)
   const [selectedVm, setSelectedVm] = useState<Vm | null>(null)
 
-  // Load VMs when the component first mounts
+  // Incremented each time we want VmEditPage to re-fetch its info
+  const [vmRefreshKey, setVmRefreshKey] = useState(0)
+
+  // Load VMs on mount and whenever this page becomes active again after being hidden
   useEffect(() => {
+    if (!isActive) return
     loadVms()
-  }, [])
+    setVmRefreshKey((k) => k + 1)
+  }, [isActive])
 
   /**
    * Calls the main process to get the list of registered VMs.
@@ -42,6 +48,11 @@ export default function LandingPage({ onNavigate, onScriptRunning }: LandingPage
 
     if (result.ok) {
       setVms(result.vms)
+      // Keep selectedVm in sync with fresh data (e.g. updated running state)
+      setSelectedVm((prev) => {
+        if (!prev) return null
+        return result.vms.find((v) => v.name === prev.name) ?? null
+      })
     } else {
       setError(result.error ?? 'Could not load VMs')
       setVms([])
@@ -51,7 +62,7 @@ export default function LandingPage({ onNavigate, onScriptRunning }: LandingPage
   }
 
   if (selectedVm) {
-    return <VmEditPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} />
+    return <VmEditPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} />
   }
 
   return (

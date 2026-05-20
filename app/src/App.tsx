@@ -46,7 +46,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto p-6">
         <ErrorBoundary>
           <div style={{ display: currentPage === 'landing' ? undefined : 'none' }}>
-            <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} />
+            <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} />
           </div>
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">

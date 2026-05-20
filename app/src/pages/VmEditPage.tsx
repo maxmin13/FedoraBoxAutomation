@@ -8,6 +8,7 @@ interface VmEditPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
+  refreshKey?: number
 }
 
 type View = 'detail' | 'share-folder' | 'share-logs'
@@ -32,12 +33,14 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-export default function VmEditPage({ vm, onBack, onScriptRunning }: VmEditPageProps) {
+export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: VmEditPageProps) {
   const [view, setView]           = useState<View>('detail')
   const [info, setInfo]           = useState<VmInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
+    setInfo(null)
+    setLoadError(null)
     window.electronAPI.getVmInfo(vm.name).then((result) => {
       if (result.ok) {
         const { ok: _ok, ...rest } = result as { ok: true } & VmInfo
@@ -46,7 +49,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning }: VmEditPagePr
         setLoadError((result as { ok: false; error?: string }).error ?? 'Could not load VM info')
       }
     })
-  }, [vm.name])
+  }, [vm.name, refreshKey])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={() => setView('detail')} onScriptRunning={onScriptRunning} />
@@ -119,7 +122,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning }: VmEditPagePr
           </div>
 
           {/* Right column — action sections */}
-          <div className="w-72 space-y-2">
+          <div className="flex-1 min-w-0 space-y-2">
 
             <Section
               title="Shared folders"
@@ -134,7 +137,10 @@ export default function VmEditPage({ vm, onBack, onScriptRunning }: VmEditPagePr
             >
               {info.sharedFolders.length > 0 ? (
                 info.sharedFolders.map((sf) => (
-                  <Row key={sf.name} label={sf.name} value={sf.hostPath} mono />
+                  <div key={sf.name} className="space-y-0.5">
+                    <Row label="Host folder" value={sf.hostPath} mono />
+                    <Row label="VM folder"   value={sf.mountPoint || '—'} mono={!!sf.mountPoint} />
+                  </div>
                 ))
               ) : (
                 <p className="text-zinc-500 text-sm">None configured</p>
@@ -190,12 +196,28 @@ function Section({
 }
 
 function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
   return (
-    <div className="flex items-baseline gap-2 text-sm">
+    <div className="relative flex items-center gap-2 text-sm min-w-0 group">
       <span className="text-zinc-500 w-24 shrink-0">{label}</span>
-      <span className={mono ? 'text-zinc-300 font-mono text-xs break-all' : 'text-zinc-300'}>
+      <span className={mono ? 'text-zinc-300 font-mono text-xs truncate min-w-0' : 'text-zinc-300'}>
         {value}
       </span>
+      {mono && (
+        <button
+          onClick={handleCopy}
+          className="ml-auto shrink-0 hidden group-hover:flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white text-xs"
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      )}
     </div>
   )
 }

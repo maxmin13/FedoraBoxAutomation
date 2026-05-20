@@ -115,6 +115,11 @@ if ([string]::IsNullOrWhiteSpace($MountPoint)) {
     Write-Host "  Mount point: $mountPoint" -ForegroundColor DarkGray
 }
 
+if ($mountPoint.TrimEnd('/') -eq '/var/log') {
+    Write-Host "  ERROR: /var/log is a system directory and cannot be used as a mount point." -ForegroundColor Red
+    exit 1
+}
+
 # Skip everything if the share is already configured correctly.
 $vmInfo = & $script:vbox showvminfo $vmName --machinereadable 2>$null
 $shareAlreadyCorrect = $false

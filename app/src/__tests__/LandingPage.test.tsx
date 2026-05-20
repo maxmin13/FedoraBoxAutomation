@@ -20,7 +20,7 @@ beforeEach(() => {
 })
 
 async function renderAndFlush() {
-  render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} />)
+  render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} isActive={true} />)
   await act(async () => {})
 }
 
@@ -29,13 +29,13 @@ async function renderAndFlush() {
 describe('loading state', () => {
   it('shows "Loading VMs..." while listVms is pending', () => {
     window.electronAPI.listVms = vi.fn().mockReturnValue(new Promise(() => {}))
-    render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} isActive={true} />)
     expect(screen.getByText('Loading VMs...')).toBeInTheDocument()
   })
 
   it('shows a disabled loading button while loading', () => {
     window.electronAPI.listVms = vi.fn().mockReturnValue(new Promise(() => {}))
-    render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} isActive={true} />)
     expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled()
   })
 })
