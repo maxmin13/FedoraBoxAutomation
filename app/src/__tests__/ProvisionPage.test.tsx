@@ -254,8 +254,10 @@ describe('"Run another" behaviour', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
   }
 
-  it('after a failed run, clicking "Run another" clears the Desktop username input', async () => {
+  it('after a failed run, clicking "Run another" clears the Desktop username input when no credentials are saved', async () => {
     await runToDone(1)
+    // No saved credentials → loginUser should be cleared
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
     fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
     // Navigate back to Languages → Oracle JDK to check loginUser was cleared
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())

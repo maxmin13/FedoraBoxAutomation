@@ -25,4 +25,4 @@
 
 # openssl if the install fails, how do we roll back? should we give the user the possibility to roll back?
 
-# in case of script error, give the user to rollback
+# in case of script error, give the user to rollback, at least for openssl

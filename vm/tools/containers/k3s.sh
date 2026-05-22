@@ -23,9 +23,12 @@ HOME_DIR=$(eval echo "~${LOGIN_USER}")
 STEP "k3s"
 ####
 
-if k3s --version > /dev/null 2>&1
+FRESH_INSTALL=false
+K3S_BIN='/usr/local/bin/k3s'
+
+if [[ -x "${K3S_BIN}" ]]
 then
-    log_info "k3s already installed: $(k3s --version)"
+    log_info "k3s already installed: $("${K3S_BIN}" --version)"
 else
     log_info "Downloading and installing k3s ..."
 
@@ -36,7 +39,8 @@ else
     chmod +x "${WORK_DIR}/k3s-install.sh"
     "${WORK_DIR}/k3s-install.sh"
 
-    log_info "k3s installed: $(k3s --version)"
+    log_info "k3s installed: $("${K3S_BIN}" --version)"
+    FRESH_INSTALL=true
 fi
 
 systemctl status k3s --no-pager
@@ -66,11 +70,18 @@ fi
 STEP "Cluster status"
 ####
 
-log_info "Waiting for node to be ready ..."
-timeout 60 bash -c 'until k3s kubectl get nodes 2>/dev/null | grep -q " Ready"; do sleep 2; done'
-
-k3s kubectl get nodes
-k3s kubectl get pods --all-namespaces
+if [[ "${FRESH_INSTALL}" == 'true' ]]; then
+    log_info "Waiting for node to be ready (up to 60s) ..."
+    if env -i PATH="${PATH}" HOME="${HOME}" timeout 60 bash -c \
+        'until /usr/local/bin/k3s kubectl get nodes 2>/dev/null | grep -q " Ready"; do sleep 2; done'
+    then
+        "${K3S_BIN}" kubectl get nodes
+        "${K3S_BIN}" kubectl get pods --all-namespaces
+    else
+        log_warn "Node not Ready within 60s — k3s may still be initializing."
+        log_warn "Check with: k3s kubectl get nodes"
+    fi
+fi
 
 log_info "k3s is running. Use kubectl (after re-login) or k3s kubectl immediately."
 log_info "Start        : systemctl start k3s"
