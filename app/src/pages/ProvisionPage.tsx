@@ -183,10 +183,12 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showLog,      setShowLog]      = useState(false)
   const [runningLabel, setRunningLabel] = useState('')
 
-  const [showSetupGuide,  setShowSetupGuide]  = useState(false)
-  const [forceConfirm,    setForceConfirm]    = useState(false)
-  const setupGuideRef        = useRef<HTMLDivElement>(null)
-  const forceConfirmNeededRef = useRef(false)
+  const [showSetupGuide,    setShowSetupGuide]    = useState(false)
+  const [forceConfirm,      setForceConfirm]      = useState(false)
+  const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
+  const setupGuideRef          = useRef<HTMLDivElement>(null)
+  const forceConfirmNeededRef  = useRef(false)
+  const alreadyInstalledRef    = useRef(false)
 
   useEffect(() => {
     if (!showSetupGuide) return
@@ -282,11 +284,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setError(null)
     setShowLog(true)
     forceConfirmNeededRef.current = false
+    alreadyInstalledRef.current   = false
 
     const unsubLine = window.electronAPI.onScriptLine((line) => {
       setLines((prev) => [...prev, line])
       if (/Use 'Install anyway'/i.test(line.text)) {
         forceConfirmNeededRef.current = true
+      }
+      if (/already installed/i.test(line.text)) {
+        alreadyInstalledRef.current = true
       }
     })
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
@@ -296,12 +302,14 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (forceConfirmNeededRef.current && selectedScript?.name === 'openssl.sh') {
         setForceConfirm(true)
         setSuccess(false)
+        setAlreadyInstalled(false)
         setPageState('done')
         setShowLog(false)
         unsubLine()
         unsubDone()
         return
       }
+      setAlreadyInstalled(alreadyInstalledRef.current)
       setSuccess(exitCode === 0)
       setPageState('done')
       setShowLog(false)
@@ -401,12 +409,19 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
 
-        {success === true && (
+        {success === true && !alreadyInstalled && (
           <div className="bg-green-900 border border-green-700 rounded-lg p-4 shrink-0">
             <p className="text-green-200 font-medium">{runningLabel} completed successfully.</p>
             {runningLabel === 'Guest Additions' && (
               <p className="text-green-300 text-sm mt-1">Reboot the VM to activate, then return here to provision.</p>
             )}
+          </div>
+        )}
+
+        {success === true && alreadyInstalled && (
+          <div className="bg-blue-950 border border-blue-700 rounded-lg p-4 shrink-0">
+            <p className="text-blue-200 font-medium">{runningLabel} is already installed.</p>
+            <p className="text-blue-400 text-sm mt-1">No changes were made.</p>
           </div>
         )}
 
@@ -452,6 +467,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           <button
             onClick={() => {
               if (!success) { setLoginUser(''); setArgValues(['', '']) }
+              setAlreadyInstalled(false)
               setPageState('idle')
               setIdleView('categories')
             }}

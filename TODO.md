@@ -18,4 +18,11 @@
 
 # check the error messages displayed to the user, are they user friendly
 
-# openssl provision form doesn't have the credentials preloaded. can you make sure that you alway populate credentias in the input boxes when they are saved, and that you leave the input boxed empty when they are not?
+# rationalise the error messages returned by shell script, devise a common pattern to return a user friendly error msg to the user
+
+# on a new vm, install fedora 3.3.2, check if the user is warned that a previous version is already present. also check if he s displayed with what he has to do after isntalling, for ex, maintaing...
+
+# add sanity checks after successfull openssl install.
+# if the install fails, how do we roll back? should we give the user the possibility to roll back?
+
+# when running a provision script, if the program is already installed, inform the user that the program was already installed, not the the installation was successfull
