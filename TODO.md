@@ -15,3 +15,7 @@
 
 
 # is it possible to display in the vm detail the list of the program installed with provision
+
+# check the error messages displayed to the user, are they user friendly
+
+# openssl provision form doesn't have the credentials preloaded. can you make sure that you alway populate credentias in the input boxes when they are saved, and that you leave the input boxed empty when they are not?
