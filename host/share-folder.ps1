@@ -178,6 +178,7 @@ if ($runningVms -contains $vmName) {
     }
     if (-not $vmStopped) { Write-Host "  ERROR: VM did not stop in time. Shut it down manually and re-run." -ForegroundColor Red; exit 1 }
     Write-Host "  VM stopped." -ForegroundColor Green
+    Start-Sleep -Seconds 3
 }
 
 try {
@@ -331,6 +332,11 @@ try {
     }
 
 } catch {
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    $msg = $_.Exception.Message
+    if ($msg -match 'object is not ready') {
+        Write-Host "  ERROR: VirtualBox did not release the session lock in time after shutdown. Wait a few seconds and try again." -ForegroundColor Red
+    } else {
+        Write-Host "  ERROR: $msg" -ForegroundColor Red
+    }
     exit 1
 }
