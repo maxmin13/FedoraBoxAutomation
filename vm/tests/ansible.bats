@@ -34,6 +34,12 @@ STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
 STUB
 
     _stub dnf 0
+    _stub curl 0
+
+    # python3 stub prints a version string for the log_info line
+    printf '#!/bin/bash\nif [[ "$1" == "--version" ]]; then echo "Python 3.12.0"; fi\nprintf "python3 %%s\\n" "$*" >> "%s"\nexit 0\n' \
+        "$CALLS_FILE" > "$TEST_TMPDIR/bin/python3"
+    chmod +x "$TEST_TMPDIR/bin/python3"
 
     # Default: ansible already installed
     _stub ansible 0
@@ -46,6 +52,20 @@ teardown() {
         rm -f /tmp/common.sh
     fi
     rm -rf "$TEST_TMPDIR"
+}
+
+@test "exits 1 when Python 3 is not installed" {
+    rm "$TEST_TMPDIR/bin/python3"
+    run bash "$SCRIPT"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Python 3 is required"* ]]
+}
+
+@test "warns but continues when Fedora mirrors are unreachable" {
+    _stub curl 1
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"unreachable"* ]]
 }
 
 @test "exits 0 when Ansible is already installed" {

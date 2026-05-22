@@ -11,6 +11,7 @@ beforeEach(() => {
     loadVmCredentials:  vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' }),
     checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: true, guestAdditions: true, version: '7.0.14' }),
     runShareLogs:       vi.fn().mockResolvedValue({ ok: true }),
+    saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     pickFolder:         vi.fn().mockResolvedValue({ folderPath: HOST_PATH }),
     onScriptLine:       vi.fn().mockReturnValue(() => {}),
     onScriptDone:       vi.fn().mockReturnValue(() => {}),
@@ -67,11 +68,11 @@ describe('idle form', () => {
     })
   })
 
-  it('shows a credentials warning when no credentials are saved', async () => {
+  it('shows a hint to fill in fields when no credentials are saved', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
     await renderAndFlush()
     await waitFor(() => {
-      expect(screen.getByText(/no saved credentials/i)).toBeInTheDocument()
+      expect(screen.getByText(/fill in all fields/i)).toBeInTheDocument()
     })
   })
 

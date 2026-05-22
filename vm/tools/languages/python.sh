@@ -21,13 +21,8 @@
 
 source /tmp/common.sh
 
-if [[ 0 -eq $# ]]
-then
-    log_error 'login user not found.'
-    exit 1
-fi
-
-LOGIN_USER="${1}"
+LOGIN_USER="${1:-}"
+require_login_user "${LOGIN_USER}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 if [[ -n "${2:-}" ]]; then
     PYTHON_VERSION="${2}"

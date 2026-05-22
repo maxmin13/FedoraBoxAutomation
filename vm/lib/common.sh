@@ -30,5 +30,17 @@ _log() {
 
 log_info()  { _log 'INFO'  "$@"; }
 log_warn()  { _log 'WARN'  "$@"; }
-log_error() { _log 'ERROR' "$@"; }
+log_error() { _log 'ERROR' "$@"; printf 'ERROR: %s\n' "$*"; }
 STEP()      { echo; _log 'STEP' "===[ $* ]==="; echo; }
+
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+    if ! id "${user}" &>/dev/null; then
+        log_error "Desktop user '${user}' does not exist on this system. Verify the username and try again."
+        exit 1
+    fi
+}

@@ -25,13 +25,8 @@
 
 source /tmp/common.sh
 
-if [[ 0 -eq $# ]]
-then
-    log_error 'login user not found.'
-    exit 1
-fi
-
-LOGIN_USER="${1}"
+LOGIN_USER="${1:-}"
+require_login_user "${LOGIN_USER}"
 TOMCAT_VERSION="${2:-10.1.33}"
 TOMCAT_PORT="${3:-8080}"
 TOMCAT_MAJOR="${TOMCAT_VERSION%%.*}"

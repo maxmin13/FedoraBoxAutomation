@@ -224,7 +224,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
               type="text"
               value={loginUser}
               onChange={(e) => setLoginUser(e.target.value)}
-              placeholder="fedora"
+              placeholder="your desktop username"
               className={inputClass(loginUser)}
             />
           </div>

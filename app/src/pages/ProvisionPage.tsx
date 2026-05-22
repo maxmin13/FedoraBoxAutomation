@@ -35,14 +35,14 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'java.sh',   label: 'Oracle JDK',  relPath: 'java.sh',   description: 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile', argType: 'user' },
       { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
       { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source (latest stable) + venv + pyenv',
-        argType: 'user+custom', argPrompts: ['Python version (leave blank for latest)'] },
+        argType: 'user+custom', argPrompts: ['Python version'] },
     ],
   },
   {
     name: 'Build Tools', dir: 'build-tools',
     scripts: [
       { name: 'maven.sh', label: 'Apache Maven', relPath: 'maven.sh', description: 'Apache Maven - sets M2_HOME and PATH',
-        argType: 'custom', argPrompts: ['Maven version (leave blank for 3.9.5)'], argDefaults: ['3.9.5'] },
+        argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['3.9.5'] },
     ],
   },
   {
@@ -51,11 +51,11 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'httpd.sh',         label: 'Apache HTTP Server',  relPath: 'httpd.sh',               description: 'Apache HTTP Server',                              argType: 'user' },
       { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
         argType: 'user+custom2',
-        argPrompts:  ['Tomcat version (leave blank for 10.1.33)', 'HTTP port (leave blank for 8080)'],
+        argPrompts:  ['Tomcat version', 'HTTP port'],
         argDefaults: ['10.1.33', '8080'] },
       { name: 'tomcat-remove.sh', label: 'Remove Tomcat',       relPath: 'tomcat/tomcat-remove.sh', description: 'Remove a Tomcat instance by version and port',
         argType: 'custom2',
-        argPrompts:  ['Tomcat version to remove (leave blank for 10.1.33)', 'HTTP port to remove (leave blank for 8080)'],
+        argPrompts:  ['Tomcat version to remove', 'HTTP port to remove'],
         argDefaults: ['10.1.33', '8080'] },
     ],
   },
@@ -71,9 +71,9 @@ const CATEGORIES: CategoryDef[] = [
     name: 'IDEs', dir: 'ides',
     scripts: [
       { name: 'eclipse.sh',          label: 'Eclipse IDE',          relPath: 'eclipse.sh',          description: 'Eclipse IDE for Java EE',
-        argType: 'custom', argPrompts: ['Eclipse release (leave blank for 2026-03)'], argDefaults: ['2026-03'] },
+        argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['2026-03'] },
       { name: 'eclipse-ee.sh',       label: 'Eclipse IDE (installer)', relPath: 'eclipse-ee.sh',    description: 'Eclipse IDE for Java EE via installer',
-        argType: 'custom', argPrompts: ['Eclipse release (leave blank for 2026-03)'], argDefaults: ['2026-03'] },
+        argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['2026-03'] },
       { name: 'visualstudiocode.sh', label: 'Visual Studio Code',   relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo', argType: 'none' },
     ],
   },
@@ -228,7 +228,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setCredsStatus('idle')
     setCredsError(null)
     setIsLive(false)
-  }, [vmUser, vmPass, loginUser])
+  }, [vmUser, vmPass])
 
   async function handleTestCreds() {
     setCredsStatus('checking')
@@ -284,7 +284,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       setLines((prev) => [...prev, line])
     )
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-      if (exitCode === 0) {
+      if (exitCode === 0 && loginUser) {
         window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
       setSuccess(exitCode === 0)
@@ -346,11 +346,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     'focus:outline-none focus:border-blue-500 ' +
     (val ? 'border-zinc-400' : 'border-zinc-600')
 
-  const credsFilled   = !!vmUser && !!vmPass && !!loginUser
+  const credsFilled   = !!vmUser && !!vmPass
   const credsVerified = credsStatus === 'ok'
   const credsReady    = credsFilled && credsVerified && !isLive
-  const canRunFull    = credsReady
-  const canRunScript  = credsReady && !!selectedScript
+  const canRunFull    = credsReady && !!loginUser
+  const canRunScript  = credsReady && !!loginUser && !!selectedScript
 
   // ── Running ──────────────────────────────────────────────────────────────────
   if (pageState === 'running') {
@@ -393,7 +393,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
         <div className="mt-auto flex justify-between shrink-0">
           <button
-            onClick={() => { setPageState('idle'); setIdleView('categories') }}
+            onClick={() => {
+              if (!success) { setLoginUser(''); setArgValues(['', '']) }
+              setPageState('idle')
+              setIdleView('categories')
+            }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             Run another
@@ -434,7 +438,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           {/* Credentials — single row */}
           <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3 shrink-0">
             <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-2">Credentials</h2>
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-2 max-w-sm">
               <div className="flex-1 min-w-0">
                 <label className="block text-zinc-400 text-xs mb-1">VM root username</label>
                 <input
@@ -442,7 +446,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   value={vmUser}
                   onChange={(e) => setVmUser(e.target.value)}
                   placeholder="root"
-                  className={icr(vmUser)}
+                  autoComplete="off"
+                  className={'w-full ' + icr(vmUser)}
                 />
               </div>
               <div className="flex-1 min-w-0">
@@ -452,17 +457,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   value={vmPass}
                   onChange={(e) => setVmPass(e.target.value)}
                   placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                  className={icr(vmPass)}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <label className="block text-zinc-400 text-xs mb-1">Desktop username</label>
-                <input
-                  type="text"
-                  value={loginUser}
-                  onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="fedora"
-                  className={icr(loginUser)}
+                  autoComplete="new-password"
+                  className={'w-full ' + icr(vmPass)}
                 />
               </div>
             </div>
@@ -486,7 +482,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
           {/* Hint text */}
           {!credsFilled && (
-            <p className="text-zinc-500 text-xs shrink-0">Fill in all credential fields to continue.</p>
+            <p className="text-zinc-500 text-xs shrink-0">Fill in VM credentials to continue.</p>
           )}
           {credsFilled && !credsVerified && (
             <p className="text-zinc-500 text-xs shrink-0">Test your credentials to unlock provisioning.</p>
@@ -669,6 +665,20 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
             </div>
 
+            {(selectedScript.argType === 'user' || selectedScript.argType === 'user+custom' || selectedScript.argType === 'user+custom2') && (
+              <div>
+                <label className="block text-zinc-400 text-xs mb-1">Desktop username</label>
+                <input
+                  type="text"
+                  value={loginUser}
+                  onChange={(e) => setLoginUser(e.target.value)}
+                  placeholder="your desktop username"
+                  autoComplete="off"
+                  className={ic(loginUser)}
+                />
+              </div>
+            )}
+
             {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (
               <div>
                 <label className="block text-zinc-400 text-xs mb-1">
@@ -679,6 +689,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   value={argValues[0]}
                   onChange={(e) => setArgValues([e.target.value, argValues[1]])}
                   placeholder={selectedScript.argDefaults?.[0] ?? ''}
+                  autoComplete="off"
                   className={ic(argValues[0])}
                 />
               </div>
@@ -695,6 +706,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                     value={argValues[0]}
                     onChange={(e) => setArgValues([e.target.value, argValues[1]])}
                     placeholder={selectedScript.argDefaults?.[0] ?? ''}
+                    autoComplete="off"
                     className={ic(argValues[0])}
                   />
                 </div>
@@ -707,16 +719,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                     value={argValues[1]}
                     onChange={(e) => setArgValues([argValues[0], e.target.value])}
                     placeholder={selectedScript.argDefaults?.[1] ?? ''}
+                    autoComplete="off"
                     className={ic(argValues[1])}
                   />
                 </div>
-              </div>
-            )}
-
-            {selectedScript.argType !== 'none' && (
-              <div className="px-3 py-2 bg-zinc-900 rounded text-xs font-mono text-zinc-400">
-                <span className="text-zinc-600">args: </span>
-                {buildScriptArgs(selectedScript, argValues, loginUser) || <span className="text-zinc-600 italic">none</span>}
               </div>
             )}
 

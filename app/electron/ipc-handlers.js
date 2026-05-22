@@ -130,9 +130,12 @@ function streamScript(win, scriptPath, args) {
 
 function extractError(lines) {
   const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
-  return errorLines.length > 0
-    ? errorLines.at(-1).text.trim().replace(/^ERROR:\s*/i, '')
-    : lines.filter(l => l.text.trim()).at(-1)?.text.trim() ?? null
+  if (errorLines.length === 0) {
+    return lines.filter(l => l.text.trim()).at(-1)?.text.trim() ?? null
+  }
+  const specific = errorLines.filter(l => !/script exited with code/i.test(l.text))
+  const best = specific.length > 0 ? specific.at(-1) : errorLines.at(-1)
+  return best.text.trim().replace(/^ERROR:\s*/i, '')
 }
 
 /**

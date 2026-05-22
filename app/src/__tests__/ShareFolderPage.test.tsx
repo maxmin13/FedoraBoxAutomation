@@ -27,7 +27,7 @@ async function fillAllFields() {
   fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/mnt/shared' } })
   fireEvent.change(screen.getByPlaceholderText('root'),         { target: { value: 'root' } })
   fireEvent.change(screen.getByPlaceholderText('••••••••'),     { target: { value: 'password' } })
-  fireEvent.change(screen.getByPlaceholderText('fedora'),       { target: { value: 'fedora' } })
+  fireEvent.change(screen.getByPlaceholderText('your desktop username'), { target: { value: 'fedora' } })
 }
 
 // Simulate a full run by wiring onScriptDone to fire immediately with the given exitCode.
@@ -49,7 +49,7 @@ describe('idle form', () => {
     expect(screen.getByPlaceholderText('/mnt/shared')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('root')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('fedora')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
   })
 
   it('disables the run button when fields are empty', async () => {
@@ -92,14 +92,14 @@ describe('credential pre-fill', () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText('root')).toHaveValue('root')
     })
-    expect(screen.getByPlaceholderText('fedora')).toHaveValue('alice')
+    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('alice')
   })
 
   it('leaves fields empty when no saved credentials exist', async () => {
     await renderAndFlush()
     await act(async () => {})
     expect(screen.getByPlaceholderText('root')).toHaveValue('')
-    expect(screen.getByPlaceholderText('fedora')).toHaveValue('')
+    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
   })
 })
 
