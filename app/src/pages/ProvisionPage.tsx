@@ -9,6 +9,7 @@ type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'cu
 
 interface ScriptDef {
   name: string
+  label: string
   relPath: string
   description: string
   argType: ArgType
@@ -31,28 +32,28 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Languages', dir: 'languages',
     scripts: [
-      { name: 'java.sh',   relPath: 'java.sh',   description: 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile', argType: 'user' },
-      { name: 'php.sh',    relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
-      { name: 'python.sh', relPath: 'python.sh', description: 'Python from source (latest stable) + venv + pyenv',
+      { name: 'java.sh',   label: 'Oracle JDK',  relPath: 'java.sh',   description: 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile', argType: 'user' },
+      { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
+      { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source (latest stable) + venv + pyenv',
         argType: 'user+custom', argPrompts: ['Python version (leave blank for latest)'] },
     ],
   },
   {
     name: 'Build Tools', dir: 'build-tools',
     scripts: [
-      { name: 'maven.sh', relPath: 'maven.sh', description: 'Apache Maven - sets M2_HOME and PATH',
+      { name: 'maven.sh', label: 'Apache Maven', relPath: 'maven.sh', description: 'Apache Maven - sets M2_HOME and PATH',
         argType: 'custom', argPrompts: ['Maven version (leave blank for 3.9.5)'], argDefaults: ['3.9.5'] },
     ],
   },
   {
     name: 'Web Servers', dir: 'web-servers',
     scripts: [
-      { name: 'httpd.sh',         relPath: 'httpd.sh',               description: 'Apache HTTP Server',                              argType: 'user' },
-      { name: 'tomcat.sh',        relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
+      { name: 'httpd.sh',         label: 'Apache HTTP Server',  relPath: 'httpd.sh',               description: 'Apache HTTP Server',                              argType: 'user' },
+      { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
         argType: 'user+custom2',
         argPrompts:  ['Tomcat version (leave blank for 10.1.33)', 'HTTP port (leave blank for 8080)'],
         argDefaults: ['10.1.33', '8080'] },
-      { name: 'tomcat-remove.sh', relPath: 'tomcat/tomcat-remove.sh', description: 'Remove a Tomcat instance by version and port',
+      { name: 'tomcat-remove.sh', label: 'Remove Tomcat',       relPath: 'tomcat/tomcat-remove.sh', description: 'Remove a Tomcat instance by version and port',
         argType: 'custom2',
         argPrompts:  ['Tomcat version to remove (leave blank for 10.1.33)', 'HTTP port to remove (leave blank for 8080)'],
         argDefaults: ['10.1.33', '8080'] },
@@ -61,70 +62,70 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Databases', dir: 'databases',
     scripts: [
-      { name: 'mariadb.sh',    relPath: 'mariadb.sh',    description: 'MariaDB - MySQL-compatible relational database',          argType: 'none' },
-      { name: 'postgresql.sh', relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled',      argType: 'none' },
-      { name: 'dbeaver.sh',    relPath: 'dbeaver.sh',    description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL',         argType: 'none' },
+      { name: 'mariadb.sh',    label: 'MariaDB',     relPath: 'mariadb.sh',    description: 'MariaDB - MySQL-compatible relational database',     argType: 'none' },
+      { name: 'postgresql.sh', label: 'PostgreSQL',  relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled', argType: 'none' },
+      { name: 'dbeaver.sh',    label: 'DBeaver CE',  relPath: 'dbeaver.sh',    description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL',    argType: 'none' },
     ],
   },
   {
     name: 'IDEs', dir: 'ides',
     scripts: [
-      { name: 'eclipse.sh',          relPath: 'eclipse.sh',          description: 'Eclipse IDE for Java EE',
+      { name: 'eclipse.sh',          label: 'Eclipse IDE',          relPath: 'eclipse.sh',          description: 'Eclipse IDE for Java EE',
         argType: 'custom', argPrompts: ['Eclipse release (leave blank for 2026-03)'], argDefaults: ['2026-03'] },
-      { name: 'eclipse-ee.sh',       relPath: 'eclipse-ee.sh',       description: 'Eclipse IDE for Java EE via installer',
+      { name: 'eclipse-ee.sh',       label: 'Eclipse IDE (installer)', relPath: 'eclipse-ee.sh',    description: 'Eclipse IDE for Java EE via installer',
         argType: 'custom', argPrompts: ['Eclipse release (leave blank for 2026-03)'], argDefaults: ['2026-03'] },
-      { name: 'visualstudiocode.sh', relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo',        argType: 'none' },
+      { name: 'visualstudiocode.sh', label: 'Visual Studio Code',   relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo', argType: 'none' },
     ],
   },
   {
     name: 'Containers', dir: 'containers',
     scripts: [
-      { name: 'docker.sh',   relPath: 'docker.sh',   description: 'Docker CE - adds login user to docker group',    argType: 'user' },
-      { name: 'minikube.sh', relPath: 'minikube.sh', description: 'minikube + kubectl + metrics-server addon',      argType: 'user' },
-      { name: 'k3s.sh',      relPath: 'k3s.sh',      description: 'k3s - lightweight real Kubernetes cluster',      argType: 'user' },
+      { name: 'docker.sh',   label: 'Docker CE',  relPath: 'docker.sh',   description: 'Docker CE - adds login user to docker group', argType: 'user' },
+      { name: 'minikube.sh', label: 'Minikube',   relPath: 'minikube.sh', description: 'minikube + kubectl + metrics-server addon',   argType: 'user' },
+      { name: 'k3s.sh',      label: 'k3s',        relPath: 'k3s.sh',      description: 'k3s - lightweight real Kubernetes cluster',   argType: 'user' },
     ],
   },
   {
     name: 'Cloud', dir: 'cloud',
     scripts: [
-      { name: 'aws-cli.sh', relPath: 'aws-cli.sh', description: 'AWS CLI v2 - creates ~/.aws config directory',    argType: 'user' },
-      { name: 'ecs-cli.sh', relPath: 'ecs-cli.sh', description: 'Amazon ECS CLI for managing ECS clusters',       argType: 'none' },
+      { name: 'aws-cli.sh', label: 'AWS CLI',          relPath: 'aws-cli.sh', description: 'AWS CLI v2 - creates ~/.aws config directory', argType: 'user' },
+      { name: 'ecs-cli.sh', label: 'Amazon ECS CLI',   relPath: 'ecs-cli.sh', description: 'Amazon ECS CLI for managing ECS clusters',    argType: 'none' },
     ],
   },
   {
     name: 'Security', dir: 'security',
     scripts: [
-      { name: 'openssl.sh', relPath: 'openssl.sh', description: 'OpenSSL compiled from source', argType: 'user' },
+      { name: 'openssl.sh', label: 'OpenSSL', relPath: 'openssl.sh', description: 'OpenSSL compiled from source', argType: 'user' },
     ],
   },
   {
     name: 'Network', dir: 'network',
     scripts: [
-      { name: 'wireshark.sh', relPath: 'wireshark.sh', description: 'Wireshark - network packet analyser', argType: 'user' },
+      { name: 'wireshark.sh', label: 'Wireshark', relPath: 'wireshark.sh', description: 'Wireshark - network packet analyser', argType: 'user' },
     ],
   },
   {
     name: 'Version Control', dir: 'version-control',
     scripts: [
-      { name: 'git.sh', relPath: 'git.sh', description: 'Git version control', argType: 'none' },
+      { name: 'git.sh', label: 'Git', relPath: 'git.sh', description: 'Git version control', argType: 'none' },
     ],
   },
   {
     name: 'Editors', dir: 'editors',
     scripts: [
-      { name: 'vim.sh', relPath: 'vim.sh', description: 'Vim + Pathogen + Syntastic linting (ShellCheck, pylint, jshint)', argType: 'user' },
+      { name: 'vim.sh', label: 'Vim', relPath: 'vim.sh', description: 'Vim + Pathogen + Syntastic linting (ShellCheck, pylint, jshint)', argType: 'user' },
     ],
   },
   {
     name: 'Browsers', dir: 'browsers',
     scripts: [
-      { name: 'chrome.sh', relPath: 'chrome.sh', description: 'Google Chrome stable', argType: 'none' },
+      { name: 'chrome.sh', label: 'Google Chrome', relPath: 'chrome.sh', description: 'Google Chrome stable', argType: 'none' },
     ],
   },
   {
     name: 'Automation', dir: 'automation',
     scripts: [
-      { name: 'ansible.sh', relPath: 'ansible.sh', description: 'Ansible automation and configuration management', argType: 'none' },
+      { name: 'ansible.sh', label: 'Ansible', relPath: 'ansible.sh', description: 'Ansible automation and configuration management', argType: 'none' },
     ],
   },
 ]
@@ -308,7 +309,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   async function handleRunScript() {
     if (!selectedScript || !selectedCategory) return
-    setRunningLabel(selectedScript.name)
+    setRunningLabel(selectedScript.label)
     const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser)
     await startRun(() =>
       window.electronAPI.runProvisionScript({
@@ -392,7 +393,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
         <div className="mt-auto flex justify-between shrink-0">
           <button
-            onClick={() => { setPageState('idle'); setIdleView('mode') }}
+            onClick={() => { setPageState('idle'); setIdleView('categories') }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             Run another
@@ -650,7 +651,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   onClick={() => { setSelectedScript(script); setArgValues(['', '']); setIdleView('script-args') }}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors"
                 >
-                  <p className="text-zinc-200 text-sm font-medium">{script.name}</p>
+                  <p className="text-zinc-200 text-sm font-medium">{script.label}</p>
                   <p className="text-zinc-500 text-xs mt-0.5">{script.description}</p>
                 </button>
               ))}
@@ -664,7 +665,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
 
             <div>
-              <p className="text-zinc-100 font-semibold text-sm">{selectedScript.name}</p>
+              <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
               <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
             </div>
 
@@ -712,17 +713,19 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </div>
             )}
 
-            <div className="px-3 py-2 bg-zinc-900 rounded text-xs font-mono text-zinc-400">
-              <span className="text-zinc-600">args: </span>
-              {buildScriptArgs(selectedScript, argValues, loginUser) || <span className="text-zinc-600 italic">none</span>}
-            </div>
+            {selectedScript.argType !== 'none' && (
+              <div className="px-3 py-2 bg-zinc-900 rounded text-xs font-mono text-zinc-400">
+                <span className="text-zinc-600">args: </span>
+                {buildScriptArgs(selectedScript, argValues, loginUser) || <span className="text-zinc-600 italic">none</span>}
+              </div>
+            )}
 
             <button
               onClick={handleRunScript}
               disabled={!canRunScript}
               className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Run {selectedScript.name}
+              Run {selectedScript.label}
             </button>
 
           </div>
