@@ -24,7 +24,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   const [error, setError] = useState<string | null>(null)
 
   // VM currently open in the detail view (null = show grid)
-  const [selectedVm, setSelectedVm] = useState<Vm | null>(null)
+  const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
+  const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
 
   // Incremented each time we want VmEditPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
@@ -62,10 +63,15 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   }
 
   if (selectedVm) {
-    return <VmEditPage vm={selectedVm} onBack={() => setSelectedVm(null)} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} />
+    return (
+      <div className="h-full">
+        <VmEditPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} />
+      </div>
+    )
   }
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="max-w-4xl mx-auto">
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
@@ -124,10 +130,68 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
       {!loading && vms.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {vms.map((vm) => (
-            <VmCard key={vm.uuid} vm={vm} onRefresh={loadVms} onEdit={() => setSelectedVm(vm)} />
+            <VmCard
+              key={vm.uuid}
+              vm={vm}
+              onRefresh={loadVms}
+              onEdit={() => { setSelectedVmView('detail'); setSelectedVm(vm) }}
+              onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
+            />
           ))}
         </div>
       )}
+    </div>
+    </div>
+  )
+}
+
+// ── StopModal ──────────────────────────────────────────────────────────────
+
+interface StopModalProps {
+  vmName: string
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function StopModal({ vmName, busy, onConfirm, onCancel }: StopModalProps) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-zinc-400 text-sm text-center mb-2">Stop this VM?</p>
+        <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-2">{vmName}</p>
+        <p className="text-zinc-500 text-xs text-center mb-8">
+          An ACPI shutdown signal will be sent. Unsaved work inside the VM may be lost.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? 'Stopping...' : 'Stop VM'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -142,6 +206,12 @@ interface DeleteModalProps {
 }
 
 function DeleteModal({ vmName, busy, onConfirm, onCancel }: DeleteModalProps) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
@@ -188,11 +258,13 @@ interface VmCardProps {
   vm: Vm
   onRefresh: () => void
   onEdit: () => void
+  onProvision: () => void
 }
 
-function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
+function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showStopModal,   setShowStopModal]   = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   async function handleStart() {
@@ -210,6 +282,7 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
   }
 
   async function handleStop() {
+    setShowStopModal(false)
     setBusy(true)
     setError(null)
     try {
@@ -240,6 +313,15 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
 
   return (
     <>
+      {showStopModal && (
+        <StopModal
+          vmName={vm.name}
+          busy={busy}
+          onConfirm={handleStop}
+          onCancel={() => setShowStopModal(false)}
+        />
+      )}
+
       {showDeleteModal && (
         <DeleteModal
           vmName={vm.name}
@@ -265,7 +347,7 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
         <div className="flex gap-2 mt-auto flex-wrap">
           {vm.running ? (
             <button
-              onClick={handleStop}
+              onClick={() => setShowStopModal(true)}
               disabled={busy}
               className="px-3 py-1 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -290,9 +372,17 @@ function VmCard({ vm, onRefresh, onEdit }: VmCardProps) {
           </button>
 
           <button
-            onClick={onEdit}
+            onClick={onProvision}
             disabled={busy}
             className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+          >
+            Provision
+          </button>
+
+          <button
+            onClick={onEdit}
+            disabled={busy}
+            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Detail
           </button>

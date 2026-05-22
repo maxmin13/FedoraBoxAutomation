@@ -102,25 +102,7 @@ function Add-VBoxGuestAdditionsIso {
         '--type', 'dvddrive', '--medium', $isoPath
     )
     Write-Host "  Guest Additions ISO attached on controller $controller port 1 device 0." -ForegroundColor Green
-    Write-Host ""
-    Write-Host "  To install Guest Additions inside the VM:" -ForegroundColor Cyan
-    Write-Host "    1. Complete the Fedora OS installation and log in." -ForegroundColor Cyan
-    Write-Host "    2. Open a terminal and run:" -ForegroundColor Cyan
-    Write-Host "         sudo dnf update -y" -ForegroundColor White
-    Write-Host "         # If a new kernel was installed, reboot before continuing:" -ForegroundColor DarkGray
-    Write-Host "         sudo reboot" -ForegroundColor White
-    Write-Host "         # After reboot, confirm the running kernel:" -ForegroundColor DarkGray
-    Write-Host "         uname -r" -ForegroundColor White
-    Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor White
-    Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor White
-    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor White
-    Write-Host "         rpm -q kernel-devel-`$(uname -r)  # DKMS builds GA modules against this -- must match running kernel" -ForegroundColor DarkGray
-    Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor White
-    Write-Host "         sudo passwd root" -ForegroundColor White
-    Write-Host "         sudo reboot" -ForegroundColor White
-    Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
-    Write-Host "         sestatus" -ForegroundColor White
-    Write-Host "    3. Guest Additions will then be active (shared clipboard, better resolution, guest control)." -ForegroundColor Cyan
+    Write-Host "  Use the Provision page to install Guest Additions inside the VM." -ForegroundColor Cyan
 }
 
 Write-Header "Fedora VM Creator"
@@ -320,50 +302,11 @@ try {
     }
 
     Write-Host ""
-    Write-Host "  Next steps after Fedora installation completes:" -ForegroundColor Cyan
+    Write-Host "  Next steps:" -ForegroundColor Cyan
     Write-Host "    1. Complete the Fedora installer." -ForegroundColor White
     Write-Host "       Before rebooting, eject the Live ISO: Devices -> Optical Drives -> Remove disk from virtual drive." -ForegroundColor DarkGray
     Write-Host "       Then reboot. On first boot the GNOME wizard will ask you to create your user account." -ForegroundColor DarkGray
-    Write-Host "    2. Install Guest Additions and disable SELinux:" -ForegroundColor White
-    Write-Host "         sudo dnf update -y" -ForegroundColor DarkGray
-    Write-Host "         # If a new kernel was installed, reboot before continuing:" -ForegroundColor DarkGray
-    Write-Host "         sudo reboot" -ForegroundColor DarkGray
-    Write-Host "         # After reboot, confirm the running kernel:" -ForegroundColor DarkGray
-    Write-Host "         uname -r" -ForegroundColor DarkGray
-    Write-Host "         sudo dnf install -y dkms kernel-devel-`$(uname -r) kernel-headers gcc make perl bzip2" -ForegroundColor DarkGray
-    Write-Host "         sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config" -ForegroundColor DarkGray
-    Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
-    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
-    Write-Host "         rpm -q kernel-devel-`$(uname -r)  # DKMS builds GA modules against this -- must match running kernel" -ForegroundColor DarkGray
-    Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
-    Write-Host "         sudo passwd root" -ForegroundColor DarkGray
-    Write-Host "         sudo usermod -aG vboxsf <your-username>  # replace with your desktop login name" -ForegroundColor DarkGray
-    Write-Host "         # Adding the user to vboxsf now ensures shared folder access works after reboot." -ForegroundColor DarkGray
-    Write-Host "         # If skipped, share-folder.ps1 will do it via guestcontrol -- but only if the root password is set and Guest Additions are fully running." -ForegroundColor DarkGray
-    Write-Host "         sudo reboot" -ForegroundColor DarkGray
-    Write-Host "         # After reboot, verify SELinux is disabled:" -ForegroundColor DarkGray
-    Write-Host "         sestatus" -ForegroundColor DarkGray
-    Write-Host "         # Verify Guest Additions installed correctly:" -ForegroundColor DarkGray
-    Write-Host "         cat /var/log/vboxadd-install.log   # installer output; confirm no errors" -ForegroundColor DarkGray
-    Write-Host "         cat /var/log/vboxadd-setup.log     # kernel module build log; check for compile errors" -ForegroundColor DarkGray
-    Write-Host "         lsmod | grep vbox                  # vboxguest, vboxsf, vboxvideo should appear" -ForegroundColor DarkGray
-    Write-Host "         systemctl status vboxadd           # service should be active" -ForegroundColor DarkGray
-    Write-Host "         ls /lib/modules/`$(uname -r)/misc/vbox*.ko*  # .ko files must exist for the running kernel" -ForegroundColor DarkGray
-    Write-Host "         modinfo vboxguest | grep ^version  # GA version should match your VirtualBox host version" -ForegroundColor DarkGray
-    Write-Host "         groups <your-username>              # output should include vboxsf" -ForegroundColor DarkGray
-    Write-Host "         # Verify root password is set (required for share-folder.ps1 guestcontrol):" -ForegroundColor DarkGray
-    Write-Host "         su - root                           # should prompt for password and succeed; type exit to return" -ForegroundColor DarkGray
-    Write-Host "    If something went wrong (e.g. modules did not compile):" -ForegroundColor White
-    Write-Host "         # 1. Fix the root cause:" -ForegroundColor DarkGray
-    Write-Host "         #    - If kernel was updated but not rebooted: reboot first, then continue." -ForegroundColor DarkGray
-    Write-Host "         #    - If kernel-devel was missing: sudo dnf install -y kernel-devel-`$(uname -r)" -ForegroundColor DarkGray
-    Write-Host "         # 2. Re-mount the Guest Additions ISO (mount is lost after reboot):" -ForegroundColor DarkGray
-    Write-Host "         sudo mkdir -p /mnt/ga" -ForegroundColor DarkGray
-    Write-Host "         sudo mount /dev/sr1 /mnt/ga  # if it fails, try /dev/sr0 (run lsblk to check)" -ForegroundColor DarkGray
-    Write-Host "         # 3. Re-run the installer:" -ForegroundColor DarkGray
-    Write-Host "         sudo /mnt/ga/VBoxLinuxAdditions.run" -ForegroundColor DarkGray
-    Write-Host "         sudo reboot" -ForegroundColor DarkGray
-    Write-Host "    3. Run provision-vm.ps1 to install software." -ForegroundColor White
+    Write-Host "    2. Use the Provision page to install Guest Additions and configure the VM." -ForegroundColor White
     Write-Host ""
 
 } catch {

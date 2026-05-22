@@ -29,7 +29,7 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
 
   useEffect(() => {
     onScriptRunning(pageState === 'running')
-  }, [pageState])
+  }, [pageState, onScriptRunning])
 
   useEffect(() => {
     window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
@@ -94,8 +94,9 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
     'focus:outline-none focus:border-blue-500 ' +
     (value ? 'border-zinc-400' : 'border-zinc-600')
 
+  const invalidMountPoint = !!mountPoint && !/^\/[^\\ ]*$/.test(mountPoint.trim())
   const reservedMountPoint = mountPoint.trimEnd().replace(/\/+$/, '') === '/var/log'
-  const canRun = pageState === 'idle' && !!hostPath && !!mountPoint && !reservedMountPoint && !!vmUser && !!vmPass && !!loginUser
+  const canRun = pageState === 'idle' && !!hostPath && !!mountPoint && !invalidMountPoint && !reservedMountPoint && !!vmUser && !!vmPass && !!loginUser
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -202,9 +203,12 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
               value={mountPoint}
               onChange={(e) => setMountPoint(e.target.value)}
               placeholder="/mnt/shared"
-              className={inputClass(mountPoint) + (reservedMountPoint ? ' border-red-500' : '')}
+              className={inputClass(mountPoint) + (invalidMountPoint || reservedMountPoint ? ' border-red-500' : '')}
             />
-            {reservedMountPoint && (
+            {invalidMountPoint && (
+              <p className="text-red-400 text-xs mt-1">Must be an absolute Linux path starting with / and containing no spaces.</p>
+            )}
+            {!invalidMountPoint && reservedMountPoint && (
               <p className="text-red-400 text-xs mt-1">/var/log is a system directory and cannot be used as a mount point.</p>
             )}
           </div>
@@ -248,7 +252,7 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
           Set up shared folder
         </button>
 
-        {!canRun && (
+        {!canRun && !(invalidMountPoint || reservedMountPoint) && (
           <p className="text-zinc-500 text-xs mt-2">Fill in all fields above to continue.</p>
         )}
       </div>

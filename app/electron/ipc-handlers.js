@@ -24,9 +24,10 @@ const log = require('./logger')
 // The docs/ folder sits two levels above app/electron/
 const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
 
-// Credentials store — JSON file inside .credentials/ at repo root, keyed by VM name
-const CREDS_DIR  = path.join(__dirname, '..', '..', '.credentials')
-const CREDS_FILE = path.join(CREDS_DIR, 'credentials.json')
+// VM state store — JSON file inside .vm-data/ at repo root, keyed by VM name.
+// Stores guestcontrol credentials, login user, and setup flags (e.g. gaScriptDone).
+const CREDS_DIR  = path.join(__dirname, '..', '..', '.vm-data')
+const CREDS_FILE = path.join(CREDS_DIR, 'vm-state.json')
 
 async function readCredsStore() {
   try {
@@ -46,7 +47,7 @@ async function writeCredsStore(store) {
 // Channels excluded from IPC logging.
 // 'is-dev' is polled on every page load; 'read-log' returns the full file
 // content — logging it back to the log file would create a feedback loop.
-const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
+const SILENT_CHANNELS = new Set(['is-dev', 'read-log', 'check-vm-credentials'])
 
 function truncate(str, max = 120) {
   return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
@@ -127,6 +128,13 @@ function streamScript(win, scriptPath, args) {
   })
 }
 
+function extractError(lines) {
+  const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
+  return errorLines.length > 0
+    ? errorLines.at(-1).text.trim().replace(/^ERROR:\s*/i, '')
+    : lines.filter(l => l.text.trim()).at(-1)?.text.trim() ?? null
+}
+
 /**
  * Registers all IPC handlers. Called once from main.js after the window is created.
  * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
@@ -147,7 +155,7 @@ function registerIpcHandlers(win) {
   handleIpc('read-doc', async (_event, filename) => {
     try {
       const filePath = path.join(DOCS_DIR, filename)
-      const content = fs.readFileSync(filePath, 'utf8')
+      const content = await fs.promises.readFile(filePath, 'utf8')
       return { ok: true, content }
     } catch (error) {
       log.error(`[ipc][read-doc] ${filename}:`, error.message)
@@ -287,6 +295,37 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── check-vm-credentials ─────────────────────────────────
+  // Tests guestcontrol credentials by running a no-op echo inside the guest.
+  // Requires the VM to be running with Guest Additions installed.
+  // Also detects whether the VM is booting from a live ISO (isLive: true)
+  // by checking for /run/initramfs/live, which only exists in live environments.
+  handleIpc('check-vm-credentials', async (_event, { vmName, vmUser, vmPass }) => {
+    try {
+      // --password is unavoidable: VBoxManage guestcontrol has no stdin/env-var alternative
+      execSync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/echo --username "${vmUser}" --password "${vmPass}" --wait-stdout -- -c "echo ok"`,
+        { encoding: 'utf8', stdio: 'pipe' }
+      )
+      let isLive = false
+      try {
+        execSync(
+          `VBoxManage guestcontrol "${vmName}" run --exe /bin/test --username "${vmUser}" --password "${vmPass}" -- -d /run/initramfs/live`,
+          { encoding: 'utf8', stdio: 'pipe' }
+        )
+        isLive = true
+      } catch {
+        // exit code 1 means directory absent — installed OS
+      }
+      return { ok: true, isLive }
+    } catch (error) {
+      log.error(`[ipc][check-vm-credentials] "${vmName}":`, error.message)
+      const raw = (error.stderr ?? error.message ?? '').toString().trim()
+      const msg = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(l => l)[0] ?? 'Connection failed'
+      return { ok: false, error: msg }
+    }
+  })
+
   // ── run-sanity-checks ─────────────────────────────────────
   // Runs the sanity check script with -Json flag and returns structured results.
   handleIpc('run-sanity-checks', async () => {
@@ -336,12 +375,44 @@ function registerIpcHandlers(win) {
   })
 
   // ── save-vm-credentials ──────────────────────────────────
-  // Persists credentials for a VM. Called automatically after VM creation.
   handleIpc('save-vm-credentials', async (_event, { vmName, user, pass, loginUser }) => {
     const store = await readCredsStore()
     store[vmName] = { user, pass, loginUser }
     await writeCredsStore(store)
     return { ok: true }
+  })
+
+  // ── run-provision-script ─────────────────────────────────
+  // Uploads and runs a single guest script via guestcontrol. Streams output to the renderer.
+  handleIpc('run-provision-script', async (_event, params) => {
+    const psArgs = [
+      '-VmName',        params.vmName,
+      '-VmUser',        params.vmUser,
+      '-VmPass',        params.vmPass,
+      '-LoginUser',     params.loginUser,
+      '-ScriptRelPath', params.scriptRelPath,
+      '-NonInteractive',
+    ]
+    if (params.scriptArgs) psArgs.push('-ScriptArgs', params.scriptArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionScript, psArgs)
+    if (exitCode === 0) return { ok: true }
+    return { ok: false, errorDetail: extractError(lines) }
+  })
+
+  // ── run-provision-full ───────────────────────────────────
+  // Runs all base setup scripts (system-prep, network, selinux, desktop, utilities). Streams output.
+  handleIpc('run-provision-full', async (_event, params) => {
+    const psArgs = [
+      '-VmName',    params.vmName,
+      '-VmUser',    params.vmUser,
+      '-VmPass',    params.vmPass,
+      '-LoginUser', params.loginUser,
+      '-Hostname',  params.hostname,
+      '-NonInteractive',
+    ]
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionFull, psArgs)
+    if (exitCode === 0) return { ok: true }
+    return { ok: false, errorDetail: extractError(lines) }
   })
 
   // ── run-share-folder ─────────────────────────────────────
@@ -360,12 +431,7 @@ function registerIpcHandlers(win) {
     ]
     const { exitCode, lines } = await streamScript(win, SCRIPTS.shareFolder, psArgs)
     if (exitCode === 0) return { ok: true }
-    // Find the last explicit ERROR: line; fall back to the last non-empty line
-    const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
-    const lastLine = errorLines.length > 0
-      ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
-      : (lines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
-    return { ok: false, errorDetail: lastLine }
+    return { ok: false, errorDetail: extractError(lines) }
   })
 
   // ── get-vm-guest-logs-path ────────────────────────────────
@@ -469,18 +535,20 @@ function registerIpcHandlers(win) {
 
       return {
         ok: true,
-        osType:        kv['ostype']        ?? 'Unknown',
-        state:         kv['VMState']       ?? 'unknown',
-        ramMB:         parseInt(kv['memory'] ?? '0', 10),
-        cpus:          parseInt(kv['cpus']   ?? '1', 10),
-        vramMB:        parseInt(kv['vram']   ?? '0', 10),
-        nic:           kv['nic1']          ?? 'null',
-        mac:           kv['macaddress1']   ?? '',
-        diskCapacityMB,
-        diskType,
-        sharedFolders,
-        gaVersion,
-        logSyncPath,
+        info: {
+          osType:        kv['ostype']        ?? 'Unknown',
+          state:         kv['VMState']       ?? 'unknown',
+          ramMB:         parseInt(kv['memory'] ?? '0', 10),
+          cpus:          parseInt(kv['cpus']   ?? '1', 10),
+          vramMB:        parseInt(kv['vram']   ?? '0', 10),
+          nic:           kv['nic1']          ?? 'null',
+          mac:           kv['macaddress1']   ?? '',
+          diskCapacityMB,
+          diskType,
+          sharedFolders,
+          gaVersion,
+          logSyncPath,
+        },
       }
     } catch (error) {
       log.error(`[ipc][get-vm-info] "${vmName}":`, error.message)
@@ -495,11 +563,7 @@ function registerIpcHandlers(win) {
     const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-NonInteractive']
     const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs)
     if (exitCode === 0) return { ok: true }
-    const errorLines = lines.filter(l => /^\s*ERROR:/i.test(l.text))
-    const lastLine = errorLines.length > 0
-      ? errorLines[errorLines.length - 1].text.trim().replace(/^ERROR:\s*/i, '')
-      : (lines.filter(l => l.text.trim()).pop()?.text.trim() ?? null)
-    return { ok: false, errorDetail: lastLine }
+    return { ok: false, errorDetail: extractError(lines) }
   })
 
   // ── install-virtualbox ────────────────────────────────────

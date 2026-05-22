@@ -49,9 +49,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reads saved credentials for a VM
   loadVmCredentials: (vmName) => ipcRenderer.invoke('load-vm-credentials', vmName),
 
-  // Saves credentials for a VM (called automatically after VM creation)
   saveVmCredentials: (vmName, user, pass, loginUser) =>
     ipcRenderer.invoke('save-vm-credentials', { vmName, user, pass, loginUser }),
+
+  // Tests whether guestcontrol credentials are valid for a running VM with Guest Additions
+  checkVmCredentials: (vmName, vmUser, vmPass) =>
+    ipcRenderer.invoke('check-vm-credentials', { vmName, vmUser, vmPass }),
+
+  // Runs a single guest script via guestcontrol and streams output to the renderer
+  runProvisionScript: (params) => ipcRenderer.invoke('run-provision-script', params),
+
+  // Runs the full base setup (system-prep, network, selinux, desktop, utilities) and streams output
+  runProvisionFull: (params) => ipcRenderer.invoke('run-provision-full', params),
 
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results

@@ -4,9 +4,8 @@ app/dist/
 app/out/
 app/.vite/
 
-# Credentials — never commit these
-.credentials/
-.credentials.json
+# VM state data — contains passwords, never commit
+.vm-data/
 
 # Environment variable files — may contain secrets
 .env

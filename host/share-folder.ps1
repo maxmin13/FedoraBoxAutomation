@@ -150,8 +150,17 @@ if ($runningVms -contains $vmName) {
     } elseif (-not (Read-YesNo "Shut down '$vmName' now and continue?" $false)) {
         Write-Host "  Aborted." -ForegroundColor Red; exit 1
     }
-    Write-Host "  Sending ACPI shutdown..." -ForegroundColor Cyan
-    Invoke-VBox @('controlvm', $vmName, 'acpipowerbutton')
+    $currentState = (& $script:vbox showvminfo $vmName --machinereadable 2>$null |
+        Where-Object { $_ -match '^VMState=' } |
+        ForEach-Object { $_ -replace '.*="(.+)".*', '$1' } |
+        Select-Object -First 1)
+    if ($currentState -match 'paused') {
+        Write-Host "  VM is paused - sending hard poweroff..." -ForegroundColor Cyan
+        Invoke-VBox @('controlvm', $vmName, 'poweroff')
+    } else {
+        Write-Host "  Sending ACPI shutdown..." -ForegroundColor Cyan
+        Invoke-VBox @('controlvm', $vmName, 'acpipowerbutton')
+    }
     Write-Host "  Waiting for VM to stop..." -ForegroundColor Cyan
     $deadline = (Get-Date).AddSeconds(120)
     $vmStopped = $false

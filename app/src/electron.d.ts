@@ -31,6 +31,23 @@ export interface ShareLogsParams {
   hostPath: string
 }
 
+export interface ProvisionScriptParams {
+  vmName: string
+  vmUser: string
+  vmPass: string
+  loginUser: string
+  scriptRelPath: string
+  scriptArgs: string
+}
+
+export interface ProvisionFullParams {
+  vmName: string
+  vmUser: string
+  vmPass: string
+  loginUser: string
+  hostname: string
+}
+
 export interface CheckResult {
   id: string
   label: string
@@ -75,11 +92,14 @@ declare global {
   interface Window {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
-      getVmInfo: (vmName: string) => Promise<({ ok: true } & VmInfo) | { ok: false; error?: string }>
+      getVmInfo: (vmName: string) => Promise<{ ok: true; info: VmInfo } | { ok: false; error?: string }>
       checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
+      checkVmCredentials: (vmName: string, vmUser: string, vmPass: string) => Promise<{ ok: boolean; isLive?: boolean; error?: string }>
       runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>
       runShareLogs: (params: ShareLogsParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+      runProvisionScript: (params: ProvisionScriptParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+      runProvisionFull:   (params: ProvisionFullParams)   => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>

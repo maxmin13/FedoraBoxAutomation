@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
+import ProvisionPage from './ProvisionPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface VmEditPageProps {
@@ -9,9 +10,10 @@ interface VmEditPageProps {
   onBack: () => void
   onScriptRunning: (running: boolean) => void
   refreshKey?: number
+  initialView?: View
 }
 
-type View = 'detail' | 'share-folder' | 'share-logs'
+type View = 'detail' | 'share-folder' | 'share-logs' | 'provision'
 
 function formatMac(raw: string): string {
   return raw.replace(/(..)(?!$)/g, '$1:').toUpperCase()
@@ -33,8 +35,8 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: VmEditPageProps) {
-  const [view, setView]           = useState<View>('detail')
+export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView }: VmEditPageProps) {
+  const [view, setView]           = useState<View>(initialView ?? 'detail')
   const [info, setInfo]           = useState<VmInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [infoKey, setInfoKey]     = useState(0)
@@ -49,10 +51,9 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
     setLoadError(null)
     window.electronAPI.getVmInfo(vm.name).then((result) => {
       if (result.ok) {
-        const { ok: _ok, ...rest } = result as { ok: true } & VmInfo
-        setInfo(rest as VmInfo)
+        setInfo(result.info)
       } else {
-        setLoadError((result as { ok: false; error?: string }).error ?? 'Could not load VM info')
+        setLoadError(result.error ?? 'Could not load VM info')
       }
     })
   }, [vm.name, refreshKey, infoKey])
@@ -63,6 +64,14 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
 
   if (view === 'share-logs') {
     return <ShareLogsPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
+  }
+
+  if (view === 'provision') {
+    return (
+      <div className="h-full">
+        <ProvisionPage vm={vm} onBack={onBack} onScriptRunning={onScriptRunning} />
+      </div>
+    )
   }
 
   const diskValue = info?.diskCapacityMB != null
@@ -176,6 +185,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey }: 
                 mono={!!info.logSyncPath}
               />
             </Section>
+
 
           </div>
 

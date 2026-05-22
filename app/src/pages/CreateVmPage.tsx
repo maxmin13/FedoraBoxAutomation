@@ -22,7 +22,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
   const [diskType,   setDiskType]   = useState('VDI')
   const [vramMB,     setVramMB]     = useState(128)
   const [nicType,    setNicType]    = useState('nat')
-  const [attachGA,   setAttachGA]   = useState(true)
   const [startAfter, setStartAfter] = useState(false)
 
   // Wizard + execution state
@@ -42,7 +41,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
 
   useEffect(() => {
     onScriptRunning(pageState === 'running')
-  }, [pageState])
+  }, [pageState, onScriptRunning])
 
   useEffect(() => {
     window.electronAPI.listVms().then((result) => {
@@ -53,7 +52,12 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
   const trimmedName  = vmName.trim()
   const nameConflict = trimmedName !== '' && existingNames.includes(trimmedName)
   const step1Valid   = trimmedName !== '' && isoPath.trim() !== ''
-  const step2Valid   = ramMB >= 1024 && cpus >= 1 && cpus <= 32 && diskMB >= 10000 && vramMB >= 16 && vramMB <= 256
+
+  const ramError  = ramMB  < 1024  ? 'Minimum 1024 MB'            : null
+  const cpusError = cpus   < 1     ? 'Minimum 1'                   : cpus > 32   ? 'Maximum 32'   : null
+  const diskError = diskMB < 10000 ? 'Minimum 10000 MB (10 GB)'    : null
+  const vramError = vramMB < 16    ? 'Minimum 16 MB'               : vramMB > 256 ? 'Maximum 256 MB' : null
+  const step2Valid = !ramError && !cpusError && !diskError && !vramError
 
   async function handleCreate() {
     setPageState('running')
@@ -75,7 +79,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
       diskType,
       vramMB,
       nicType,
-      attachGuestAdditions: attachGA,
+      attachGuestAdditions: true,
       startVm: startAfter,
       forceRecreate: nameConflict,
     }
@@ -116,7 +120,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
             <div className="bg-green-900 border border-green-700 rounded-lg p-4">
               <p className="text-green-200 font-medium">VM created successfully.</p>
               <p className="text-green-300 text-sm mt-1">
-                Start the VM, then follow the setup steps on the next page.
+                Start the VM and complete the Fedora installer inside it.
               </p>
             </div>
             <LogPanel
@@ -180,33 +184,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                 <p className="text-zinc-400 text-sm mt-1">
                   Then reboot. On first boot the GNOME wizard will ask you to create your user
                   account.
-                </p>
-              </NextStep>
-              <NextStep number={2} title="Install Guest Additions and disable SELinux">
-                <p className="text-zinc-400 text-sm mb-2">Open a terminal inside the VM and run:</p>
-                <CodeBlock
-                  lines={[
-                    'sudo dnf update -y',
-                    '# If the update installed a new kernel, reboot before continuing:',
-                    'sudo reboot',
-                    '# After reboot, confirm the running kernel:',
-                    'uname -r',
-                    'sudo dnf install -y dkms kernel-devel-$(uname -r) kernel-headers gcc make perl bzip2',
-                    "sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config",
-                    'sudo mkdir -p /mnt/ga',
-                    'sudo mount /dev/sr1 /mnt/ga   # if it fails, try /dev/sr0 (run lsblk to check)',
-                    'rpm -q kernel-devel-$(uname -r)   # DKMS builds GA modules against this — must match running kernel',
-                    'sudo /mnt/ga/VBoxLinuxAdditions.run',
-                    'sudo passwd root',
-                    'sudo reboot',
-                    '# After reboot, verify SELinux is disabled:',
-                    'sestatus',
-                  ]}
-                />
-              </NextStep>
-              <NextStep number={3} title="Provision the VM">
-                <p className="text-zinc-400 text-sm">
-                  Now that Guest Additions are active, use the Provision page to install dev tools.
                 </p>
               </NextStep>
             </div>
@@ -307,6 +284,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   step={512}
                   className={ic}
                 />
+                {ramError && <p className="text-red-400 text-xs mt-1">{ramError}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">CPUs</label>
@@ -318,6 +296,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   max={32}
                   className={ic}
                 />
+                {cpusError && <p className="text-red-400 text-xs mt-1">{cpusError}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">
@@ -331,6 +310,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   step={1000}
                   className={ic}
                 />
+                {diskError && <p className="text-red-400 text-xs mt-1">{diskError}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">
@@ -344,6 +324,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   max={256}
                   className={ic}
                 />
+                {vramError && <p className="text-red-400 text-xs mt-1">{vramError}</p>}
               </div>
             </div>
 
@@ -388,19 +369,6 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={attachGA}
-                  onChange={(e) => setAttachGA(e.target.checked)}
-                  className="accent-blue-500"
-                />
-                <span className="text-sm text-zinc-300">Attach Guest Additions ISO</span>
-                <span className="text-xs text-zinc-500">
-                  (recommended — needed for clipboard, drag-and-drop, and provisioning)
-                </span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
                   checked={startAfter}
                   onChange={(e) => setStartAfter(e.target.checked)}
                   className="accent-blue-500"
@@ -438,9 +406,8 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   <ConfirmRow label="Disk Type" value={diskType} />
                 </ConfirmSection>
                 <ConfirmSection title="Options">
-                  <ConfirmRow label="Network"         value={nicType} />
-                  <ConfirmRow label="Guest Additions" value={attachGA ? 'Attach' : 'Skip'} />
-                  <ConfirmRow label="Start after"     value={startAfter ? 'Yes' : 'No'} />
+                  <ConfirmRow label="Network"     value={nicType} />
+                  <ConfirmRow label="Start after" value={startAfter ? 'Yes' : 'No'} />
                 </ConfirmSection>
               </div>
             </div>
@@ -597,14 +564,5 @@ function NextStep({ number, title, children }: NextStepProps) {
         {children}
       </div>
     </div>
-  )
-}
-
-
-function CodeBlock({ lines }: { lines: string[] }) {
-  return (
-    <pre className="bg-zinc-900 border border-zinc-700 rounded p-3 text-xs text-zinc-300 font-mono overflow-x-auto">
-      {lines.join('\n')}
-    </pre>
   )
 }
