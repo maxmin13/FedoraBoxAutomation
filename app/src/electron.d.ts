@@ -95,6 +95,7 @@ declare global {
       getVmInfo: (vmName: string) => Promise<{ ok: true; info: VmInfo } | { ok: false; error?: string }>
       checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
       checkVmCredentials: (vmName: string, vmUser: string, vmPass: string) => Promise<{ ok: boolean; isLive?: boolean; error?: string }>
+      getVmHostname: (vmName: string, vmUser: string, vmPass: string) => Promise<{ ok: boolean; hostname?: string; error?: string }>
       runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>
       runShareLogs: (params: ShareLogsParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>

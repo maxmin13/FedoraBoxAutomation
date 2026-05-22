@@ -35,21 +35,19 @@ export default function NavBar({ currentPage, onNavigate, isDev, scriptRunning =
         const isActive = item.page === currentPage
 
         // Active item gets a filled background; inactive items are muted
-        const buttonClass = [
-          'px-3 py-1 rounded text-sm font-medium transition-colors',
-          isActive
-            ? 'bg-zinc-600 text-white'
-            : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700',
-        ].join(' ')
-
         const locked = scriptRunning && item.page !== 'logs' && item.page !== scriptPage
+
+        const buttonClass = isActive
+          ? 'px-3 py-1 rounded text-sm font-medium bg-zinc-600 text-white'
+          : locked
+          ? 'px-3 py-1 rounded text-sm font-medium text-zinc-600 cursor-not-allowed'
+          : 'px-3 py-1 rounded text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors'
 
         return (
           <button
             key={item.page}
-            onClick={() => onNavigate(item.page)}
-            disabled={locked}
-            className={buttonClass + (locked ? ' opacity-50 cursor-not-allowed' : '')}
+            onClick={() => !locked && onNavigate(item.page)}
+            className={buttonClass}
           >
             {item.label}
           </button>

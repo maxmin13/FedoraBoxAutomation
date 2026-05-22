@@ -40,7 +40,7 @@ if ([string]::IsNullOrWhiteSpace($VmName))    { $VmName    = (Read-Host "VM name
 if ([string]::IsNullOrWhiteSpace($VmUser))    { $VmUser    = (Read-Host "VM root username").Trim() }
 if ([string]::IsNullOrWhiteSpace($VmPass))    { $VmPass    = (Read-Host "VM root password") }
 if ([string]::IsNullOrWhiteSpace($LoginUser)) { $LoginUser = (Read-Host "Desktop username").Trim() }
-if ([string]::IsNullOrWhiteSpace($Hostname))  { $Hostname  = (Read-Host "VM hostname").Trim() }
+if ([string]::IsNullOrWhiteSpace($Hostname) -and -not $NonInteractive) { $Hostname = (Read-Host "VM hostname (leave blank to skip)").Trim() }
 
 $script:vmName = $VmName
 $script:vmUser = $VmUser
@@ -125,13 +125,14 @@ if (Test-Path $bgLocalPath) {
     else { Write-Host " WARNING: could not upload background image" -ForegroundColor Yellow }
 }
 
-$steps = @(
-    @{ Path = Join-Path $setupRoot 'system-prep.sh';    Args = $LoginUser },
-    @{ Path = Join-Path $setupRoot 'network-config.sh'; Args = $Hostname },
-    @{ Path = Join-Path $setupRoot 'selinux-config.sh'; Args = '' },
-    @{ Path = Join-Path $setupRoot 'desktop-config.sh'; Args = "$LoginUser $bgFileName".Trim() },
-    @{ Path = Join-Path $setupRoot 'utilities.sh';      Args = '' }
-)
+$steps = [System.Collections.Generic.List[hashtable]]::new()
+$steps.Add(@{ Path = Join-Path $setupRoot 'system-prep.sh';    Args = $LoginUser })
+if (-not [string]::IsNullOrWhiteSpace($Hostname)) {
+    $steps.Add(@{ Path = Join-Path $setupRoot 'network-config.sh'; Args = $Hostname })
+}
+$steps.Add(@{ Path = Join-Path $setupRoot 'selinux-config.sh'; Args = '' })
+$steps.Add(@{ Path = Join-Path $setupRoot 'desktop-config.sh'; Args = "$LoginUser $bgFileName".Trim() })
+$steps.Add(@{ Path = Join-Path $setupRoot 'utilities.sh';      Args = '' })
 
 foreach ($step in $steps) {
     if (-not (Test-Path $step.Path)) {

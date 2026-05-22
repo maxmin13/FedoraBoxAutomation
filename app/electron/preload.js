@@ -56,6 +56,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkVmCredentials: (vmName, vmUser, vmPass) =>
     ipcRenderer.invoke('check-vm-credentials', { vmName, vmUser, vmPass }),
 
+  // Reads the current hostname from inside the guest via guestcontrol
+  getVmHostname: (vmName, vmUser, vmPass) =>
+    ipcRenderer.invoke('get-vm-hostname', { vmName, vmUser, vmPass }),
+
   // Runs a single guest script via guestcontrol and streams output to the renderer
   runProvisionScript: (params) => ipcRenderer.invoke('run-provision-script', params),
 

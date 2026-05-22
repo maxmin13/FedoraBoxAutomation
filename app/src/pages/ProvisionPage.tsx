@@ -199,7 +199,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
   const [argValues,        setArgValues]        = useState(['', ''])
+  const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
+
+  useEffect(() => {
+    if (!changeHostname || !credsVerified || hostname) return
+    window.electronAPI.getVmHostname(vm.name, vmUser, vmPass).then((result) => {
+      if (result.ok && result.hostname) setHostname(result.hostname)
+    })
+  }, [changeHostname])
 
   useEffect(() => {
     window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
@@ -243,6 +251,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           ? 'Access denied — SELinux may be blocking the connection; disable it and reboot'
         : /VERR_NOT_FOUND/i.test(raw)
           ? 'VM not found — check the VM name'
+        : /VERR_RESOURCE_BUSY/i.test(raw)
+          ? 'Guest control service is busy — the VM may be frozen. Hard-reset it from My VMs and try again.'
+        : /ETIMEDOUT|timed out/i.test(raw)
+          ? 'Connection timed out — the VM is not responding. Hard-reset it from My VMs and try again.'
         : 'Connection failed — see Logs for details'
       setCredsError(friendly)
     }
@@ -318,7 +330,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         vmUser,
         vmPass,
         loginUser,
-        hostname: hostname.trim(),
+        hostname: changeHostname ? hostname.trim() : '',
       })
     )
   }
@@ -336,7 +348,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const credsFilled   = !!vmUser && !!vmPass && !!loginUser
   const credsVerified = credsStatus === 'ok'
   const credsReady    = credsFilled && credsVerified && !isLive
-  const canRunFull    = credsReady && !!hostname.trim()
+  const canRunFull    = credsReady
   const canRunScript  = credsReady && !!selectedScript
 
   // ── Running ──────────────────────────────────────────────────────────────────
@@ -571,19 +583,27 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 ))}
               </ol>
             </div>
-            <div>
-              <label className="block text-zinc-400 text-xs mb-1">
-                Linux hostname <span className="text-red-400">*</span>
-              </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
               <input
-                type="text"
-                value={hostname}
-                onChange={(e) => setHostname(e.target.value)}
-                placeholder="e.g. fedorabox"
-                className={ic(hostname)}
+                type="checkbox"
+                checked={changeHostname}
+                onChange={(e) => setChangeHostname(e.target.checked)}
+                className="accent-indigo-500"
               />
-              <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora — not the VirtualBox VM name.</p>
-            </div>
+              Set hostname
+            </label>
+            {changeHostname && (
+              <div>
+                <input
+                  type="text"
+                  value={hostname}
+                  onChange={(e) => setHostname(e.target.value)}
+                  placeholder="e.g. fedorabox"
+                  className={ic(hostname)}
+                />
+                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora — not the VirtualBox VM name.</p>
+              </div>
+            )}
             <button
               onClick={handleRunFull}
               disabled={!canRunFull}
@@ -591,9 +611,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             >
               Run Base Setup
             </button>
-            {!canRunFull && (
-              <p className="text-zinc-500 text-xs">Enter a hostname to continue.</p>
-            )}
           </div>
         </div>
       )}

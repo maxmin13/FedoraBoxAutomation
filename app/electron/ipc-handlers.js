@@ -47,7 +47,7 @@ async function writeCredsStore(store) {
 // Channels excluded from IPC logging.
 // 'is-dev' is polled on every page load; 'read-log' returns the full file
 // content — logging it back to the log file would create a feedback loop.
-const SILENT_CHANNELS = new Set(['is-dev', 'read-log', 'check-vm-credentials'])
+const SILENT_CHANNELS = new Set(['is-dev', 'read-log', 'check-vm-credentials', 'get-vm-hostname'])
 
 function truncate(str, max = 120) {
   return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
@@ -295,6 +295,21 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── get-vm-hostname ──────────────────────────────────────
+  // Runs /bin/hostname inside the guest and returns the current hostname.
+  // Password is excluded from logs via SILENT_CHANNELS.
+  handleIpc('get-vm-hostname', async (_event, { vmName, vmUser, vmPass }) => {
+    try {
+      const output = execSync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/hostname --username "${vmUser}" --password "${vmPass}" --wait-stdout`,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 10000 }
+      )
+      return { ok: true, hostname: output.trim() }
+    } catch (error) {
+      return { ok: false, error: error.message }
+    }
+  })
+
   // ── check-vm-credentials ─────────────────────────────────
   // Tests guestcontrol credentials by running a no-op echo inside the guest.
   // Requires the VM to be running with Guest Additions installed.
@@ -305,13 +320,13 @@ function registerIpcHandlers(win) {
       // --password is unavoidable: VBoxManage guestcontrol has no stdin/env-var alternative
       execSync(
         `VBoxManage guestcontrol "${vmName}" run --exe /bin/echo --username "${vmUser}" --password "${vmPass}" --wait-stdout -- -c "echo ok"`,
-        { encoding: 'utf8', stdio: 'pipe' }
+        { encoding: 'utf8', stdio: 'pipe', timeout: 15000 }
       )
       let isLive = false
       try {
         execSync(
           `VBoxManage guestcontrol "${vmName}" run --exe /bin/test --username "${vmUser}" --password "${vmPass}" -- -d /run/initramfs/live`,
-          { encoding: 'utf8', stdio: 'pipe' }
+          { encoding: 'utf8', stdio: 'pipe', timeout: 15000 }
         )
         isLive = true
       } catch {

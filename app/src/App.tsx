@@ -1,7 +1,7 @@
 // Top-level component. Manages which page is currently shown
 // and renders the navigation bar at the top.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import NavBar from './components/NavBar'
 import LandingPage from './pages/LandingPage'
 import SetupPage from './pages/SetupPage'
@@ -19,6 +19,10 @@ export default function App() {
   const [isDev, setIsDev] = useState(false)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
+  // Set to true when a script that ran from 'landing' finishes while the user
+  // is on another page.  The next navigation to 'landing' will skip the key
+  // increment so the provision result stays visible; the one after that resets.
+  const [preserveLanding, setPreserveLanding] = useState(false)
 
   useEffect(() => {
     window.electronAPI.isDev().then(setIsDev)
@@ -27,15 +31,34 @@ export default function App() {
   const currentPageRef = useRef(currentPage)
   useEffect(() => { currentPageRef.current = currentPage }, [currentPage])
 
-  function handleScriptRunning(running: boolean) {
-    setScriptRunning(running)
-    if (running) setScriptPage(currentPageRef.current)
-    else setScriptPage(null)
-  }
+  const scriptPageRef = useRef<Page | null>(null)
+
+  const handleScriptRunning = useCallback((running: boolean) => {
+    if (running) {
+      const page = currentPageRef.current
+      scriptPageRef.current = page
+      setScriptRunning(true)
+      setScriptPage(page)
+      setPreserveLanding(false)
+    } else {
+      if (scriptPageRef.current === 'landing' && currentPageRef.current !== 'landing') {
+        setPreserveLanding(true)
+      }
+      scriptPageRef.current = null
+      setScriptRunning(false)
+      setScriptPage(null)
+    }
+  }, [])
 
   function handleNavigate(page: Page) {
-    if (page === 'landing' && !scriptRunning) {
-      setLandingKey((k) => k + 1)
+    if (page === 'landing') {
+      if (preserveLanding) {
+        // First return after script — show result, consume the flag
+        setPreserveLanding(false)
+      } else if (!scriptRunning) {
+        // Normal navigation — reset landing to VM grid
+        setLandingKey((k) => k + 1)
+      }
     }
     setCurrentPage(page)
   }
@@ -63,11 +86,9 @@ export default function App() {
               <DocsPage />
             </div>
           )}
-          {currentPage === 'logs' && (
-            <div className="h-full overflow-hidden">
-              <LogsPage />
-            </div>
-          )}
+          <div style={{ display: currentPage === 'logs' ? undefined : 'none' }} className="h-full overflow-hidden">
+            <LogsPage />
+          </div>
         </ErrorBoundary>
       </main>
     </div>
