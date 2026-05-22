@@ -35,9 +35,10 @@ describe('NavBar', () => {
 
   it('disables non-Console nav buttons when scriptRunning is true', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} scriptRunning={true} />)
-    expect(screen.getByRole('button', { name: 'My VMs' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Setup' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Create VM' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'My VMs' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('keeps Console accessible when scriptRunning is true', () => {
@@ -47,8 +48,11 @@ describe('NavBar', () => {
 
   it('keeps the script-running page button accessible during a script run', () => {
     render(<NavBar currentPage="create-vm" onNavigate={onNavigate} isDev={false} scriptRunning={true} scriptPage="create-vm" />)
-    expect(screen.getByRole('button', { name: 'Create VM' })).not.toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Setup' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
+    expect(onNavigate).toHaveBeenCalledWith('create-vm')
+    onNavigate.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('does not disable nav buttons when scriptRunning is false', () => {

@@ -273,36 +273,36 @@ describe('open-log-dir handler', () => {
 
 describe('read-doc handler', () => {
   let readDocHandler
-  let mockReadFileSync
+  let mockReadFile
 
   beforeAll(() => {
-    // Spy on fs.readFileSync before reloading the module so the fresh load picks up the spy
-    mockReadFileSync = vi.spyOn(fs, 'readFileSync')
+    // Spy on fs.promises.readFile before reloading the module so the fresh load picks up the spy
+    mockReadFile = vi.spyOn(fs.promises, 'readFile')
     readDocHandler = loadHandlers()('read-doc')
   })
 
   afterAll(() => {
-    mockReadFileSync.mockRestore()
+    mockReadFile.mockRestore()
     cleanupHandlers()
   })
 
   it('returns ok: true with the file content when the file exists', async () => {
-    mockReadFileSync.mockReturnValueOnce('# My Doc\nSome content.')
+    mockReadFile.mockResolvedValueOnce('# My Doc\nSome content.')
     const result = await readDocHandler({}, 'README.md')
     expect(result).toEqual({ ok: true, content: '# My Doc\nSome content.' })
   })
 
   it('returns ok: false with an error message when the file does not exist', async () => {
-    mockReadFileSync.mockImplementationOnce(() => { throw new Error('ENOENT: no such file or directory') })
+    mockReadFile.mockRejectedValueOnce(new Error('ENOENT: no such file or directory'))
     const result = await readDocHandler({}, 'missing.md')
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/missing\.md/)
   })
 
   it('reads from the docs/ directory (path does not traverse outside the repo)', async () => {
-    mockReadFileSync.mockReturnValueOnce('')
+    mockReadFile.mockResolvedValueOnce('')
     await readDocHandler({}, 'SETUP.md')
-    const calledPath = mockReadFileSync.mock.calls.at(-1)[0]
+    const calledPath = mockReadFile.mock.calls.at(-1)[0]
     expect(calledPath).toMatch(/docs[\\/]SETUP\.md$/)
   })
 })
@@ -402,7 +402,7 @@ describe('save-vm-credentials handler', () => {
   it('creates the credentials directory if it does not exist', async () => {
     mockReadFile.mockResolvedValueOnce('{}')
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'pw', loginUser: 'alice' })
-    expect(mockMkdir).toHaveBeenCalledWith(expect.stringContaining('.credentials'), { recursive: true })
+    expect(mockMkdir).toHaveBeenCalledWith(expect.stringContaining('.vm-data'), { recursive: true })
   })
 })
 
@@ -967,13 +967,13 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC) // showmediuminfo
     const result = await getVmInfoHandler({}, 'FedoraBox')
     expect(result.ok).toBe(true)
-    expect(result.osType).toBe('Fedora_64')
-    expect(result.state).toBe('poweroff')
-    expect(result.ramMB).toBe(4096)
-    expect(result.cpus).toBe(2)
-    expect(result.vramMB).toBe(128)
-    expect(result.nic).toBe('nat')
-    expect(result.mac).toBe('080027AABBCC')
+    expect(result.info.osType).toBe('Fedora_64')
+    expect(result.info.state).toBe('poweroff')
+    expect(result.info.ramMB).toBe(4096)
+    expect(result.info.cpus).toBe(2)
+    expect(result.info.vramMB).toBe(128)
+    expect(result.info.nic).toBe('nat')
+    expect(result.info.mac).toBe('080027AABBCC')
   })
 
   it('derives logSyncPath from the CfgFile directory', async () => {
@@ -982,8 +982,8 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce('')
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.logSyncPath).toMatch(/FedoraBox/)
-    expect(result.logSyncPath).toMatch(/guest-logs/)
+    expect(result.info.logSyncPath).toMatch(/FedoraBox/)
+    expect(result.info.logSyncPath).toMatch(/guest-logs/)
   })
 
   it('returns diskCapacityMB and diskType from showmediuminfo', async () => {
@@ -992,8 +992,8 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce('')
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.diskCapacityMB).toBe(51200)
-    expect(result.diskType).toBe('dynamic')
+    expect(result.info.diskCapacityMB).toBe(51200)
+    expect(result.info.diskType).toBe('dynamic')
   })
 
   it('returns diskType "fixed" when showmediuminfo reports fixed variant', async () => {
@@ -1002,7 +1002,7 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce('')
       .mockReturnValueOnce(MEDIUM_INFO_FIXED)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.diskType).toBe('fixed')
+    expect(result.info.diskType).toBe('fixed')
   })
 
   it('returns shared folders with mountPoint merged from plain showvminfo', async () => {
@@ -1011,8 +1011,8 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce(MR_WITH_SF)
       .mockReturnValueOnce(plainWithSf)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.sharedFolders).toHaveLength(1)
-    expect(result.sharedFolders[0]).toMatchObject({
+    expect(result.info.sharedFolders).toHaveLength(1)
+    expect(result.info.sharedFolders[0]).toMatchObject({
       name:       'vbox-share',
       hostPath:   'C:\\Work\\shared',
       mountPoint: '/mnt/shared',
@@ -1026,7 +1026,7 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
       .mockReturnValueOnce('Value: 7.0.14\n')  // guestproperty
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.gaVersion).toBe('7.0.14')
+    expect(result.info.gaVersion).toBe('7.0.14')
   })
 
   it('returns gaVersion: null when VM is stopped (skips guestproperty call)', async () => {
@@ -1035,7 +1035,7 @@ describe('get-vm-info handler', () => {
       .mockReturnValueOnce('')
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.gaVersion).toBeNull()
+    expect(result.info.gaVersion).toBeNull()
     const cmdsCalled = mockExecSync.mock.calls.map(([cmd]) => cmd)
     expect(cmdsCalled.some(c => c.includes('guestproperty'))).toBe(false)
   })

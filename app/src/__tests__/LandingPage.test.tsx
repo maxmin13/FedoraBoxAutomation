@@ -124,6 +124,8 @@ describe('VM list', () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Stop VM' }))
+    await act(async () => {})
     expect(window.electronAPI.stopVm).toHaveBeenCalledWith('RunningVM')
   })
 

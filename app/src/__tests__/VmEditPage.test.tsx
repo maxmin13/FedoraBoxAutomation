@@ -7,18 +7,20 @@ const RUNNING_VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 
 const SAMPLE_INFO = {
   ok: true,
-  osType: 'Fedora_64',
-  state: 'poweroff',
-  ramMB: 4096,
-  cpus: 2,
-  vramMB: 128,
-  diskCapacityMB: 51200,
-  diskType: 'dynamic',
-  nic: 'nat',
-  mac: '080027AABBCC',
-  sharedFolders: [],
-  gaVersion: null,
-  logSyncPath: 'C:\\VMs\\FedoraBox\\guest-logs',
+  info: {
+    osType: 'Fedora_64',
+    state: 'poweroff',
+    ramMB: 4096,
+    cpus: 2,
+    vramMB: 128,
+    diskCapacityMB: 51200,
+    diskType: 'dynamic',
+    nic: 'nat',
+    mac: '080027AABBCC',
+    sharedFolders: [],
+    gaVersion: null,
+    logSyncPath: 'C:\\VMs\\FedoraBox\\guest-logs',
+  },
 }
 
 beforeEach(() => {
@@ -172,8 +174,11 @@ describe('VmEditPage', () => {
 
   it('shows host folder and VM mount point when folders are configured', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
-      ...SAMPLE_INFO,
-      sharedFolders: [{ name: 'vbox-share', hostPath: 'C:\\Work\\shared', mountPoint: '/home/user/shared', existsOnHost: true }],
+      ok: true,
+      info: {
+        ...SAMPLE_INFO.info,
+        sharedFolders: [{ name: 'vbox-share', hostPath: 'C:\\Work\\shared', mountPoint: '/home/user/shared', existsOnHost: true }],
+      },
     })
     render(<VmEditPage vm={STOPPED_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => {
@@ -205,9 +210,12 @@ describe('VmEditPage', () => {
 
   it('shows the actual GA version when VM is running with Guest Additions', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
-      ...SAMPLE_INFO,
-      state: 'running',
-      gaVersion: '7.0.14',
+      ok: true,
+      info: {
+        ...SAMPLE_INFO.info,
+        state: 'running',
+        gaVersion: '7.0.14',
+      },
     })
     render(<VmEditPage vm={RUNNING_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('7.0.14')).toBeInTheDocument())
@@ -215,9 +223,12 @@ describe('VmEditPage', () => {
 
   it('shows "Not installed" when VM is running but Guest Additions are absent', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
-      ...SAMPLE_INFO,
-      state: 'running',
-      gaVersion: null,
+      ok: true,
+      info: {
+        ...SAMPLE_INFO.info,
+        state: 'running',
+        gaVersion: null,
+      },
     })
     render(<VmEditPage vm={RUNNING_VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Not installed')).toBeInTheDocument())
