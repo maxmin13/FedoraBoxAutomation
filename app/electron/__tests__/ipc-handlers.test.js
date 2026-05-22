@@ -404,6 +404,20 @@ describe('save-vm-credentials handler', () => {
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'pw', loginUser: 'alice' })
     expect(mockMkdir).toHaveBeenCalledWith(expect.stringContaining('.vm-data'), { recursive: true })
   })
+
+  it('preserves the existing loginUser when the new value is empty', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'old', loginUser: 'fedora' } }))
+    await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'new', loginUser: '' })
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    expect(written.FedoraBox.loginUser).toBe('fedora')
+  })
+
+  it('overwrites loginUser when the new value is non-empty', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'old', loginUser: 'olduser' } }))
+    await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'new', loginUser: 'newuser' })
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    expect(written.FedoraBox.loginUser).toBe('newuser')
+  })
 })
 
 // ── check-vm-ready handler ────────────────────────────────────────────────────

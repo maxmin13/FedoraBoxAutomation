@@ -395,7 +395,8 @@ function registerIpcHandlers(win) {
   // ── save-vm-credentials ──────────────────────────────────
   handleIpc('save-vm-credentials', async (_event, { vmName, user, pass, loginUser }) => {
     const store = await readCredsStore()
-    store[vmName] = { user, pass, loginUser }
+    const existing = store[vmName] ?? {}
+    store[vmName] = { user, pass, loginUser: loginUser || existing.loginUser || '' }
     await writeCredsStore(store)
     return { ok: true }
   })
