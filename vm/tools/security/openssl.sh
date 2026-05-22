@@ -2,15 +2,22 @@
 
 ##
 ## Description: Installs build dependencies and builds OpenSSL 3.3.2 from
-##              source to /usr/local/ssl. Adds it to the login user's PATH
-##              in ~/.bash_profile. Skips the build if already installed.
-## Usage:       sudo ./openssl.sh <login-user>
+##              source to /usr/local/ssl. Adds /usr/local/ssl/bin to the
+##              login user's PATH in ~/.bash_profile. The binary is built
+##              with RPATH so it finds its own libraries without touching the
+##              system linker cache (ldconfig), keeping system tools unaffected.
+##              Skips the build if the same version is already installed; exits
+##              with code 2 if a different version is found (pass --force to
+##              overwrite) or if the openssl-libs RPM is already installed.
+## Usage:       sudo ./openssl.sh <login-user> [--force]
 ## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
+##              $2  --force       Overwrite an existing installation (optional)
 ##
 
 source /tmp/common.sh
 
 LOGIN_USER="${1:-}"
+FORCE="${2:-}"
 require_login_user "${LOGIN_USER}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 OPENSSL_VERSION="3.3.2"
@@ -20,14 +27,24 @@ OPENSSL_DIR="/usr/local/ssl"
 STEP "OpenSSL"
 ####
 
-dnf groupinstall -y "Development Tools"
-dnf install -y perl-core zlib-devel
-
 if [[ -x "${OPENSSL_DIR}/bin/openssl" ]] && \
    "${OPENSSL_DIR}/bin/openssl" version 2>/dev/null | grep -q "${OPENSSL_VERSION}"
 then
-    log_info "OpenSSL ${OPENSSL_VERSION} already installed."
+    log_info "OpenSSL ${OPENSSL_VERSION} already installed at ${OPENSSL_DIR}. Nothing to do."
+elif [[ -x "${OPENSSL_DIR}/bin/openssl" ]] && [[ "${FORCE}" != "--force" ]]; then
+    EXISTING=$("${OPENSSL_DIR}/bin/openssl" version 2>/dev/null || echo "unknown version")
+    log_error "A different version of OpenSSL is already installed at ${OPENSSL_DIR} (${EXISTING}). Use 'Install anyway' to replace it."
+    exit 2
+elif rpm -q openssl-libs &>/dev/null && [[ "${FORCE}" != "--force" ]]; then
+    EXISTING=$(rpm -q openssl-libs --queryformat '%{VERSION}' 2>/dev/null || echo "unknown version")
+    log_error "System OpenSSL libraries are already installed (openssl-libs ${EXISTING}). Use 'Install anyway' to add OpenSSL ${OPENSSL_VERSION} at ${OPENSSL_DIR} alongside it."
+    exit 2
 else
+    if ! dnf install -y gcc make perl-core zlib-devel; then
+        log_error "Failed to install build dependencies. Check the log above for details."
+        exit 1
+    fi
+
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
@@ -39,15 +56,11 @@ else
     tar -xf "${WORK_DIR}/openssl.tar.gz" -C "${WORK_DIR}"
     cd "${WORK_DIR}/openssl-${OPENSSL_VERSION}"
 
-    ./config --prefix="${OPENSSL_DIR}" --openssldir="${OPENSSL_DIR}" shared zlib
+    ./config --prefix="${OPENSSL_DIR}" --openssldir="${OPENSSL_DIR}" shared zlib \
+        -Wl,-rpath,"${OPENSSL_DIR}/lib64"
 
     make -j"$(nproc)"
     make install
-
-    rm -f "/etc/ld.so.conf.d/openssl-${OPENSSL_VERSION}.conf"
-    echo "${OPENSSL_DIR}/lib64" > "/etc/ld.so.conf.d/openssl-${OPENSSL_VERSION}.conf"
-
-    ldconfig -v
 
     if ! grep -q "openssl" "${HOME_DIR}/.bash_profile"; then
         {
@@ -60,6 +73,70 @@ else
     log_info "OpenSSL ${OPENSSL_VERSION} successfully installed."
 fi
 
-log_info "Version : ${OPENSSL_DIR}/bin/openssl version"
+####
+STEP "Sanity checks"
+####
+
+FAIL=0
+
+if [[ ! -x "${OPENSSL_DIR}/bin/openssl" ]]; then
+    log_error "Binary not found: ${OPENSSL_DIR}/bin/openssl"
+    FAIL=1
+else
+    INSTALLED=$("${OPENSSL_DIR}/bin/openssl" version 2>/dev/null || true)
+    if echo "${INSTALLED}" | grep -q "${OPENSSL_VERSION}"; then
+        log_info "Binary  : ${INSTALLED}"
+    else
+        log_error "Version mismatch: expected ${OPENSSL_VERSION}, got '${INSTALLED}'"
+        FAIL=1
+    fi
+fi
+
+if [[ ! -f "${OPENSSL_DIR}/openssl.cnf" ]]; then
+    log_error "Config not found: ${OPENSSL_DIR}/openssl.cnf"
+    FAIL=1
+else
+    log_info "Config  : ${OPENSSL_DIR}/openssl.cnf"
+fi
+
+if echo "sanity" | "${OPENSSL_DIR}/bin/openssl" dgst -sha256 &>/dev/null; then
+    log_info "SHA-256 : OK"
+else
+    log_error "SHA-256 digest test failed — RPATH or library issue"
+    FAIL=1
+fi
+
+RPATH_LIB=$(ldd "${OPENSSL_DIR}/bin/openssl" 2>/dev/null | grep libssl | awk '{print $3}')
+if echo "${RPATH_LIB}" | grep -q "${OPENSSL_DIR}/lib64"; then
+    log_info "RPATH   : libssl loaded from ${RPATH_LIB}"
+else
+    log_error "RPATH broken: libssl resolved to '${RPATH_LIB}' instead of ${OPENSSL_DIR}/lib64"
+    FAIL=1
+fi
+
+if echo "test" | "${OPENSSL_DIR}/bin/openssl" enc -aes-256-cbc -pbkdf2 -pass pass:x 2>/dev/null \
+    | "${OPENSSL_DIR}/bin/openssl" enc -d -aes-256-cbc -pbkdf2 -pass pass:x 2>/dev/null \
+    | grep -q "test"; then
+    log_info "AES-256 : encrypt/decrypt roundtrip OK"
+else
+    log_error "AES-256 encrypt/decrypt roundtrip failed"
+    FAIL=1
+fi
+
+if "${OPENSSL_DIR}/bin/openssl" req -x509 -newkey rsa:2048 -nodes -days 1 \
+    -keyout /dev/null -out /tmp/openssl-sanity.crt \
+    -subj "/CN=sanity-check" &>/dev/null; then
+    log_info "RSA/X509: self-signed certificate OK"
+    rm -f /tmp/openssl-sanity.crt
+else
+    log_error "Self-signed certificate generation failed"
+    FAIL=1
+fi
+
+if [[ "${FAIL}" -eq 1 ]]; then
+    log_error "One or more sanity checks failed."
+    exit 1
+fi
+
 log_info "Install : ${OPENSSL_DIR}"
-log_info "Config  : ${OPENSSL_DIR}/openssl.cnf"
+log_info "All sanity checks passed."

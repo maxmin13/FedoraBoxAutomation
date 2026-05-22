@@ -95,7 +95,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Security', dir: 'security',
     scripts: [
-      { name: 'openssl.sh', label: 'OpenSSL', relPath: 'openssl.sh', description: 'OpenSSL compiled from source', argType: 'user' },
+      { name: 'openssl.sh', label: 'OpenSSL 3.3.2', relPath: 'openssl.sh', description: 'OpenSSL 3.3.2 built from source to /usr/local/ssl; adds /usr/local/ssl/bin to PATH in ~/.bash_profile', argType: 'user' },
     ],
   },
   {
@@ -183,8 +183,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showLog,      setShowLog]      = useState(false)
   const [runningLabel, setRunningLabel] = useState('')
 
-  const [showSetupGuide, setShowSetupGuide] = useState(false)
-  const setupGuideRef = useRef<HTMLDivElement>(null)
+  const [showSetupGuide,  setShowSetupGuide]  = useState(false)
+  const [forceConfirm,    setForceConfirm]    = useState(false)
+  const setupGuideRef        = useRef<HTMLDivElement>(null)
+  const forceConfirmNeededRef = useRef(false)
 
   useEffect(() => {
     if (!showSetupGuide) return
@@ -279,13 +281,26 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setSuccess(null)
     setError(null)
     setShowLog(true)
+    forceConfirmNeededRef.current = false
 
-    const unsubLine = window.electronAPI.onScriptLine((line) =>
+    const unsubLine = window.electronAPI.onScriptLine((line) => {
       setLines((prev) => [...prev, line])
-    )
+      if (/Use 'Install anyway'/i.test(line.text)) {
+        forceConfirmNeededRef.current = true
+      }
+    })
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
       if (exitCode === 0 && loginUser) {
         window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
+      }
+      if (forceConfirmNeededRef.current && selectedScript?.name === 'openssl.sh') {
+        setForceConfirm(true)
+        setSuccess(false)
+        setPageState('done')
+        setShowLog(false)
+        unsubLine()
+        unsubDone()
+        return
       }
       setSuccess(exitCode === 0)
       setPageState('done')
@@ -311,6 +326,22 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     if (!selectedScript || !selectedCategory) return
     setRunningLabel(selectedScript.label)
     const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser)
+    await startRun(() =>
+      window.electronAPI.runProvisionScript({
+        vmName:      vm.name,
+        vmUser,
+        vmPass,
+        loginUser,
+        scriptRelPath: `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
+        scriptArgs,
+      })
+    )
+  }
+
+  async function handleRunForce() {
+    if (!selectedScript || !selectedCategory) return
+    setForceConfirm(false)
+    const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + ' --force'
     await startRun(() =>
       window.electronAPI.runProvisionScript({
         vmName:      vm.name,
@@ -379,7 +410,33 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           </div>
         )}
 
-        {success === false && (
+        {forceConfirm && (
+          <div className="bg-amber-950 border border-amber-700 rounded-lg p-4 space-y-3 shrink-0">
+            <p className="text-amber-200 font-medium">OpenSSL is already installed on this system</p>
+            {error && <p className="text-amber-300 text-sm">{error}</p>}
+            <ul className="text-amber-400 text-xs space-y-1 list-disc list-inside">
+              <li>System tools (curl, wget, sshd) may silently link against the new libraries</li>
+              <li>dnf update will not patch /usr/local/ssl — you must rebuild manually when CVEs drop</li>
+              <li>The system OpenSSL still wins in the terminal unless PATH is manually adjusted</li>
+            </ul>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRunForce}
+                className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
+              >
+                Install anyway
+              </button>
+              <button
+                onClick={() => setForceConfirm(false)}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!forceConfirm && success === false && (
           <div className="bg-red-900 border border-red-700 rounded-lg p-4 space-y-1 shrink-0">
             <p className="text-red-200 font-medium">{runningLabel} failed.</p>
             {error
