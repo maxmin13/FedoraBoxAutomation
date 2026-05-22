@@ -291,7 +291,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (/Use 'Install anyway'/i.test(line.text)) {
         forceConfirmNeededRef.current = true
       }
-      if (/already installed/i.test(line.text)) {
+      if (/\[INFO\s*\].*already installed/i.test(line.text)) {
         alreadyInstalledRef.current = true
       }
     })
@@ -465,8 +465,17 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
         <div className="mt-auto flex justify-between shrink-0">
           <button
-            onClick={() => {
-              if (!success) { setLoginUser(''); setArgValues(['', '']) }
+            onClick={async () => {
+              if (!success) {
+                const saved = await window.electronAPI.loadVmCredentials(vm.name)
+                if (saved.ok) {
+                  if (saved.user)  setVmUser(saved.user)
+                  if (saved.pass)  setVmPass(saved.pass)
+                  setLoginUser(saved.loginUser ?? '')
+                } else {
+                  setLoginUser('')
+                }
+              }
               setAlreadyInstalled(false)
               setPageState('idle')
               setIdleView('categories')

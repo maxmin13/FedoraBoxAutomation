@@ -43,12 +43,12 @@ then
 fi
 
 sudo -u "${LOGIN_USER}" sg docker -c "minikube config set driver ${DRIVER_NM}"
-sudo -u "${LOGIN_USER}" sg docker -c "minikube addons enable metrics-server"
 sudo -u "${LOGIN_USER}" sg docker -c "minikube version"
 sudo -u "${LOGIN_USER}" sg docker -c "minikube config view"
 
 log_info "minikube driver set to ${DRIVER_NM} for ${LOGIN_USER}."
 log_info 'Commands: minikube start --force | stop | status | dashboard | logs'
+log_info "To enable metrics-server after first start: minikube addons enable metrics-server"
 
 ####
 STEP "kubectl"
