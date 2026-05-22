@@ -1172,3 +1172,178 @@ describe('run-share-logs handler', () => {
     expect(result.errorDetail).toBe('crontab write failed')
   })
 })
+
+// ── extractError — Script exited with code filtering ─────────────────────────
+
+describe('extractError — Script exited with code filtering', () => {
+  let runShareFolderHandler
+  let mockRunScript
+
+  const PARAMS = {
+    vmName:     'FedoraBox',
+    hostPath:   'C:\\Work\\shared',
+    mountPoint: '/mnt/shared',
+    vmUser:     'root',
+    vmPass:     'secret',
+    loginUser:  'fedora',
+  }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runShareFolderHandler = loadHandlers()('run-share-folder')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockRunScript.mockReset()
+  })
+
+  it('prefers a specific ERROR: line over the generic Script exited with code message', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: "ERROR: Desktop user 'badname' does not exist on this system.", source: 'stdout' })
+      onLine({ text: '  ERROR: Script exited with code 1', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runShareFolderHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe("Desktop user 'badname' does not exist on this system.")
+  })
+})
+
+// ── run-provision-script handler ──────────────────────────────────────────────
+
+describe('run-provision-script handler', () => {
+  let runProvisionScriptHandler
+  let mockRunScript
+
+  const PARAMS = {
+    vmName:        'FedoraBox',
+    vmUser:        'root',
+    vmPass:        'secret',
+    loginUser:     'fedora',
+    scriptRelPath: 'tools/editors/vim.sh',
+    scriptArgs:    'fedora',
+  }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runProvisionScriptHandler = loadHandlers()('run-provision-script')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockRunScript.mockReset()
+  })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await runProvisionScriptHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns errorDetail from the last ERROR: prefixed line on failure', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'Installing vim...', source: 'stdout' })
+      onLine({ text: 'ERROR: guest control failed', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runProvisionScriptHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('guest control failed')
+  })
+
+  it('passes -ScriptArgs when params.scriptArgs is set', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    await runProvisionScriptHandler({}, PARAMS)
+    const psArgs = mockRunScript.mock.calls[0][1]
+    const idx = psArgs.indexOf('-ScriptArgs')
+    expect(idx).toBeGreaterThan(-1)
+    expect(psArgs[idx + 1]).toBe('fedora')
+  })
+
+  it('omits -ScriptArgs when params.scriptArgs is falsy', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const paramsNoArgs = { ...PARAMS, scriptArgs: '' }
+    await runProvisionScriptHandler({}, paramsNoArgs)
+    const psArgs = mockRunScript.mock.calls[0][1]
+    expect(psArgs).not.toContain('-ScriptArgs')
+  })
+})
+
+// ── run-provision-full handler ────────────────────────────────────────────────
+
+describe('run-provision-full handler', () => {
+  let runProvisionFullHandler
+  let mockRunScript
+
+  const PARAMS = {
+    vmName:    'FedoraBox',
+    vmUser:    'root',
+    vmPass:    'secret',
+    loginUser: 'fedora',
+    hostname:  'myhost',
+  }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runProvisionFullHandler = loadHandlers()('run-provision-full')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockRunScript.mockReset()
+  })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await runProvisionFullHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns errorDetail from the last ERROR: prefixed line on failure', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'Running base setup...', source: 'stdout' })
+      onLine({ text: 'ERROR: system prep failed', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runProvisionFullHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.errorDetail).toBe('system prep failed')
+  })
+
+  it('passes -Hostname in the PowerShell args', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    await runProvisionFullHandler({}, PARAMS)
+    const psArgs = mockRunScript.mock.calls[0][1]
+    const idx = psArgs.indexOf('-Hostname')
+    expect(idx).toBeGreaterThan(-1)
+    expect(psArgs[idx + 1]).toBe('myhost')
+  })
+})
