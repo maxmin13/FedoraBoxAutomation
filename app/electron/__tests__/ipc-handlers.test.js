@@ -1361,3 +1361,357 @@ describe('run-provision-full handler', () => {
     expect(psArgs[idx + 1]).toBe('myhost')
   })
 })
+
+// ── is-dev handler ────────────────────────────────────────────────────────────
+
+describe('is-dev handler', () => {
+  let isDevHandler
+
+  beforeAll(() => {
+    isDevHandler = loadHandlers()('is-dev')
+  })
+
+  afterAll(() => cleanupHandlers())
+
+  it('returns true when NODE_ENV is not "production"', async () => {
+    const original = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    try {
+      expect(await isDevHandler({})).toBe(true)
+    } finally {
+      process.env.NODE_ENV = original
+    }
+  })
+
+  it('returns false when NODE_ENV is "production"', async () => {
+    const original = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      expect(await isDevHandler({})).toBe(false)
+    } finally {
+      process.env.NODE_ENV = original
+    }
+  })
+})
+
+// ── get-vm-hostname handler ───────────────────────────────────────────────────
+
+describe('get-vm-hostname handler', () => {
+  let getVmHostnameHandler
+  let mockExecSync
+
+  const PARAMS = { vmName: 'FedoraBox', vmUser: 'root', vmPass: 'secret' }
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    getVmHostnameHandler = loadHandlers()('get-vm-hostname')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => { mockExecSync.mockReset() })
+
+  it('returns the trimmed hostname on success', async () => {
+    mockExecSync.mockReturnValue('fedorabox\n')
+    const result = await getVmHostnameHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true, hostname: 'fedorabox' })
+  })
+
+  it('includes the VM name in the VBoxManage command', async () => {
+    mockExecSync.mockReturnValue('fedorabox\n')
+    await getVmHostnameHandler({}, PARAMS)
+    expect(mockExecSync.mock.calls[0][0]).toContain('FedoraBox')
+  })
+
+  it('returns ok: false when VBoxManage throws', async () => {
+    mockExecSync.mockImplementation(() => { throw new Error('VM not found') })
+    const result = await getVmHostnameHandler({}, PARAMS)
+    expect(result).toEqual({ ok: false, error: 'VM not found' })
+  })
+})
+
+// ── check-vm-credentials handler ─────────────────────────────────────────────
+
+describe('check-vm-credentials handler', () => {
+  let checkVmCredsHandler
+  let mockExecSync
+
+  const PARAMS = { vmName: 'FedoraBox', vmUser: 'root', vmPass: 'secret' }
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    checkVmCredsHandler = loadHandlers()('check-vm-credentials')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => { mockExecSync.mockReset() })
+
+  it('returns ok: true, isLive: false when credentials are valid and the live directory is absent', async () => {
+    mockExecSync.mockReturnValueOnce('ok\n')
+    mockExecSync.mockImplementationOnce(() => { throw new Error('exit 1') })
+    const result = await checkVmCredsHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true, isLive: false })
+  })
+
+  it('returns ok: true, isLive: true when the live OS directory exists', async () => {
+    mockExecSync.mockReturnValueOnce('ok\n')
+    mockExecSync.mockReturnValueOnce('')
+    const result = await checkVmCredsHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true, isLive: true })
+  })
+
+  it('returns ok: false when credentials are wrong, using stderr for the error message', async () => {
+    const err = new Error('Authentication failed')
+    err.stderr = 'VBoxManage: error: Could not authenticate'
+    mockExecSync.mockImplementation(() => { throw err })
+    const result = await checkVmCredsHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('VBoxManage: error: Could not authenticate')
+  })
+
+  it('falls back to error.message when stderr is absent', async () => {
+    mockExecSync.mockImplementation(() => { throw new Error('Timed out') })
+    const result = await checkVmCredsHandler({}, PARAMS)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('Timed out')
+  })
+
+  it('returns "Connection failed" when no error detail is available', async () => {
+    const err = new Error('')
+    mockExecSync.mockImplementation(() => { throw err })
+    const result = await checkVmCredsHandler({}, PARAMS)
+    expect(result).toEqual({ ok: false, error: 'Connection failed' })
+  })
+})
+
+// ── run-sanity-checks handler ─────────────────────────────────────────────────
+
+describe('run-sanity-checks handler', () => {
+  let runSanityChecksHandler
+  let mockRunScript
+
+  const sampleChecks = [
+    { id: 'ram', label: 'RAM', status: 'pass', detail: '16 GB' },
+  ]
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    runSanityChecksHandler = loadHandlers()('run-sanity-checks')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => { mockRunScript.mockReset() })
+
+  it('returns ok: true with parsed checks when the script succeeds', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: JSON.stringify(sampleChecks), source: 'stdout' })
+      onDone(0)
+    })
+    const result = await runSanityChecksHandler({})
+    expect(result.ok).toBe(true)
+    expect(result.checks).toEqual(sampleChecks)
+  })
+
+  it('passes -Json to the script', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: JSON.stringify(sampleChecks), source: 'stdout' })
+      onDone(0)
+    })
+    await runSanityChecksHandler({})
+    expect(mockRunScript.mock.calls[0][1]).toContain('-Json')
+  })
+
+  it('returns ok: false with checks: [] when output cannot be parsed', async () => {
+    mockRunScript.mockImplementation((_p, _a, onLine, onDone) => {
+      onLine({ text: 'not json output at all', source: 'stdout' })
+      onDone(1)
+    })
+    const result = await runSanityChecksHandler({})
+    expect(result.ok).toBe(false)
+    expect(result.checks).toEqual([])
+    expect(result.error).toMatch(/Could not parse/)
+  })
+})
+
+// ── create-vm handler ─────────────────────────────────────────────────────────
+
+describe('create-vm handler', () => {
+  let createVmHandler
+  let mockRunScript
+
+  const PARAMS = {
+    vmName:              'FedoraBox',
+    isoPath:             'C:\\Downloads\\fedora.iso',
+    ramMB:               4096,
+    cpus:                2,
+    diskMB:              30720,
+    diskType:            'dynamic',
+    vramMB:              128,
+    nicType:             'nat',
+    attachGuestAdditions: true,
+    startVm:             true,
+    forceRecreate:       false,
+  }
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    createVmHandler = loadHandlers()('create-vm')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => { mockRunScript.mockReset() })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await createVmHandler({}, PARAMS)
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns ok: false when the script exits non-zero', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(1))
+    const result = await createVmHandler({}, PARAMS)
+    expect(result).toEqual({ ok: false })
+  })
+
+  it('passes -vmName and -isoPath in the PowerShell args', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    await createVmHandler({}, PARAMS)
+    const psArgs = mockRunScript.mock.calls[0][1]
+    expect(psArgs).toContain('-vmName')
+    expect(psArgs).toContain('FedoraBox')
+    expect(psArgs).toContain('-isoPath')
+    expect(psArgs).toContain('C:\\Downloads\\fedora.iso')
+  })
+
+  it('passes -vmFolder when provided', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    await createVmHandler({}, { ...PARAMS, vmFolder: 'D:\\VMs' })
+    const psArgs = mockRunScript.mock.calls[0][1]
+    expect(psArgs).toContain('-vmFolder')
+    expect(psArgs).toContain('D:\\VMs')
+  })
+
+  it('omits -vmFolder when not provided', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    await createVmHandler({}, PARAMS)
+    const psArgs = mockRunScript.mock.calls[0][1]
+    expect(psArgs).not.toContain('-vmFolder')
+  })
+})
+
+// ── install-virtualbox handler ────────────────────────────────────────────────
+
+describe('install-virtualbox handler', () => {
+  let installVirtualBoxHandler
+  let mockRunScript
+
+  beforeAll(() => {
+    mockRunScript = vi.fn()
+    const srId = require.resolve('../script-runner')
+    require.cache[srId] = {
+      id: srId, filename: srId, loaded: true,
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+    }
+    installVirtualBoxHandler = loadHandlers()('install-virtualbox')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('../script-runner')]
+    cleanupHandlers()
+  })
+
+  beforeEach(() => { mockRunScript.mockReset() })
+
+  it('returns ok: true when the script exits 0', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
+    const result = await installVirtualBoxHandler({})
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns ok: false when the script exits non-zero', async () => {
+    mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(1))
+    const result = await installVirtualBoxHandler({})
+    expect(result).toEqual({ ok: false })
+  })
+})
+
+// ── log-error handler ─────────────────────────────────────────────────────────
+
+describe('log-error handler', () => {
+  let logErrorHandler
+  let mockLogError
+
+  beforeAll(() => {
+    mockLogError = vi.fn()
+    const logId = require.resolve('../logger')
+    const loggerStub = {
+      id: logId, filename: logId, loaded: true,
+      exports: {
+        LOG_DIR:  'C:\\fake\\logs',
+        info:     vi.fn(),
+        warn:     vi.fn(),
+        error:    mockLogError,
+        hostLine: vi.fn(),
+        hostMark: vi.fn(),
+      },
+    }
+    logErrorHandler = loadHandlers({}, { [logId]: loggerStub })('log-error')
+  })
+
+  afterAll(() => {
+    cleanupHandlers([require.resolve('../logger')])
+  })
+
+  beforeEach(() => { mockLogError.mockReset() })
+
+  it('logs the error message', async () => {
+    await logErrorHandler({}, 'Something went wrong', 'Error: at line 1')
+    expect(mockLogError).toHaveBeenCalledWith('[renderer] uncaught error:', 'Something went wrong')
+  })
+
+  it('logs the stack trace when provided', async () => {
+    await logErrorHandler({}, 'Something went wrong', 'Error: at line 1')
+    expect(mockLogError).toHaveBeenCalledWith('[renderer] stack:', 'Error: at line 1')
+  })
+
+  it('does not log a stack line when stack is null', async () => {
+    await logErrorHandler({}, 'Something went wrong', null)
+    expect(mockLogError).toHaveBeenCalledTimes(1)
+    expect(mockLogError).toHaveBeenCalledWith('[renderer] uncaught error:', 'Something went wrong')
+  })
+})

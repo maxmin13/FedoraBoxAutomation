@@ -26,3 +26,7 @@
 # openssl if the install fails, how do we roll back? should we give the user the possibility to roll back?
 
 # in case of script error, give the user to rollback, at least for openssl
+
+# when stopping a vm, change the status to stopping
+
+# check why in the detail, C:\Users\maxmi\VirtualBox VMs\Fedora test ga\guest-logs is shown as a shared folder
