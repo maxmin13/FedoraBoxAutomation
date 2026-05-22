@@ -16,6 +16,9 @@
 param(
     [string]$VmName        = '',
     [string]$HostPath      = '',
+    [string]$VmUser        = '',
+    [string]$VmPass        = '',
+    [string]$LoginUser     = '',
     [switch]$NonInteractive
 )
 
@@ -76,19 +79,33 @@ if (-not (Test-Path $HostPath)) {
 # ---------------------------------------------------------------------------
 Write-Header "Step 1 - Mount Shared Folder"
 
-& "$PSScriptRoot\share-folder.ps1" -VmName $VmName -HostPath $HostPath -MountPoint "/mnt/log" -NonInteractive:$NonInteractive
+$shareFolderArgs = @{
+    VmName     = $VmName
+    HostPath   = $HostPath
+    MountPoint = '/mnt/log'
+}
+if ($VmUser)         { $shareFolderArgs['VmUser']         = $VmUser    }
+if ($VmPass)         { $shareFolderArgs['VmPass']         = $VmPass    }
+if ($LoginUser)      { $shareFolderArgs['LoginUser']      = $LoginUser  }
+if ($NonInteractive) { $shareFolderArgs['NonInteractive'] = $true       }
+& "$PSScriptRoot\share-folder.ps1" @shareFolderArgs
 if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: share-folder.ps1 failed." -ForegroundColor Red; exit 1 }
 
 # ---------------------------------------------------------------------------
 Write-Header "Step 2 - Install Log Sync Timer"
 
-$creds = Get-VmCredentials -VmName $VmName
-if (-not $creds) {
-    Write-Host "  ERROR: No saved credentials for '$VmName'." -ForegroundColor Red
-    exit 1
+if ([string]::IsNullOrWhiteSpace($VmUser) -or [string]::IsNullOrWhiteSpace($VmPass)) {
+    $creds = Get-VmCredentials -VmName $VmName
+    if (-not $creds) {
+        Write-Host "  ERROR: No credentials supplied or saved for '$VmName'." -ForegroundColor Red
+        exit 1
+    }
+    $vmUser = $creds.User
+    $vmPass = $creds.Pass
+} else {
+    $vmUser = $VmUser
+    $vmPass = $VmPass
 }
-$vmUser = $creds.User
-$vmPass = $creds.Pass
 
 $setupScript = @'
 #!/bin/bash

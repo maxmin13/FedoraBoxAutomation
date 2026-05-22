@@ -12,13 +12,15 @@ interface ShareLogsPageProps {
 type PageState = 'idle' | 'running' | 'done'
 
 export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogsPageProps) {
-  const [hostPath,        setHostPath]        = useState('')
-  const [pageState,       setPageState]       = useState<PageState>('idle')
-  const [lines,           setLines]           = useState<ScriptLine[]>([])
-  const [success,         setSuccess]         = useState<boolean | null>(null)
-  const [error,           setError]           = useState<string | null>(null)
-  const [showLog,         setShowLog]         = useState(false)
-  const [hasCredentials,  setHasCredentials]  = useState<boolean | null>(null)
+  const [hostPath,   setHostPath]   = useState('')
+  const [vmUser,     setVmUser]     = useState('')
+  const [vmPass,     setVmPass]     = useState('')
+  const [loginUser,  setLoginUser]  = useState('')
+  const [pageState,  setPageState]  = useState<PageState>('idle')
+  const [lines,      setLines]      = useState<ScriptLine[]>([])
+  const [success,    setSuccess]    = useState<boolean | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+  const [showLog,    setShowLog]    = useState(false)
 
   type VmReadyState = { running: boolean; guestAdditions: boolean; version?: string }
   const [vmReady, setVmReady] = useState<VmReadyState | null>(null)
@@ -32,7 +34,11 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
       if (result.ok && result.path) setHostPath(result.path)
     })
     window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
-      setHasCredentials(saved.ok)
+      if (saved.ok) {
+        if (saved.user)      setVmUser(saved.user)
+        if (saved.pass)      setVmPass(saved.pass)
+        if (saved.loginUser) setLoginUser(saved.loginUser)
+      }
     })
     window.electronAPI.checkVmReady(vm.name).then((result) => {
       if (result.ok) {
@@ -52,6 +58,9 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
       setLines((prev) => [...prev, line])
     )
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+      if (exitCode === 0) {
+        window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
+      }
       setSuccess(exitCode === 0)
       setPageState('done')
       setShowLog(false)
@@ -60,7 +69,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     })
 
     try {
-      const result = await window.electronAPI.runShareLogs({ vmName: vm.name, hostPath })
+      const result = await window.electronAPI.runShareLogs({ vmName: vm.name, hostPath, vmUser, vmPass, loginUser })
       if (!result.ok && result.errorDetail) {
         setError(result.errorDetail)
       }
@@ -74,7 +83,12 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     }
   }
 
-  const canRun = pageState === 'idle' && !!hostPath && hasCredentials === true
+  const inputClass = (value: string) =>
+    'w-full px-2.5 py-1.5 bg-zinc-700 border rounded text-zinc-100 text-sm ' +
+    'focus:outline-none focus:border-blue-500 ' +
+    (value ? 'border-zinc-400' : 'border-zinc-600')
+
+  const canRun = pageState === 'idle' && !!hostPath && !!vmUser && !!vmPass && !!loginUser
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -161,15 +175,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
 
         <VmReadyBanner vmReady={vmReady} />
 
-        {hasCredentials === false && (
-          <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-amber-950 border border-amber-700 rounded text-xs text-amber-300">
-            <span className="mt-0.5">&#9888;</span>
-            <span>
-              No saved credentials found for this VM. Run the shared folder setup first to save them.
-            </span>
-          </div>
-        )}
-
         <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded text-xs text-zinc-400">
           <span className="mt-0.5">&#9432;</span>
           <span>
@@ -178,23 +183,51 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           </span>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-zinc-400 text-xs mb-1">Log destination (host folder)</label>
-          <input
-            type="text"
-            value={hostPath}
-            readOnly
-            placeholder="Loading..."
-            className={
-              'w-full px-2.5 py-1.5 bg-zinc-700 border rounded text-zinc-100 text-sm ' +
-              'focus:outline-none focus:border-blue-500 cursor-pointer ' +
-              (hostPath ? 'border-zinc-400' : 'border-zinc-600')
-            }
-            onClick={async () => {
-              const result = await window.electronAPI.pickFolder()
-              if (result.folderPath) setHostPath(result.folderPath)
-            }}
-          />
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="block text-zinc-400 text-xs mb-1">Log destination (host folder)</label>
+            <input
+              type="text"
+              value={hostPath}
+              readOnly
+              placeholder="Loading..."
+              className={inputClass(hostPath) + ' cursor-pointer'}
+              onClick={async () => {
+                const result = await window.electronAPI.pickFolder()
+                if (result.folderPath) setHostPath(result.folderPath)
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-zinc-400 text-xs mb-1">VM root username</label>
+            <input
+              type="text"
+              value={vmUser}
+              onChange={(e) => setVmUser(e.target.value)}
+              placeholder="root"
+              className={inputClass(vmUser)}
+            />
+          </div>
+          <div>
+            <label className="block text-zinc-400 text-xs mb-1">VM root password</label>
+            <input
+              type="password"
+              value={vmPass}
+              onChange={(e) => setVmPass(e.target.value)}
+              placeholder="••••••••"
+              className={inputClass(vmPass)}
+            />
+          </div>
+          <div>
+            <label className="block text-zinc-400 text-xs mb-1">Desktop username (added to vboxsf)</label>
+            <input
+              type="text"
+              value={loginUser}
+              onChange={(e) => setLoginUser(e.target.value)}
+              placeholder="fedora"
+              className={inputClass(loginUser)}
+            />
+          </div>
         </div>
 
         <button
@@ -205,13 +238,8 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           Set up log sync
         </button>
 
-        {!canRun && hasCredentials === false && (
-          <p className="text-zinc-500 text-xs mt-2">
-            Credentials required — set up a shared folder for this VM first.
-          </p>
-        )}
-        {!canRun && hasCredentials !== false && !hostPath && (
-          <p className="text-zinc-500 text-xs mt-2">Select a destination folder to continue.</p>
+        {!canRun && (
+          <p className="text-zinc-500 text-xs mt-2">Fill in all fields above to continue.</p>
         )}
       </div>
     </div>

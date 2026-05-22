@@ -29,6 +29,9 @@ export interface ShareFolderParams {
 export interface ShareLogsParams {
   vmName: string
   hostPath: string
+  vmUser: string
+  vmPass: string
+  loginUser: string
 }
 
 export interface ProvisionScriptParams {

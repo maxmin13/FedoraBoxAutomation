@@ -575,7 +575,7 @@ function registerIpcHandlers(win) {
   // Runs share-logs.ps1 non-interactively. Streams output to the renderer.
   // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
   handleIpc('run-share-logs', async (_event, params) => {
-    const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-NonInteractive']
+    const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-VmUser', params.vmUser, '-VmPass', params.vmPass, '-LoginUser', params.loginUser, '-NonInteractive']
     const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs)
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
