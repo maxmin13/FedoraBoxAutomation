@@ -43,12 +43,6 @@ function Get-VBoxErrMsg {
     if ($text -match 'current status is: starting') {
         return 'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
     }
-    if ($text -match 'current status is: paused') {
-        return 'VM is paused - resume it and try again'
-    }
-    if ($text -match 'is not currently running|machine.*not.*running|powered.?off') {
-        return 'VM is not running - start it and try again'
-    }
     if ($text -match 'VERR_DUPLICATE') {
         return 'A previous guest session is still active - wait a few seconds and try again'
     }
