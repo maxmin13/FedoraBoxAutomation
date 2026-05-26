@@ -205,6 +205,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const setupGuideRef          = useRef<HTMLDivElement>(null)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
+  const lastErrorRef           = useRef<string | null>(null)
 
   useEffect(() => {
     if (!showSetupGuide) return
@@ -301,6 +302,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setShowLog(true)
     forceConfirmNeededRef.current = false
     alreadyInstalledRef.current   = false
+    lastErrorRef.current          = null
 
     const unsubLine = window.electronAPI.onScriptLine((line) => {
       setLines((prev) => [...prev, line])
@@ -310,6 +312,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (/\[INFO\s*\].*already installed/i.test(line.text)) {
         alreadyInstalledRef.current = true
       }
+      const errMatch = line.text.match(/^\s*ERROR:\s*(.+)/)
+      if (errMatch) lastErrorRef.current = errMatch[1].trim()
     })
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
       if (exitCode === 0 && loginUser) {
@@ -327,6 +331,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       }
       setAlreadyInstalled(alreadyInstalledRef.current)
       setSuccess(exitCode === 0)
+      if (exitCode !== 0 && lastErrorRef.current) setError(lastErrorRef.current)
       setPageState('done')
       setShowLog(false)
       unsubLine()
