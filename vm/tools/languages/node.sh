@@ -29,9 +29,23 @@ fi
 if [[ "${INSTALLED_MAJOR}" == "${NODE_MAJOR}" ]]; then
     log_info "Node.js ${NODE_MAJOR}.x already installed: $(node --version)"
 else
-    # Check whether the Fedora system repo already ships the requested major.
-    # Strip the epoch prefix (e.g. "1:24.13.1" -> "24") before comparing.
-    REPO_MAJOR="$(dnf info nodejs 2>/dev/null \
+    # Remove any installed Fedora nodejs packages before installing the
+    # requested version.  Fedora 44+ ships nodejs24-bin and nodejs24-npm-bin
+    # which file-conflict with NodeSource packages for other major versions.
+    # --allowerasing does not resolve file-level RPM conflicts; explicit
+    # removal is required.
+    INSTALLED_NODEJS_PKGS="$(rpm -qa --qf '%{NAME}\n' | grep '^nodejs' || true)"
+    if [[ -n "${INSTALLED_NODEJS_PKGS}" ]]; then
+        log_info "Removing existing nodejs packages to avoid conflicts ..."
+        # Word-splitting is intentional: one package name per line.
+        # shellcheck disable=SC2086
+        dnf remove -y ${INSTALLED_NODEJS_PKGS}
+    fi
+
+    # Check whether the Fedora system repo ships the requested major.
+    # Use --disablerepo=nodesource* to exclude any NodeSource repo that may
+    # have been added by a previous failed run of this script.
+    REPO_MAJOR="$(dnf info --disablerepo='nodesource*' nodejs 2>/dev/null \
         | awk '/^Version/{v=$3} END{print v}' \
         | sed 's/^[0-9]*://' \
         | cut -d. -f1)"
@@ -40,12 +54,9 @@ else
         log_info "Installing Node.js ${NODE_MAJOR}.x from Fedora repo ..."
         dnf install -y nodejs
     else
-        # Fedora ships a different major (or no nodejs at all); use NodeSource.
-        # --allowerasing lets dnf replace any conflicting Fedora nodejs packages
-        # (e.g. nodejs24-npm-bin on Fedora 44 conflicts with NodeSource 22/20).
-        log_info "Fedora repo offers Node.js ${REPO_MAJOR:-unknown}.x; switching to NodeSource for ${NODE_MAJOR}.x ..."
+        log_info "Fedora repo offers Node.js ${REPO_MAJOR:-unknown}.x; using NodeSource for ${NODE_MAJOR}.x ..."
         curl -fsSL "https://rpm.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
-        dnf install -y --allowerasing nodejs
+        dnf install -y nodejs
     fi
     log_info "Node.js $(node --version) installed."
 fi
