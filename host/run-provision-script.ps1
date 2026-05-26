@@ -62,7 +62,13 @@ if (Test-Path $commonScript) {
     Write-Host "  Uploading common.sh..." -NoNewline
     $ua = @('guestcontrol', $script:vmName, 'copyto', $commonScript, '/tmp/common.sh', '--username', $script:vmUser, '--password', $script:vmPass)
     $r  = & $script:vbox @ua 2>&1
-    if ($LASTEXITCODE -ne 0) { Write-Host " WARNING: $r" -ForegroundColor Yellow } else { Write-Host " OK" -ForegroundColor Green }
+    if ($LASTEXITCODE -ne 0) {
+        $rText = ($r | ForEach-Object { $_.ToString() }) -join ' '
+        $warn  = if ($rText -match 'current status is: starting') {
+            'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
+        } else { $rText }
+        Write-Host " WARNING: $warn" -ForegroundColor Yellow
+    } else { Write-Host " OK" -ForegroundColor Green }
 }
 
 # Upload the target script
@@ -74,7 +80,11 @@ $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $localPath, $guestPath
 $result = & $script:vbox @uploadArgs 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host " FAILED" -ForegroundColor Red
-    Write-Host "  ERROR: $result" -ForegroundColor Red
+    $rText  = ($result | ForEach-Object { $_.ToString() }) -join ' '
+    $errMsg = if ($rText -match 'current status is: starting') {
+        'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
+    } else { $rText }
+    Write-Host "  ERROR: $errMsg" -ForegroundColor Red
     exit 1
 }
 Write-Host " OK" -ForegroundColor Green
