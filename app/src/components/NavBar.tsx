@@ -12,8 +12,8 @@ interface NavBarProps {
 }
 
 const NAV_ITEMS: { page: Page; label: string; devOnly?: boolean }[] = [
+  { page: 'setup', label: 'Requirements' },
   { page: 'landing', label: 'My VMs' },
-  { page: 'setup', label: 'Setup' },
   { page: 'create-vm', label: 'Create VM' },
   { page: 'logs', label: 'Console' },
   { page: 'docs', label: 'Docs', devOnly: true },

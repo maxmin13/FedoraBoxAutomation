@@ -9,10 +9,10 @@ describe('NavBar', () => {
     onNavigate.mockReset()
   })
 
-  it('shows all core nav items: My VMs, Setup, Create VM, Console', () => {
+  it('shows all core nav items: Requirements, My VMs, Create VM, Console', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} />)
+    expect(screen.getByRole('button', { name: 'Requirements' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'My VMs' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Setup' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create VM' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Console' })).toBeInTheDocument()
   })
@@ -29,14 +29,14 @@ describe('NavBar', () => {
 
   it('calls onNavigate with the correct page name when a button is clicked', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
     expect(onNavigate).toHaveBeenCalledWith('setup')
   })
 
   it('disables non-Console nav buttons when scriptRunning is true', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} isDev={false} scriptRunning={true} />)
     fireEvent.click(screen.getByRole('button', { name: 'My VMs' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
     expect(onNavigate).not.toHaveBeenCalled()
   })
@@ -51,7 +51,7 @@ describe('NavBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
     expect(onNavigate).toHaveBeenCalledWith('create-vm')
     onNavigate.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
     expect(onNavigate).not.toHaveBeenCalled()
   })
 
@@ -74,7 +74,7 @@ describe('NavBar', () => {
 
   it('applies active styling to the current page button', () => {
     render(<NavBar currentPage="setup" onNavigate={onNavigate} isDev={false} />)
-    const setupBtn = screen.getByRole('button', { name: 'Setup' })
+    const setupBtn = screen.getByRole('button', { name: 'Requirements' })
     expect(setupBtn.className).toMatch(/bg-zinc-600/)
   })
 
