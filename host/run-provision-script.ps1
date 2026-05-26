@@ -33,6 +33,25 @@ $ErrorActionPreference = 'Stop'
 
 . "$PSScriptRoot\common.ps1"
 
+# Converts raw 2>&1 output (mix of strings and ErrorRecord objects) to a
+# plain string and maps known VBoxManage errors to friendly sentences.
+function Get-VBoxErrMsg {
+    param([object[]]$Output)
+    $text = ($Output | ForEach-Object {
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { [string]$_ }
+    }) -join ' '
+    if ($text -match 'current status is: starting') {
+        return 'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
+    }
+    if ($text -match 'VERR_DUPLICATE') {
+        return 'A previous guest session is still active - wait a few seconds and try again'
+    }
+    if ($text -match 'VERR_AUTHENTICATION_FAILURE|authentication failure') {
+        return 'Wrong username or password'
+    }
+    return $text
+}
+
 $script:vbox = Find-VBoxManage
 if (-not $script:vbox) {
     Write-Host "ERROR: VBoxManage.exe not found. Is VirtualBox installed?" -ForegroundColor Red
@@ -61,13 +80,11 @@ $commonScript = Join-Path $projectRoot "vm\lib\common.sh"
 if (Test-Path $commonScript) {
     Write-Host "  Uploading common.sh..." -NoNewline
     $ua = @('guestcontrol', $script:vmName, 'copyto', $commonScript, '/tmp/common.sh', '--username', $script:vmUser, '--password', $script:vmPass)
+    $ErrorActionPreference = 'SilentlyContinue'
     $r  = & $script:vbox @ua 2>&1
+    $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0) {
-        $rText = ($r | ForEach-Object { $_.ToString() }) -join ' '
-        $warn  = if ($rText -match 'current status is: starting') {
-            'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
-        } else { $rText }
-        Write-Host " WARNING: $warn" -ForegroundColor Yellow
+        Write-Host " WARNING: $(Get-VBoxErrMsg $r)" -ForegroundColor Yellow
     } else { Write-Host " OK" -ForegroundColor Green }
 }
 
@@ -77,14 +94,12 @@ $guestPath = "/tmp/$fileName"
 
 Write-Host "  Uploading $fileName..." -NoNewline
 $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $localPath, $guestPath, '--username', $script:vmUser, '--password', $script:vmPass)
+$ErrorActionPreference = 'SilentlyContinue'
 $result = & $script:vbox @uploadArgs 2>&1
+$ErrorActionPreference = 'Stop'
 if ($LASTEXITCODE -ne 0) {
     Write-Host " FAILED" -ForegroundColor Red
-    $rText  = ($result | ForEach-Object { $_.ToString() }) -join ' '
-    $errMsg = if ($rText -match 'current status is: starting') {
-        'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
-    } else { $rText }
-    Write-Host "  ERROR: $errMsg" -ForegroundColor Red
+    Write-Host "  ERROR: $(Get-VBoxErrMsg $result)" -ForegroundColor Red
     exit 1
 }
 Write-Host " OK" -ForegroundColor Green
@@ -120,7 +135,10 @@ $result = & $script:vbox @runArgs 2>&1
 $exitCode = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 
-$result | ForEach-Object { Write-Host $_.ToString() }
+$result | ForEach-Object {
+    $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { [string]$_ }
+    Write-Host $line
+}
 
 if ($exitCode -ne 0) {
     Write-Host "  ERROR: Script exited with code $exitCode" -ForegroundColor Red
