@@ -135,7 +135,8 @@ function extractError(lines) {
   if (specific.length > 0) {
     return specific.at(-1).text.trim().replace(/^ERROR:\s*/i, '')
   }
-  return lines.filter(l => l.text.trim()).at(-1)?.text.trim() ?? null
+  const lastLine = lines.filter(l => l.text.trim()).at(-1)?.text.trim()
+  return lastLine ?? 'The VM did not respond — check it is running and try again'
 }
 
 /**
