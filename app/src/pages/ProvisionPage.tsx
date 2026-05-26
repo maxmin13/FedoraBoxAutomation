@@ -42,6 +42,14 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
       { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv (blank = latest stable)',
         argType: 'user+custom', argPrompts: ['Python version'], argDefaults: ['3.13.3'] },
+      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource — includes npm',
+        argType: 'user+custom',
+        argPrompts:  ['Node.js version'],
+        argDefaults: ['22'],
+        argOptions: [[
+          { value: '22', label: '22 — LTS Active (until Apr 2027)' },
+          { value: '20', label: '20 — LTS Maintenance (until Apr 2026)' },
+        ]] },
     ],
   },
   {
@@ -148,7 +156,7 @@ function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: stri
       return v || script.argDefaults?.[0] || ''
     }
     case 'user+custom': {
-      const v = argValues[0]?.trim()
+      const v = argValues[0]?.trim() || script.argDefaults?.[0] || ''
       return v ? `${loginUser} ${v}` : loginUser
     }
     case 'user+custom2': {
@@ -768,21 +776,38 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </div>
             )}
 
-            {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (
-              <div>
-                <label className="block text-zinc-400 text-xs mb-1">
-                  {selectedScript.argPrompts?.[0] ?? 'Argument'}
-                </label>
-                <input
-                  type="text"
-                  value={argValues[0]}
-                  onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                  placeholder={selectedScript.argDefaults?.[0] ?? ''}
-                  autoComplete="off"
-                  className={ic(argValues[0])}
-                />
-              </div>
-            )}
+            {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (() => {
+              const opts   = selectedScript.argOptions?.[0]
+              const curVal = argValues[0]
+              const defVal = selectedScript.argDefaults?.[0] ?? ''
+              return (
+                <div>
+                  <label className="block text-zinc-400 text-xs mb-1">
+                    {selectedScript.argPrompts?.[0] ?? 'Argument'}
+                  </label>
+                  {opts?.length ? (
+                    <select
+                      value={curVal || defVal}
+                      onChange={(e) => setArgValues([e.target.value, argValues[1]])}
+                      className={ic(curVal || defVal) + ' cursor-pointer'}
+                    >
+                      {opts.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={curVal}
+                      onChange={(e) => setArgValues([e.target.value, argValues[1]])}
+                      placeholder={defVal}
+                      autoComplete="off"
+                      className={ic(curVal)}
+                    />
+                  )}
+                </div>
+              )
+            })()}
 
             {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
               <div className="space-y-3">
