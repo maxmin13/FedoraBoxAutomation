@@ -54,11 +54,12 @@ teardown() {
     rm -rf "$TEST_TMPDIR"
 }
 
-@test "exits 1 when Python 3 is not installed" {
+@test "exits 2 when Python 3 is not installed" {
     rm "$TEST_TMPDIR/bin/python3"
     run bash "$SCRIPT"
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Python 3 is required"* ]]
+    [[ "$output" == *"python.sh"* ]]
 }
 
 @test "warns but continues when Fedora mirrors are unreachable" {

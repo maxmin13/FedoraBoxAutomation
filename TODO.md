@@ -18,7 +18,6 @@
 
 # check the error messages displayed to the user, are they user friendly
 
-# rationalise the error messages returned by shell script, devise a common pattern to return a user friendly error msg to the user
 
 # on a new vm, install fedora 3.3.2, check if the user is warned that a previous version is already present. also check if he s displayed with what he has to do after isntalling, for ex, maintaing...
 
@@ -27,6 +26,4 @@
 
 # in case of script error, give the user to rollback, at least for openssl
 
-# when stopping a vm, change the status to stopping
-
-# check why in the detail, C:\Users\maxmi\VirtualBox VMs\Fedora test ga\guest-logs is shown as a shared folder
+# provision claude code

@@ -118,6 +118,32 @@ EOF
 
 # ── 6. Log file tee ────────────────────────────────────────────────────────────
 
+# ── 7. trap ERR ────────────────────────────────────────────────────────────────
+
+@test "trap ERR emits an ERROR: line when a command fails unexpectedly" {
+    run bash << EOF
+export PATH="$TEST_TMPDIR/bin:\$PATH"
+export FEDORA_BOX_LOG="$FEDORA_BOX_LOG"
+source "$COMMON_SH"
+false
+EOF
+    [[ "$output" == *"ERROR:"* ]]
+    [[ "$output" == *"false"* ]]
+}
+
+@test "trap ERR includes the failing command in the message" {
+    run bash << EOF
+export PATH="$TEST_TMPDIR/bin:\$PATH"
+export FEDORA_BOX_LOG="$FEDORA_BOX_LOG"
+source "$COMMON_SH"
+nonexistent_command_xyz
+EOF
+    [[ "$output" == *"ERROR:"* ]]
+    [[ "$output" == *"nonexistent_command_xyz"* ]]
+}
+
+# ── 8. Log file tee ────────────────────────────────────────────────────────────
+
 @test "log output is teed to the log file" {
     bash << EOF
 export PATH="$TEST_TMPDIR/bin:\$PATH"

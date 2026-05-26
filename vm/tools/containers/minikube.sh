@@ -24,8 +24,8 @@ STEP "Docker check"
 ####
 
 if ! docker --version > /dev/null 2>&1; then
-    log_error 'Docker is not installed. Run docker.sh before k8-install.sh.'
-    exit 1
+    log_error 'Docker is not installed. Run docker.sh before minikube.sh.'
+    exit 2
 fi
 log_info "Docker found: $(docker --version)"
 

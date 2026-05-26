@@ -538,6 +538,18 @@ function registerIpcHandlers(win) {
         logSyncPath = path.join(path.dirname(kv['CfgFile']), 'guest-logs')
       }
 
+      // Hide the log-sync share from the user-facing shared-folders list.
+      // share-logs.ps1 registers the guest-logs folder as a VirtualBox shared
+      // folder internally (so the VM can mount /mnt/log), but it is already
+      // shown under "Log sync" — displaying it again in "Shared folders" is
+      // confusing.  Filter by hostPath so the comparison is case-insensitive
+      // on Windows (paths may differ only in case).
+      const userSharedFolders = logSyncPath
+        ? sharedFolders.filter(
+            sf => sf.hostPath.toLowerCase() !== logSyncPath.toLowerCase()
+          )
+        : sharedFolders
+
       // Guest Additions version — only queryable when the VM is running
       let gaVersion = null
       const running = /^running$/i.test(kv['VMState'] ?? '')
@@ -564,7 +576,7 @@ function registerIpcHandlers(win) {
           mac:           kv['macaddress1']   ?? '',
           diskCapacityMB,
           diskType,
-          sharedFolders,
+          sharedFolders: userSharedFolders,
           gaVersion,
           logSyncPath,
         },

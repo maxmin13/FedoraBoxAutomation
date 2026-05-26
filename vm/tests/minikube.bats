@@ -31,6 +31,13 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     # Default: Docker, minikube, kubectl all already installed
@@ -64,14 +71,16 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
-@test "exits 1 when Docker is not installed" {
+@test "exits 2 when Docker is not installed" {
     _stub docker 1   # exit 1 = docker not found
     run bash "$SCRIPT" testuser
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"Docker is not installed"* ]]
+    [[ "$output" == *"docker.sh"* ]]
+    [[ "$output" == *"minikube.sh"* ]]
 }
 
 @test "exits 0 when Docker, minikube, and kubectl are all present" {

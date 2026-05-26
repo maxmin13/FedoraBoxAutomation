@@ -1054,6 +1054,56 @@ describe('get-vm-info handler', () => {
     expect(cmdsCalled.some(c => c.includes('guestproperty'))).toBe(false)
   })
 
+  it('filters the log-sync share (guest-logs) out of sharedFolders', async () => {
+    // The guest-logs folder is registered as a VirtualBox shared folder by
+    // share-logs.ps1 so the VM can mount /mnt/log.  It must NOT appear in the
+    // user-facing "Shared folders" list — it is already shown under "Log sync".
+    const MR_WITH_LOG_SHARE = [
+      'VMState="poweroff"\r',
+      'ostype="Fedora_64"\r',
+      'memory="4096"\r',
+      'cpus="2"\r',
+      'vram="128"\r',
+      'nic1="nat"\r',
+      'macaddress1="080027AABBCC"\r',
+      'CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\r',
+      'SharedFolderNameMachineMapping1="guest-logs"\r',
+      'SharedFolderPathMachineMapping1="C:\\VMs\\FedoraBox\\guest-logs"\r',
+    ].join('\n')
+    mockExecSync
+      .mockReturnValueOnce(MR_WITH_LOG_SHARE)
+      .mockReturnValueOnce('') // plain showvminfo
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(true)
+    expect(result.info.sharedFolders).toHaveLength(0)
+    // logSyncPath is still populated correctly
+    expect(result.info.logSyncPath).toMatch(/guest-logs$/)
+  })
+
+  it('keeps non-log-sync shared folders when log-sync share is also present', async () => {
+    const MR_WITH_BOTH = [
+      'VMState="poweroff"\r',
+      'ostype="Fedora_64"\r',
+      'memory="4096"\r',
+      'cpus="2"\r',
+      'vram="128"\r',
+      'nic1="nat"\r',
+      'macaddress1="080027AABBCC"\r',
+      'CfgFile="C:\\VMs\\FedoraBox\\FedoraBox.vbox"\r',
+      'SharedFolderNameMachineMapping1="vbox-share"\r',
+      'SharedFolderPathMachineMapping1="C:\\Work\\shared"\r',
+      'SharedFolderNameMachineMapping2="guest-logs"\r',
+      'SharedFolderPathMachineMapping2="C:\\VMs\\FedoraBox\\guest-logs"\r',
+    ].join('\n')
+    mockExecSync
+      .mockReturnValueOnce(MR_WITH_BOTH)
+      .mockReturnValueOnce('') // plain showvminfo
+    const result = await getVmInfoHandler({}, 'FedoraBox')
+    expect(result.ok).toBe(true)
+    expect(result.info.sharedFolders).toHaveLength(1)
+    expect(result.info.sharedFolders[0].name).toBe('vbox-share')
+  })
+
   it('returns ok: false when the main VBoxManage call throws', async () => {
     mockExecSync.mockImplementationOnce(() => { throw new Error('VM not found') })
     const result = await getVmInfoHandler({}, 'FedoraBox')

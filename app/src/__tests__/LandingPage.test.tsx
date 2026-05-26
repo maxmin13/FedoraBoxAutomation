@@ -129,6 +129,38 @@ describe('VM list', () => {
     expect(window.electronAPI.stopVm).toHaveBeenCalledWith('RunningVM')
   })
 
+  it('shows "Starting..." badge while startVm is in flight', async () => {
+    let resolveStart: (v: { ok: boolean }) => void
+    window.electronAPI.startVm = vi.fn().mockReturnValue(
+      new Promise<{ ok: boolean }>((r) => { resolveStart = r })
+    )
+    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
+    await renderAndFlush()
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    await act(async () => {})
+    expect(screen.getByText('Starting...')).toBeInTheDocument()
+    await act(async () => { resolveStart({ ok: true }) })
+  })
+
+  it('shows "Stopping..." badge while stopVm is in flight', async () => {
+    let resolveStop: (v: { ok: boolean }) => void
+    window.electronAPI.stopVm = vi.fn().mockReturnValue(
+      new Promise<{ ok: boolean }>((r) => { resolveStop = r })
+    )
+    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [RUNNING_VM] })
+    await renderAndFlush()
+    // Open the stop confirmation modal
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await act(async () => {})
+    // Confirm stop — stopVm is now pending (never resolves until we call resolveStop)
+    fireEvent.click(screen.getByRole('button', { name: 'Stop VM' }))
+    await act(async () => {})
+    // Badge should immediately switch to "Stopping..."
+    expect(screen.getByText('Stopping...')).toBeInTheDocument()
+    // Resolve to avoid dangling async work
+    await act(async () => { resolveStop({ ok: true }) })
+  })
+
   it('calls startVm with the VM name when Start is clicked', async () => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
     await renderAndFlush()

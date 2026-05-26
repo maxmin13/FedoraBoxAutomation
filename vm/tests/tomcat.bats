@@ -31,6 +31,13 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     _stub wget       0
@@ -64,15 +71,16 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
-@test "exits 1 when JAVA_HOME is not set and Java is not found" {
+@test "exits 2 when JAVA_HOME is not set and Java is not found" {
     unset JAVA_HOME
-    # readlink stub returns nothing → JAVA_BIN is empty → exits 1
+    # readlink stub returns nothing → JAVA_BIN is empty → exits 2
     run bash "$SCRIPT" root
-    [ "$status" -eq 1 ]
+    [ "$status" -eq 2 ]
     [[ "$output" == *"JAVA_HOME is not set"* ]]
+    [[ "$output" == *"java.sh"* ]]
 }
 
 @test "exits 1 when the installation directory already exists" {

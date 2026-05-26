@@ -60,7 +60,7 @@ teardown() {
 @test "exits 1 when no hostname argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"network parameters not found"* ]]
+    [[ "$output" == *"Hostname argument is required"* ]]
 }
 
 @test "exits 0 when hostname is set successfully" {

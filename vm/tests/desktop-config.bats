@@ -31,6 +31,13 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     _stub dnf        0
@@ -69,6 +76,11 @@ GDMCONF
 
     [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
     echo "# .bash_profile" > /root/.bash_profile
+
+    # Bookmarks file for the root user (HOME_DIR=/root when login-user is root)
+    [[ -f /root/.config/gtk-3.0/bookmarks ]] && \
+        cp /root/.config/gtk-3.0/bookmarks "$TEST_TMPDIR/bookmarks.bak"
+    rm -f /root/.config/gtk-3.0/bookmarks
 }
 
 teardown() {
@@ -97,13 +109,18 @@ teardown() {
     else
         rm -f /root/.bash_profile
     fi
+    if [[ -f "$TEST_TMPDIR/bookmarks.bak" ]]; then
+        mv "$TEST_TMPDIR/bookmarks.bak" /root/.config/gtk-3.0/bookmarks
+    else
+        rm -f /root/.config/gtk-3.0/bookmarks
+    fi
     rm -rf "$TEST_TMPDIR"
 }
 
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing parameters"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 with all tools stubbed" {
@@ -124,4 +141,16 @@ teardown() {
 @test "configures git to use LF line endings" {
     run bash "$SCRIPT" root
     grep -q "core.autocrlf" "$CALLS_FILE"
+}
+
+@test "adds /opt bookmark to Nautilus when not present" {
+    run bash "$SCRIPT" root
+    grep -q 'file:///opt' /root/.config/gtk-3.0/bookmarks
+}
+
+@test "does not duplicate /opt bookmark when already present" {
+    mkdir -p /root/.config/gtk-3.0
+    echo 'file:///opt opt' > /root/.config/gtk-3.0/bookmarks
+    run bash "$SCRIPT" root
+    [ "$(grep -c 'file:///opt' /root/.config/gtk-3.0/bookmarks)" -eq 1 ]
 }

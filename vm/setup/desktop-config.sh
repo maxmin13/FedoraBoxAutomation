@@ -3,8 +3,9 @@
 ##
 ## Description: Configures the GNOME desktop environment for a Fedora VM.
 ##              Disables Wayland (forces X11), sets background image, silences
-##              the bell, configures Gedit and Nautilus, sets up the Git prompt,
-##              applies kernel parameters for minikube, and disables GNOME keyring.
+##              the bell, configures Gedit and Nautilus (adds /opt bookmark),
+##              sets up the Git prompt, applies kernel parameters for minikube,
+##              and disables GNOME keyring.
 ## Usage:       sudo ./desktop-config.sh <login-user> [background-image-filename]
 ## Parameters:  $1  <login-user>               Non-root desktop username (e.g. maxmin)
 ##              $2  [background-image-filename] Image filename in /usr/share/backgrounds/ (optional)
@@ -12,13 +13,8 @@
 
 source /tmp/common.sh
 
-if [[ 1 -gt $# ]]
-then
-   log_error 'missing parameters.'
-   exit 1
-fi
-
-LOGIN_USER="${1}"
+LOGIN_USER="${1:-}"
+require_login_user "${LOGIN_USER}"
 BACKGROUND_IMG="${2:-}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 
@@ -119,6 +115,17 @@ STEP "Nautilus file manager"
 gsettings_set org.gnome.nautilus.list-view default-visible-columns "['name', 'size', 'date_modified', 'type']"
 
 log_info 'Nautilus additional type column added.'
+
+BOOKMARKS_FILE="${HOME_DIR}/.config/gtk-3.0/bookmarks"
+mkdir -p "${HOME_DIR}/.config/gtk-3.0"
+
+if grep -q 'file:///opt' "${BOOKMARKS_FILE}" 2>/dev/null; then
+    log_info 'Nautilus bookmark for /opt already present.'
+else
+    echo 'file:///opt opt' >> "${BOOKMARKS_FILE}"
+    chown "${LOGIN_USER}":"${LOGIN_USER}" "${BOOKMARKS_FILE}"
+    log_info 'Nautilus bookmark for /opt added.'
+fi
 
 ####
 STEP "Git"

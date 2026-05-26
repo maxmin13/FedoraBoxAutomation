@@ -188,7 +188,7 @@ function StopModal({ vmName, busy, onConfirm, onCancel }: StopModalProps) {
             disabled={busy}
             className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {busy ? 'Stopping...' : 'Stop VM'}
+            Stop VM
           </button>
         </div>
       </div>
@@ -262,13 +262,16 @@ interface VmCardProps {
 }
 
 function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
-  const [busy, setBusy] = useState(false)
+  const [busy,     setBusy]     = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showStopModal,   setShowStopModal]   = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   async function handleStart() {
     setBusy(true)
+    setStarting(true)
     setError(null)
     try {
       const result = await window.electronAPI.startVm(vm.name)
@@ -277,6 +280,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
       }
     } finally {
       setBusy(false)
+      setStarting(false)
       onRefresh()
     }
   }
@@ -284,6 +288,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
   async function handleStop() {
     setShowStopModal(false)
     setBusy(true)
+    setStopping(true)
     setError(null)
     try {
       const result = await window.electronAPI.stopVm(vm.name)
@@ -292,6 +297,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
       }
     } finally {
       setBusy(false)
+      setStopping(false)
       onRefresh()
     }
   }
@@ -335,7 +341,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
         {/* VM name and running badge */}
         <div className="flex items-center justify-between">
           <span className="text-zinc-100 font-medium truncate">{vm.name}</span>
-          <VmRunningBadge running={vm.running} />
+          <VmRunningBadge running={vm.running} starting={starting} stopping={stopping} />
         </div>
 
         {/* UUID in small muted text */}
@@ -351,7 +357,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
               disabled={busy}
               className="px-3 py-1 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {busy ? 'Stopping...' : 'Stop'}
+              Stop
             </button>
           ) : (
             <button
@@ -359,7 +365,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
               disabled={busy}
               className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {busy ? 'Starting...' : 'Start'}
+              Start
             </button>
           )}
 

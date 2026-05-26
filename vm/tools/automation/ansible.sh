@@ -15,7 +15,7 @@ STEP "Prerequisites"
 if ! command -v python3 > /dev/null 2>&1
 then
     log_error 'Python 3 is required but not found. Run python.sh first.'
-    exit 1
+    exit 2
 fi
 log_info "Python: $(python3 --version)"
 

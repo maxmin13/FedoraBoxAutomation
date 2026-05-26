@@ -11,7 +11,7 @@ source /tmp/common.sh
 
 if [[ 1 -gt $# ]]
 then
-   log_error 'network parameters not found.'
+   log_error 'Hostname argument is required. Usage: network-config.sh <hostname>'
    exit 1
 fi
 

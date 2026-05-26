@@ -45,13 +45,13 @@ if [[ -z "${JAVA_HOME:-}" ]]; then
         log_warn "JAVA_HOME was not set; resolved to ${JAVA_HOME} from /usr/bin/java."
     else
         log_error 'JAVA_HOME is not set and Java was not found. Run java.sh before tomcat.sh.'
-        exit 1
+        exit 2
     fi
 fi
 
 if [[ ! -x "${JAVA_HOME}/bin/java" ]]; then
     log_error "JAVA_HOME=${JAVA_HOME} does not contain a valid Java executable. Run java.sh before tomcat.sh."
-    exit 1
+    exit 2
 fi
 
 log_info "JAVA_HOME=${JAVA_HOME}"
