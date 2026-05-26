@@ -61,6 +61,11 @@ STUB
     # falls back to 'java -XshowSettings:property -version' for detection.
     # Default: returns nothing useful → detection fails → exits 2.
     _stub java 0
+
+    # Back up and reset the root .bash_profile so the profile-read fallback
+    # starts clean for every test.
+    [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
+    echo '# .bash_profile' > /root/.bash_profile
 }
 
 teardown() {
@@ -68,6 +73,11 @@ teardown() {
         mv "$TEST_TMPDIR/common.sh.bak" /tmp/common.sh
     else
         rm -f /tmp/common.sh
+    fi
+    if [[ -f "$TEST_TMPDIR/bash_profile.bak" ]]; then
+        mv "$TEST_TMPDIR/bash_profile.bak" /root/.bash_profile
+    else
+        rm -f /root/.bash_profile
     fi
     rm -rf /opt/apache-tomcat-10.1.33-8080
     rm -rf /opt/tomcat-cache
@@ -97,6 +107,15 @@ teardown() {
     [ "$status" -eq 2 ]
     [[ "$output" == *"JAVA_HOME=/usr is invalid"* ]]
     [[ "$output" == *"JAVA_HOME is not set"* ]]
+}
+
+@test "reads JAVA_HOME from login user's .bash_profile when not in environment" {
+    unset JAVA_HOME
+    # Simulate java.sh having written JAVA_HOME to the login user's .bash_profile
+    echo "export JAVA_HOME=${TEST_TMPDIR}/java" >> /root/.bash_profile
+    run bash "$SCRIPT" root
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".bash_profile"* ]]
 }
 
 @test "exits 1 when the installation directory already exists" {

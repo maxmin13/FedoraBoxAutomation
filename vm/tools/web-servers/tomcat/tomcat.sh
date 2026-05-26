@@ -46,19 +46,38 @@ if [[ -n "${JAVA_HOME:-}" && ! -x "${JAVA_HOME}/bin/java" ]]; then
 fi
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
+    DETECTED_JAVA_HOME=''
+
+    # 1. Ask the JVM itself (works when java is on PATH).
     if command -v java > /dev/null 2>&1; then
-        # Some JDK versions exit non-zero for -XshowSettings even on success;
-        # catch that with a named warning instead of letting trap ERR fire.
         DETECTED_JAVA_HOME="$(java -XshowSettings:property -version 2>&1 \
             | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')" \
             || { log_warn 'java -XshowSettings:property exited non-zero; checking captured output.'; true; }
-        if [[ -n "${DETECTED_JAVA_HOME}" && -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
-            export JAVA_HOME="${DETECTED_JAVA_HOME}"
-            log_warn "JAVA_HOME was not set; resolved to ${JAVA_HOME} via java.home property."
-        else
-            log_error 'JAVA_HOME is not set and Java was not found. Run java.sh before tomcat.sh.'
-            exit 2
-        fi
+    fi
+
+    # 2. Read JAVA_HOME written by java.sh into the login user's .bash_profile.
+    #    guestcontrol does not source login profiles, so the variable is invisible.
+    if [[ -z "${DETECTED_JAVA_HOME}" || ! -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
+        _profile=$(eval echo "~${LOGIN_USER}")/.bash_profile
+        DETECTED_JAVA_HOME="$(grep '^export JAVA_HOME=' "${_profile}" 2>/dev/null \
+            | tail -1 | cut -d= -f2)"
+        [[ -n "${DETECTED_JAVA_HOME}" ]] && \
+            log_warn "JAVA_HOME sourced from ${_profile}: ${DETECTED_JAVA_HOME}."
+    fi
+
+    # 3. Search standard Oracle JDK / OpenJDK filesystem paths.
+    if [[ -z "${DETECTED_JAVA_HOME}" || ! -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
+        for _dir in /usr/java/jdk-* /usr/lib/jvm/java-*-oracle /usr/lib/jvm/java-*-openjdk-*; do
+            if [[ -x "${_dir}/bin/java" ]]; then
+                DETECTED_JAVA_HOME="${_dir}"
+                log_warn "JAVA_HOME not set; found JDK at ${DETECTED_JAVA_HOME}."
+                break
+            fi
+        done
+    fi
+
+    if [[ -n "${DETECTED_JAVA_HOME}" && -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
+        export JAVA_HOME="${DETECTED_JAVA_HOME}"
     else
         log_error 'JAVA_HOME is not set and Java was not found. Run java.sh before tomcat.sh.'
         exit 2

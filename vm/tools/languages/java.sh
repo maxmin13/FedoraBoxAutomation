@@ -61,14 +61,27 @@ if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
    # Ask the JVM itself — reliable across install methods (RPM, alternatives, custom).
    # Some JDK versions exit non-zero for diagnostic -X flags even on success;
    # catch that with a named warning instead of letting trap ERR fire.
+   # 1. Ask the JVM itself (works when java is on PATH after alternatives setup).
    JAVA_HOME_VAL="$(java -XshowSettings:property -version 2>&1 \
        | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')" \
-       || { log_warn 'java -XshowSettings:property exited non-zero; trying symlink fallback.'; true; }
+       || { log_warn 'java -XshowSettings:property exited non-zero; trying filesystem search.'; true; }
 
+   # 2. Search standard Oracle JDK / OpenJDK filesystem paths.
+   #    Needed when the RPM was just installed and alternatives are not yet on PATH.
    if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
-      # Fallback: follow the /usr/bin/java symlink chain.
+      for _dir in /usr/java/jdk-* /usr/lib/jvm/java-*-oracle /usr/lib/jvm/java-*-openjdk-*; do
+         if [[ -x "${_dir}/bin/java" ]]; then
+            JAVA_HOME_VAL="${_dir}"
+            log_warn "java not on PATH; found JDK at ${JAVA_HOME_VAL}."
+            break
+         fi
+      done
+   fi
+
+   # 3. Follow /usr/bin/java symlink chain as a last resort.
+   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
       JAVA_HOME_VAL="$(readlink -f /usr/bin/java 2>/dev/null | sed 's:/bin/java::')" \
-          || { log_warn 'readlink /usr/bin/java failed; java.sh may need to be re-run.'; true; }
+          || { log_warn 'readlink /usr/bin/java failed.'; true; }
    fi
 
    if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then

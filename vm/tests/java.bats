@@ -125,8 +125,21 @@ teardown() {
     [ "$(grep -c 'JAVA_HOME' /root/.bash_profile)" -eq 1 ]
 }
 
+@test "finds JAVA_HOME via filesystem search when java is not on PATH" {
+    # Remove java from PATH so XshowSettings path is skipped
+    rm "$TEST_TMPDIR/bin/java"
+    # fakejdk is already at $TEST_TMPDIR/fakejdk — but it is not in /usr/java/* or
+    # /usr/lib/jvm/* so the glob won't find it.  Symlink it into a known search path.
+    mkdir -p /usr/java
+    ln -sfn "${TEST_TMPDIR}/fakejdk" /usr/java/jdk-test-stub
+    run bash "$SCRIPT" root
+    rm -f /usr/java/jdk-test-stub
+    [ "$status" -eq 0 ]
+    grep -q "JAVA_HOME" /root/.bash_profile
+}
+
 @test "exits 1 when JAVA_HOME cannot be determined" {
-    # Remove java from PATH and make readlink return nothing → both detection paths fail
+    # Remove java from PATH and make readlink return nothing → all detection paths fail
     rm "$TEST_TMPDIR/bin/java"
     run bash "$SCRIPT" root
     [ "$status" -eq 1 ]
