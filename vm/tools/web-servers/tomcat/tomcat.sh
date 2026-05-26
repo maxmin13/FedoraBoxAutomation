@@ -38,11 +38,24 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 STEP "Java check"
 ####
 
+# If JAVA_HOME is already set but stale or wrong (e.g. /usr from a bad java.sh run),
+# clear it so we can re-detect below rather than failing with a misleading message.
+if [[ -n "${JAVA_HOME:-}" && ! -x "${JAVA_HOME}/bin/java" ]]; then
+    log_warn "JAVA_HOME=${JAVA_HOME} is invalid; re-detecting."
+    unset JAVA_HOME
+fi
+
 if [[ -z "${JAVA_HOME:-}" ]]; then
-    JAVA_BIN="$(readlink -f /usr/bin/java 2>/dev/null)"
-    if [[ -n "${JAVA_BIN}" ]]; then
-        export JAVA_HOME="${JAVA_BIN%/bin/java}"
-        log_warn "JAVA_HOME was not set; resolved to ${JAVA_HOME} from /usr/bin/java."
+    if command -v java > /dev/null 2>&1; then
+        DETECTED_JAVA_HOME="$(java -XshowSettings:property -version 2>&1 \
+            | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')"
+        if [[ -n "${DETECTED_JAVA_HOME}" && -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
+            export JAVA_HOME="${DETECTED_JAVA_HOME}"
+            log_warn "JAVA_HOME was not set; resolved to ${JAVA_HOME} via java.home property."
+        else
+            log_error 'JAVA_HOME is not set and Java was not found. Run java.sh before tomcat.sh.'
+            exit 2
+        fi
     else
         log_error 'JAVA_HOME is not set and Java was not found. Run java.sh before tomcat.sh.'
         exit 2

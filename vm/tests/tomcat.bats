@@ -49,11 +49,18 @@ STUB
     # Default: ss reports no listeners (port is free)
     _stub ss 0
 
-    # Provide a fake Java installation so JAVA_HOME check passes
+    # Provide a fake Java installation so the JAVA_HOME validity check passes.
+    # The binary lives at $JAVA_HOME/bin/java (not on PATH) — the script only
+    # needs to confirm the directory is a real JDK, not to run java itself.
     mkdir -p "$TEST_TMPDIR/java/bin"
     printf '#!/bin/bash\necho "openjdk 21"\n' > "$TEST_TMPDIR/java/bin/java"
     chmod +x "$TEST_TMPDIR/java/bin/java"
     export JAVA_HOME="$TEST_TMPDIR/java"
+
+    # java stub on PATH: used when JAVA_HOME is unset/invalid and the script
+    # falls back to 'java -XshowSettings:property -version' for detection.
+    # Default: returns nothing useful → detection fails → exits 2.
+    _stub java 0
 }
 
 teardown() {
@@ -76,11 +83,20 @@ teardown() {
 
 @test "exits 2 when JAVA_HOME is not set and Java is not found" {
     unset JAVA_HOME
-    # readlink stub returns nothing → JAVA_BIN is empty → exits 2
+    # java stub returns no useful output → java.home detection yields nothing → exits 2
     run bash "$SCRIPT" root
     [ "$status" -eq 2 ]
     [[ "$output" == *"JAVA_HOME is not set"* ]]
     [[ "$output" == *"java.sh"* ]]
+}
+
+@test "warns and exits 2 when JAVA_HOME is pre-set to an invalid path" {
+    export JAVA_HOME=/usr   # bad value written by a broken java.sh run
+    # java stub on PATH returns nothing → re-detection also fails
+    run bash "$SCRIPT" root
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"JAVA_HOME=/usr is invalid"* ]]
+    [[ "$output" == *"JAVA_HOME is not set"* ]]
 }
 
 @test "exits 1 when the installation directory already exists" {

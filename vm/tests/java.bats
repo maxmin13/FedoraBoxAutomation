@@ -31,15 +31,39 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
-    # Default: Java already installed
-    _stub java         0
     _stub dnf          0
     _stub wget         0
     _stub alternatives 0
-    _stub readlink     0
     _stub python3      0
+
+    # Set up a fake JDK so java.home detection resolves to a valid directory.
+    mkdir -p "${TEST_TMPDIR}/fakejdk/bin"
+    printf '#!/bin/bash\necho "openjdk 21"\nexit 0\n' > "${TEST_TMPDIR}/fakejdk/bin/java"
+    chmod +x "${TEST_TMPDIR}/fakejdk/bin/java"
+
+    # java stub: exits 0 for --version (Java "already installed"),
+    # emits java.home for -XshowSettings so JAVA_HOME detection succeeds.
+    cat > "$TEST_TMPDIR/bin/java" << JAVASTUB
+#!/bin/bash
+printf "java %s\n" "\$*" >> "${CALLS_FILE}"
+if [[ "\$*" == *"XshowSettings"* ]]; then
+    printf "    java.home = ${TEST_TMPDIR}/fakejdk\n"
+fi
+echo "openjdk 21 2023-09-19"
+exit 0
+JAVASTUB
+    chmod +x "$TEST_TMPDIR/bin/java"
+
+    _stub readlink 0
 
     # java.sh appends JAVA_HOME to ~/.bash_profile — back it up
     [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
@@ -63,7 +87,7 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 when Java is already installed" {
@@ -87,9 +111,24 @@ teardown() {
     grep -q 'JAVA_HOME' /root/.bash_profile
 }
 
+@test "writes a valid JAVA_HOME path (not /usr) to .bash_profile" {
+    run bash "$SCRIPT" root
+    # The written path must not be the bogus /usr fallback
+    ! grep -q 'JAVA_HOME=/usr$' /root/.bash_profile
+    grep -q "JAVA_HOME=${TEST_TMPDIR}/fakejdk" /root/.bash_profile
+}
+
 @test "skips adding JAVA_HOME when it is already in .bash_profile" {
     echo 'export JAVA_HOME=/usr/lib/jvm/java' >> /root/.bash_profile
     run bash "$SCRIPT" root
     # Only one JAVA_HOME line should exist (no duplicate)
     [ "$(grep -c 'JAVA_HOME' /root/.bash_profile)" -eq 1 ]
+}
+
+@test "exits 1 when JAVA_HOME cannot be determined" {
+    # Remove java from PATH and make readlink return nothing → both detection paths fail
+    rm "$TEST_TMPDIR/bin/java"
+    run bash "$SCRIPT" root
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Could not determine JAVA_HOME"* ]]
 }

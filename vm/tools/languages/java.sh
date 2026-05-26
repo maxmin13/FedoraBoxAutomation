@@ -58,7 +58,20 @@ log_info "JAVA_HOME: echo \$JAVA_HOME"
 
 BASH_PROFILE="${HOME_DIR}/.bash_profile"
 if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
-   JAVA_HOME_VAL="$(readlink -f /usr/bin/java | sed 's:/bin/java::')"
+   # Ask the JVM itself — reliable across install methods (RPM, alternatives, custom).
+   JAVA_HOME_VAL="$(java -XshowSettings:property -version 2>&1 \
+       | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')"
+
+   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
+      # Fallback: follow the /usr/bin/java symlink chain
+      JAVA_HOME_VAL="$(readlink -f /usr/bin/java 2>/dev/null | sed 's:/bin/java::')"
+   fi
+
+   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
+      log_error 'Could not determine JAVA_HOME. Verify java.sh completed successfully.'
+      exit 1
+   fi
+
    printf "\nexport JAVA_HOME=%s\n" "${JAVA_HOME_VAL}" >> "${BASH_PROFILE}"
    log_info "JAVA_HOME set to ${JAVA_HOME_VAL} in ${BASH_PROFILE}"
 else
