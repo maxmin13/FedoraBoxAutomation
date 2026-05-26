@@ -143,14 +143,16 @@ teardown() {
     grep -q "core.autocrlf" "$CALLS_FILE"
 }
 
-@test "adds /opt bookmark to Nautilus when not present" {
+@test "adds / and /opt bookmarks to Nautilus when not present" {
     run bash "$SCRIPT" root
+    grep -q 'file:/// /' /root/.config/gtk-3.0/bookmarks
     grep -q 'file:///opt' /root/.config/gtk-3.0/bookmarks
 }
 
-@test "does not duplicate /opt bookmark when already present" {
+@test "does not duplicate / and /opt bookmarks when already present" {
     mkdir -p /root/.config/gtk-3.0
-    echo 'file:///opt opt' > /root/.config/gtk-3.0/bookmarks
+    printf 'file:/// /\nfile:///opt opt\n' > /root/.config/gtk-3.0/bookmarks
     run bash "$SCRIPT" root
+    [ "$(grep -c 'file:/// /' /root/.config/gtk-3.0/bookmarks)" -eq 1 ]
     [ "$(grep -c 'file:///opt' /root/.config/gtk-3.0/bookmarks)" -eq 1 ]
 }

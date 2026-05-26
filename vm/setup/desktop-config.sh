@@ -119,12 +119,14 @@ log_info 'Nautilus additional type column added.'
 BOOKMARKS_FILE="${HOME_DIR}/.config/gtk-3.0/bookmarks"
 mkdir -p "${HOME_DIR}/.config/gtk-3.0"
 
-if grep -q 'file:///opt' "${BOOKMARKS_FILE}" 2>/dev/null; then
-    log_info 'Nautilus bookmark for /opt already present.'
+if grep -q 'file:/// /' "${BOOKMARKS_FILE}" 2>/dev/null && \
+   grep -q 'file:///opt' "${BOOKMARKS_FILE}" 2>/dev/null; then
+    log_info 'Nautilus bookmarks for / and /opt already present.'
 else
-    echo 'file:///opt opt' >> "${BOOKMARKS_FILE}"
+    grep -q 'file:/// /' "${BOOKMARKS_FILE}" 2>/dev/null  || echo 'file:/// /'       >> "${BOOKMARKS_FILE}"
+    grep -q 'file:///opt' "${BOOKMARKS_FILE}" 2>/dev/null || echo 'file:///opt opt'  >> "${BOOKMARKS_FILE}"
     chown "${LOGIN_USER}":"${LOGIN_USER}" "${BOOKMARKS_FILE}"
-    log_info 'Nautilus bookmark for /opt added.'
+    log_info 'Nautilus bookmarks for / and /opt added.'
 fi
 
 ####
