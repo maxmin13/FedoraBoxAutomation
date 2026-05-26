@@ -47,6 +47,7 @@ const CATEGORIES: CategoryDef[] = [
         argPrompts:  ['Node.js version'],
         argDefaults: ['22'],
         argOptions: [[
+          { value: '24', label: '24 — Current stable · ships natively in Fedora 44' },
           { value: '22', label: '22 — LTS Active (until Apr 2027)' },
           { value: '20', label: '20 — LTS Maintenance (until Apr 2026)' },
         ]] },
