@@ -15,7 +15,7 @@
 .PARAMETER ScriptArgs
     Arguments to pass to the script.
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File ".\run-provision-script.ps1" `
+    powershell -ExecutionPolicy Bypass -File ".\provision-script.ps1" `
         -VmName FedoraBox -VmUser root -VmPass secret -LoginUser maxmin `
         -ScriptRelPath setup/guest-additions.sh -NonInteractive
 #>

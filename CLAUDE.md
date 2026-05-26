@@ -23,8 +23,6 @@ Scripts run in order, or use the Electron GUI (`cd app && npm run dev`):
 1. `host\virtualbox-sanity-checks.ps1` — validates prerequisites (RAM, disk, CPU virtualisation, Hyper-V)
 2. `host\virtualbox-install.ps1` — downloads and silently installs VirtualBox
 3. `host\create-vm.ps1` — creates a Fedora VM from ISO with user-specified parameters; prompts to attach Guest Additions ISO
-4. `host\provision-vm.ps1` — installs dev tools into a running VM (requires Guest Additions)
-5. `host\cleanup.ps1` — removes failed VMs (preserves ISOs)
 
 ## Architecture
 
@@ -56,7 +54,6 @@ Scripts run in order, or use the Electron GUI (`cd app && npm run dev`):
 - Minimum host requirements: 8 GB RAM, 30 GB free disk, CPU virtualisation enabled in BIOS
 - Guest OS: Fedora Linux (uses `dnf` package manager and `systemctl`)
 - VBoxManage must be on PATH or discoverable; `Find-VBoxManage` searches common install locations
-- ISO files are preserved by cleanup; only failed VMs are removed
 - All PowerShell scripts use `try/catch` and `$ErrorActionPreference = 'Stop'`
 - Use plain ASCII in `.ps1` files — PowerShell 5.1 garbles Unicode punctuation (use `-` not `—`, `->` not `→`)
 
@@ -76,7 +73,7 @@ Scripts run in order, or use the Electron GUI (`cd app && npm run dev`):
 
 **Guest control:**
 - Always authenticate as `root`, not a regular user — `sudo` requires a TTY which Guest Control does not provide
-- Set a root password inside the VM (`sudo passwd root`) before running `provision-vm.ps1`
+- Set a root password inside the VM (`sudo passwd root`) before provisioning via the GUI
 
 **Electron / React:**
 - New `handleIpc()` calls in `ipc-handlers.js` require a full app restart — main process loads the file once at startup

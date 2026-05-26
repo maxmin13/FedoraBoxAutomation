@@ -10,10 +10,9 @@ const SCRIPTS = {
   sanityChecks:        path.join(HOST_DIR, 'virtualbox-sanity-checks.ps1'),
   installVirtualBox:   path.join(HOST_DIR, 'virtualbox-install.ps1'),
   createVm:            path.join(HOST_DIR, 'create-vm.ps1'),
-  runProvisionScript:  path.join(HOST_DIR, 'run-provision-script.ps1'),
-  runProvisionFull:    path.join(HOST_DIR, 'run-provision-full.ps1'),
-  cleanup:             path.join(HOST_DIR, 'cleanup.ps1'),
-  shareFolder:         path.join(HOST_DIR, 'share-folder.ps1'),
+  runProvisionScript:  path.join(HOST_DIR, 'provision-script.ps1'),
+  runProvisionFull:    path.join(HOST_DIR, 'provision-full.ps1'),
+shareFolder:         path.join(HOST_DIR, 'share-folder.ps1'),
   shareLogs:           path.join(HOST_DIR, 'share-logs.ps1'),
 }
 

@@ -130,7 +130,7 @@ Bash scripts live under `vm/` and run inside the Fedora VM via `VBoxManage guest
 
 6. **Set the file to LF line endings** — CRLF causes a "file not found" / exit 126 error on Linux. In VS Code, click the `CRLF` indicator in the bottom-right status bar and switch it to `LF` before saving.
 
-7. **Call it from a PowerShell script** if it needs to be triggered from the Electron GUI — Bash scripts are never wired into `ipc-handlers.js` directly. The flow is: IPC handler → `.ps1` → `VBoxManage guestcontrol` → `.sh` inside the VM. Add the call inside the relevant script under `host/`, typically `provision-vm.ps1`.
+7. **Call it from a PowerShell script** if it needs to be triggered from the Electron GUI — Bash scripts are never wired into `ipc-handlers.js` directly. The flow is: IPC handler → `.ps1` → `VBoxManage guestcontrol` → `.sh` inside the VM. Add the call inside the relevant script under `host/`, typically `provision-script.ps1`.
 
 8. **Add a bats test** in `vm/tests/` — see [docs/TESTING.md](TESTING.md) for how to write and run bats tests.
 

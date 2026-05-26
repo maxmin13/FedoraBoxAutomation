@@ -14,7 +14,7 @@
 .PARAMETER Hostname
     Hostname to set inside the VM.
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File ".\run-provision-full.ps1" `
+    powershell -ExecutionPolicy Bypass -File ".\provision-full.ps1" `
         -VmName FedoraBox -VmUser root -VmPass secret -LoginUser maxmin -Hostname fedorabox -NonInteractive
 #>
 param(

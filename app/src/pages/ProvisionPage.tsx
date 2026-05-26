@@ -405,7 +405,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const credsVerified = credsStatus === 'ok'
   const credsReady    = credsFilled && credsVerified && !isLive
   const canRunFull    = credsReady && !!loginUser
-  const canRunScript  = credsFilled && !!loginUser && !!selectedScript  // TEMP: credsVerified removed for testing
+  const canRunScript  = credsReady && !!loginUser && !!selectedScript
 
   // ── Running ──────────────────────────────────────────────────────────────────
   if (pageState === 'running') {
@@ -640,7 +640,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             </button>
             <button
               onClick={() => setIdleView('categories')}
-              disabled={!credsFilled}  /* TEMP: credsVerified removed for testing */
+              disabled={!credsReady}
               className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">By Category</p>

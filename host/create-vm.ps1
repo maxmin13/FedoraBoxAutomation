@@ -30,7 +30,7 @@
       - Boot order: DVD first, then disk
 
     Guest Additions note:
-      Clipboard, drag-and-drop, 3D acceleration, and guest control (used by provision-vm.ps1)
+      Clipboard, drag-and-drop, 3D acceleration, and guest control (required for provisioning via the GUI)
       all require VirtualBox Guest Additions to be installed inside the VM.
       If the ISO is attached, it appears as /dev/sr1 inside Fedora after OS installation.
 
@@ -131,7 +131,7 @@ if ([string]::IsNullOrWhiteSpace($vmName)) {
 $existingVms = & $script:vbox list vms 2>$null | ForEach-Object { if ($_ -match '"(.+)"') { $Matches[1] } }
 if ($existingVms -contains $vmName) {
     Write-Host "  WARNING: A VM named '$vmName' already exists." -ForegroundColor Yellow
-    Write-Host "  If you want to provision it, run provision-vm.ps1 instead." -ForegroundColor Cyan
+    Write-Host "  If you want to provision it, use the GUI." -ForegroundColor Cyan
     if ([string]::IsNullOrWhiteSpace($forceRecreate)) {
         $confirm = Read-Host "  Unregister and recreate it from scratch? [Y/n]"
         if ($confirm -match '^[Nn]$') {

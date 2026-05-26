@@ -347,7 +347,7 @@ Add a matching entry in `src/electron.d.ts` for every new `ipcMain.handle()` cha
 - `ipc-handlers.js` reads and writes this file via the `load-vm-credentials` and `save-vm-credentials` IPC channels.
 - The entire `.credentials/` folder is gitignored.
 
-## Guest Control (provision-vm.ps1)
+## Guest Control
 
 - `VBoxManage guestcontrol` has no TTY — `sudo` password prompts will fail silently. Always authenticate as `root`.
 - The VM must have a root password set (`sudo passwd root`) before provisioning.

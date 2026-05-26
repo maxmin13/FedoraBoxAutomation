@@ -315,8 +315,7 @@ Intercept the window close event and warn the user if a script is running.
 | `virtualbox-sanity-checks.ps1` | Kill silently — read-only, safe to abort |
 | `virtualbox-install.ps1` | Block close, show warning dialog |
 | `create-vm.ps1` | Block close, show warning dialog |
-| `provision-vm.ps1` | Block close, show warning dialog |
-| `cleanup.ps1` | Block close, show warning dialog |
+| `provision-script.ps1` / `provision-full.ps1` | Block close, show warning dialog |
 
 ### Close interception (main.js)
 
@@ -474,8 +473,8 @@ const SCRIPTS = {
   sanityChecks:      path.join(HOST, 'virtualbox-sanity-checks.ps1'),
   installVirtualBox: path.join(HOST, 'virtualbox-install.ps1'),
   createVm:          path.join(HOST, 'create-vm.ps1'),
-  provisionVm:       path.join(HOST, 'provision-vm.ps1'),
-  cleanup:           path.join(HOST, 'cleanup.ps1'),
+  runProvisionScript: path.join(HOST, 'provision-script.ps1'),
+  runProvisionFull:   path.join(HOST, 'provision-full.ps1'),
 }
 
 module.exports = SCRIPTS
