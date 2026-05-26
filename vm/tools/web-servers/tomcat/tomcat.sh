@@ -181,6 +181,7 @@ fi
 systemctl start "${SERVICE_NAME}"
 systemctl status "${SERVICE_NAME}" --no-pager
 log_info "Tomcat ${TOMCAT_VERSION} started on port ${TOMCAT_PORT}."
+log_info "Install      : ${TOMCAT_DIR}"
 log_info "Welcome page : http://localhost:${TOMCAT_PORT}"
 log_info "Start        : systemctl start ${SERVICE_NAME}"
 log_info "Stop         : systemctl stop ${SERVICE_NAME}"
