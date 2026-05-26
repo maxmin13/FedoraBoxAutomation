@@ -47,8 +47,11 @@ fi
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
     if command -v java > /dev/null 2>&1; then
+        # Some JDK versions exit non-zero for -XshowSettings even on success;
+        # catch that with a named warning instead of letting trap ERR fire.
         DETECTED_JAVA_HOME="$(java -XshowSettings:property -version 2>&1 \
-            | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')"
+            | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')" \
+            || { log_warn 'java -XshowSettings:property exited non-zero; checking captured output.'; true; }
         if [[ -n "${DETECTED_JAVA_HOME}" && -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
             export JAVA_HOME="${DETECTED_JAVA_HOME}"
             log_warn "JAVA_HOME was not set; resolved to ${JAVA_HOME} via java.home property."

@@ -59,12 +59,16 @@ log_info "JAVA_HOME: echo \$JAVA_HOME"
 BASH_PROFILE="${HOME_DIR}/.bash_profile"
 if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
    # Ask the JVM itself — reliable across install methods (RPM, alternatives, custom).
+   # Some JDK versions exit non-zero for diagnostic -X flags even on success;
+   # catch that with a named warning instead of letting trap ERR fire.
    JAVA_HOME_VAL="$(java -XshowSettings:property -version 2>&1 \
-       | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')"
+       | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')" \
+       || { log_warn 'java -XshowSettings:property exited non-zero; trying symlink fallback.'; true; }
 
    if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
-      # Fallback: follow the /usr/bin/java symlink chain
-      JAVA_HOME_VAL="$(readlink -f /usr/bin/java 2>/dev/null | sed 's:/bin/java::')"
+      # Fallback: follow the /usr/bin/java symlink chain.
+      JAVA_HOME_VAL="$(readlink -f /usr/bin/java 2>/dev/null | sed 's:/bin/java::')" \
+          || { log_warn 'readlink /usr/bin/java failed; java.sh may need to be re-run.'; true; }
    fi
 
    if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
