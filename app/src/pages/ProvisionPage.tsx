@@ -34,8 +34,8 @@ const CATEGORIES: CategoryDef[] = [
     scripts: [
       { name: 'java.sh',   label: 'Oracle JDK',  relPath: 'java.sh',   description: 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile', argType: 'user' },
       { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
-      { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv version manager',
-        argType: 'user+custom', argPrompts: ['Python version (leave blank for latest stable)'], argDefaults: ['e.g. 3.13.3'] },
+      { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv (blank = latest stable)',
+        argType: 'user+custom', argPrompts: ['Python version'], argDefaults: ['3.13.3'] },
     ],
   },
   {
