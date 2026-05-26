@@ -27,3 +27,6 @@
 # in case of script error, give the user to rollback, at least for openssl
 
 # provision claude code
+
+# with tomcat install script you can choose tomcat version and port, do the same with gui
+# the remove tomcat link on the page shouldn't be in the provision page
