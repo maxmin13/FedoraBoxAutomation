@@ -27,7 +27,7 @@ source /tmp/common.sh
 
 LOGIN_USER="${1:-}"
 require_login_user "${LOGIN_USER}"
-TOMCAT_VERSION="${2:-10.1.33}"
+TOMCAT_VERSION="${2:-10.1.36}"
 TOMCAT_PORT="${3:-8080}"
 TOMCAT_MAJOR="${TOMCAT_VERSION%%.*}"
 TOMCAT_DIR="/opt/apache-tomcat-${TOMCAT_VERSION}-${TOMCAT_PORT}"
@@ -96,12 +96,14 @@ STEP "Port check"
 ####
 
 if [[ -d "${TOMCAT_DIR}" ]]; then
-    log_error "Installation directory ${TOMCAT_DIR} already exists. Run tomcat-remove.sh first."
+    log_error "Tomcat ${TOMCAT_VERSION} is already installed on port ${TOMCAT_PORT}."
+    log_error "Remove the existing instance first, then run this installation again."
     exit 1
 fi
 
 if ss -tlnp | grep -q ":${TOMCAT_PORT} "; then
-    log_error "Port ${TOMCAT_PORT} is already in use. Choose a different port or stop the existing process."
+    log_error "Port ${TOMCAT_PORT} is already in use by another process."
+    log_error "Pick a different port or stop the process occupying it."
     ss -tlnp | grep ":${TOMCAT_PORT} "
     exit 1
 fi

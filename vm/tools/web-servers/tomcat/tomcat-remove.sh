@@ -6,13 +6,13 @@
 ##              CATALINA_BASE directory, and optionally removes the shared
 ##              Tomcat binaries from /opt.
 ## Usage:       sudo ./tomcat-remove.sh [version] [port]
-## Parameters:  $1  [version]  Tomcat version to remove (default: 10.1.33)
+## Parameters:  $1  [version]  Tomcat version to remove (default: 10.1.36)
 ##              $2  [port]     HTTP port of the instance to remove (default: 8080)
 ##
 
 source /tmp/common.sh
 
-TOMCAT_VERSION="${1:-10.1.33}"
+TOMCAT_VERSION="${1:-10.1.36}"
 TOMCAT_PORT="${2:-8080}"
 TOMCAT_DIR="/opt/apache-tomcat-${TOMCAT_VERSION}-${TOMCAT_PORT}"
 SERVICE_NAME="tomcat-${TOMCAT_VERSION}-${TOMCAT_PORT}"

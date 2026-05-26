@@ -7,6 +7,11 @@ import ProgressBar from '../components/ProgressBar'
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
 
+interface ArgOption {
+  value: string
+  label: string
+}
+
 interface ScriptDef {
   name: string
   label: string
@@ -15,6 +20,7 @@ interface ScriptDef {
   argType: ArgType
   argPrompts?: string[]
   argDefaults?: string[]
+  argOptions?: ArgOption[][]   // per-position; if set, renders a <select> instead of <input>
 }
 
 interface CategoryDef {
@@ -52,11 +58,12 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
         argType: 'user+custom2',
         argPrompts:  ['Tomcat version', 'HTTP port'],
-        argDefaults: ['10.1.33', '8080'] },
-      { name: 'tomcat-remove.sh', label: 'Remove Tomcat',       relPath: 'tomcat/tomcat-remove.sh', description: 'Remove a Tomcat instance by version and port',
-        argType: 'custom2',
-        argPrompts:  ['Tomcat version to remove', 'HTTP port to remove'],
-        argDefaults: ['10.1.33', '8080'] },
+        argDefaults: ['10.1.36', '8080'],
+        argOptions: [[
+          { value: '11.0.7',  label: '11.0.7  — latest 11.0 · Java 21+' },
+          { value: '10.1.36', label: '10.1.36 — latest 10.1 · Java 11+' },
+          { value: '9.0.102', label: '9.0.102 — latest  9.0 · Java  8+' },
+        ]] },
     ],
   },
   {
@@ -779,32 +786,39 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
             {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
               <div className="space-y-3">
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">
-                    {selectedScript.argPrompts?.[0] ?? 'First argument'}
-                  </label>
-                  <input
-                    type="text"
-                    value={argValues[0]}
-                    onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                    placeholder={selectedScript.argDefaults?.[0] ?? ''}
-                    autoComplete="off"
-                    className={ic(argValues[0])}
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">
-                    {selectedScript.argPrompts?.[1] ?? 'Second argument'}
-                  </label>
-                  <input
-                    type="text"
-                    value={argValues[1]}
-                    onChange={(e) => setArgValues([argValues[0], e.target.value])}
-                    placeholder={selectedScript.argDefaults?.[1] ?? ''}
-                    autoComplete="off"
-                    className={ic(argValues[1])}
-                  />
-                </div>
+                {([0, 1] as const).map((i) => {
+                  const opts      = selectedScript.argOptions?.[i]
+                  const curVal    = argValues[i]
+                  const defVal    = selectedScript.argDefaults?.[i] ?? ''
+                  const label     = selectedScript.argPrompts?.[i] ?? `Argument ${i + 1}`
+                  const handleChange = (val: string) =>
+                    setArgValues(i === 0 ? [val, argValues[1]] : [argValues[0], val])
+                  return (
+                    <div key={i}>
+                      <label className="block text-zinc-400 text-xs mb-1">{label}</label>
+                      {opts?.length ? (
+                        <select
+                          value={curVal || defVal}
+                          onChange={(e) => handleChange(e.target.value)}
+                          className={ic(curVal || defVal) + ' cursor-pointer'}
+                        >
+                          {opts.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={curVal}
+                          onChange={(e) => handleChange(e.target.value)}
+                          placeholder={defVal}
+                          autoComplete="off"
+                          className={ic(curVal)}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
 
