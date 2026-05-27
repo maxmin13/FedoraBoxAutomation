@@ -144,6 +144,13 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'ansible.sh', label: 'Ansible', relPath: 'ansible.sh', description: 'Ansible automation and configuration management', argType: 'none' },
     ],
   },
+  {
+    name: 'AI Tools', dir: 'ai',
+    scripts: [
+      { name: 'claude-code.sh', label: 'Claude Code', relPath: 'claude-code.sh',
+        description: 'Anthropic Claude Code CLI - AI coding assistant (requires Node.js 18+)', argType: 'user' },
+    ],
+  },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

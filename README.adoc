@@ -42,7 +42,7 @@ image::docs/screenshots/provision-landing.png[Provision landing, width=800]
 .Provision — Base Setup detail with hostname option
 image::docs/screenshots/provision-base-setup.png[Provision base setup, width=800]
 
-.Provision — By Category grid (13 categories)
+.Provision — By Category grid (14 categories)
 image::docs/screenshots/provision-by-category.png[Provision by category, width=800]
 
 .Provision — category drill-down (Databases example)
