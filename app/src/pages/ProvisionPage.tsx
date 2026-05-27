@@ -338,9 +338,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         alreadyInstalledRef.current = true
       }
     })
-    const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+    const unsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
       if (exitCode === 0 && loginUser) {
-        window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
+        await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
       if (forceConfirmNeededRef.current && selectedScript?.name === 'openssl.sh') {
         setForceConfirm(true)
