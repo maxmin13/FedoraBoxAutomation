@@ -212,6 +212,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const setupGuideRef          = useRef<HTMLDivElement>(null)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
+  const provisionRecordRef     = useRef<{ scriptRelPath: string; label: string } | null>(null)
 
   useEffect(() => {
     if (!showSetupGuide) return
@@ -351,6 +352,13 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         unsubDone()
         return
       }
+      if (exitCode === 0 && provisionRecordRef.current) {
+        window.electronAPI.markVmProvisioned({
+          vmName:        vm.name,
+          scriptRelPath: provisionRecordRef.current.scriptRelPath,
+          label:         provisionRecordRef.current.label,
+        })
+      }
       setAlreadyInstalled(alreadyInstalledRef.current)
       setSuccess(exitCode === 0)
       setPageState('done')
@@ -377,6 +385,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     if (!await checkBeforeRun()) return
     if (force) setForceConfirm(false)
     setRunningLabel(selectedScript.label)
+    provisionRecordRef.current = {
+      scriptRelPath: `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
+      label: selectedScript.label,
+    }
     const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + (force ? ' --force' : '')
     await startRun(() =>
       window.electronAPI.runProvisionScript({
@@ -393,6 +405,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   async function handleRunFull() {
     if (!await checkBeforeRun()) return
     setRunningLabel('Base Setup')
+    provisionRecordRef.current = { scriptRelPath: '__baseSetup__', label: 'Base Setup' }
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
         vmName: vm.name,

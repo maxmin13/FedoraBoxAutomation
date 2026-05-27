@@ -2,6 +2,15 @@
 // This file tells TypeScript what window.electronAPI looks like
 // so you get autocomplete and type checking in all React components.
 
+export interface ProvisionedEntry {
+  /** Path relative to the vm/tools/ directory, or '__baseSetup__' for Base Setup. */
+  scriptRelPath: string
+  /** Human-readable label shown in the UI (e.g. 'Oracle JDK', 'Base Setup'). */
+  label: string
+  /** ISO 8601 timestamp of the last successful run. */
+  at: string
+}
+
 export interface CreateVmParams {
   vmName: string
   vmFolder: string
@@ -104,7 +113,8 @@ declare global {
       runShareLogs: (params: ShareLogsParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       runProvisionScript: (params: ProvisionScriptParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       runProvisionSetup:  (params: ProvisionFullParams)   => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
-      loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
+      loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string; provisioned?: ProvisionedEntry[] }>
+      markVmProvisioned: (params: { vmName: string; scriptRelPath: string; label: string }) => Promise<{ ok: boolean }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>

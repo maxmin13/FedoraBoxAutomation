@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Vm, VmInfo } from '../electron.d'
+import type { Vm, VmInfo, ProvisionedEntry } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
 import ProvisionPage from './ProvisionPage'
@@ -35,11 +35,16 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function formatProvisionDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView }: VmEditPageProps) {
-  const [view, setView]           = useState<View>(initialView ?? 'detail')
-  const [info, setInfo]           = useState<VmInfo | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [infoKey, setInfoKey]     = useState(0)
+  const [view, setView]               = useState<View>(initialView ?? 'detail')
+  const [info, setInfo]               = useState<VmInfo | null>(null)
+  const [loadError, setLoadError]     = useState<string | null>(null)
+  const [infoKey, setInfoKey]         = useState(0)
+  const [provisioned, setProvisioned] = useState<ProvisionedEntry[]>([])
 
   function backToDetail() {
     setView('detail')
@@ -57,6 +62,12 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
       }
     })
   }, [vm.name, refreshKey, infoKey])
+
+  useEffect(() => {
+    window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
+      setProvisioned(saved.provisioned ?? [])
+    })
+  }, [vm.name, infoKey])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
@@ -186,6 +197,23 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               />
             </Section>
 
+            <Section title="Installed tools">
+              {provisioned.length > 0 ? (
+                <div className="space-y-1.5">
+                  {[...provisioned]
+                    .sort((a, b) => b.at.localeCompare(a.at))
+                    .map((entry) => (
+                      <div key={entry.scriptRelPath} className="flex items-center gap-2 text-sm">
+                        <span className="text-green-400 text-xs shrink-0">&#10003;</span>
+                        <span className="text-zinc-300 flex-1 min-w-0 truncate">{entry.label}</span>
+                        <span className="text-zinc-500 text-xs shrink-0">{formatProvisionDate(entry.at)}</span>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-zinc-500 text-sm">Nothing installed yet</p>
+              )}
+            </Section>
 
           </div>
 

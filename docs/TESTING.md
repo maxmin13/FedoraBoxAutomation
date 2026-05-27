@@ -276,14 +276,16 @@ A passing run looks like:
 ```
  ✓ src/__tests__/CheckCard.test.tsx          (15 tests)
  ✓ src/__tests__/SetupPage.test.tsx          (24 tests)
- ✓ src/__tests__/CreateVmPage.test.tsx       (25 tests)
+ ✓ src/__tests__/CreateVmPage.test.tsx       (30 tests)
  ✓ src/__tests__/LogsPage.test.tsx           (12 tests)
- ✓ src/__tests__/ProvisionPage.test.tsx     (311 tests)
- ✓ electron/__tests__/ipc-handlers.test.js   (21 tests)
- ✓ electron/__tests__/script-runner.test.js  (11 tests)
+ ✓ src/__tests__/ProvisionPage.test.tsx      (71 tests)
+ ✓ src/__tests__/VmEditPage.test.tsx          (3 tests)
+ ✓ electron/__tests__/ipc-handlers.test.js  (121 tests)
+ ✓ electron/__tests__/script-runner.test.js  (19 tests)
+ ... (16 files total)
 
-Test Files  7 passed (7)
-     Tests  419 passed (419)
+Test Files  16 passed (16)
+     Tests  409 passed (409)
 ```
 
 ### What is tested
@@ -292,11 +294,12 @@ Test Files  7 passed (7)
 |-----------|----------------|-------|
 | `src/__tests__/CheckCard.test.tsx` | `status badges` — OK/!!/XX badges; `content` — label and detail text; `"How to fix" toggle` — hidden for pass, shown for fail/warn, open/close lifecycle | 15 |
 | `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — left-panel rows rendered, summary counts (pass/warn/fail), pass/fail message, re-run; `live log stream` — emitted lines appear in right panel; `error state` — script failure message; `detail panel` — auto-selects first failing check, clicking a row shows its detail and fix content, "No action needed" for passing checks, switching selection clears previous detail; `InstallVirtualBox action` — button states and success message | 24 |
-| `src/__tests__/CreateVmPage.test.tsx` | `step 1 next button` — disabled when fields empty/partial, enabled when both filled; `step indicator` — all step labels shown, advances on Next, Back returns to step 1, "Review" label on step 3, confirm summary on step 4, fields preserved on back; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating VM..." replaces wizard, correct args passed, live log lines; `success state` — green banner, navigation button, "What to do next"; `failure state` — red banner, script output toggle; `log toggle` — hidden by default, Show/Hide lifecycle, toggle button visible when lines emitted | 25 |
+| `src/__tests__/CreateVmPage.test.tsx` | `step 1 next button` — disabled when fields empty/partial, enabled when both filled; `step indicator` — all step labels shown, advances on Next, Back returns to step 1, "Review" label on step 3, confirm summary on step 4, fields preserved on back; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating VM..." replaces wizard, correct args passed, live log lines; `success state` — green banner, navigation button, "What to do next"; `failure state` — red banner, script output toggle; `log toggle` — hidden by default, Show/Hide lifecycle, toggle button visible when lines emitted | 30 |
 | `src/__tests__/LogsPage.test.tsx` | default log selection, content rendered, empty/error states, switching logs, Refresh button, Refresh disabled while loading, folder buttons visible, correct `openLogDir` keys | 12 |
-| `src/__tests__/ProvisionPage.test.tsx` | `idle / credentials form` — fields, Save button state; `Test Connection` — success banner, credential persistence, error messages (8 `mapCredsError` branches); `script list` — flat list, by-category grouping, category drill-down; `running state` — label while in flight; `done state banners` — green success, red failure with `errorDetail`, blue already-installed, mutual exclusion, action buttons; `forceConfirm` — amber panel, Cancel, "Install anyway" passes `--force`; `changeHostname toggle` — input shown/hidden, pre-filled from `getVmHostname`, cleared on uncheck; `AI Tools category — Claude Code` — category visible in grid, script list, script-args form, run-button gate, success/failure/already-installed banners, correct scriptRelPath and scriptArgs | 311 |
-| `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item array, bare-object Array.isArray guard, error paths with stdout/stderr snippets; `get-downloads-path`; `open-log-dir` — success, correct paths, error string, unknown key | 21 |
-| `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input; `hasActiveScript`; `killActiveScript` | 11 |
+| `src/__tests__/ProvisionPage.test.tsx` | `credentials section` — fields, Test Connection states, error messages (8 `mapCredsError` branches); `script list` — flat list, by-category grouping, category drill-down; `running state` — label while in flight; `done state banners` — green success, red failure with `errorDetail`, blue already-installed, mutual exclusion, action buttons; `forceConfirm` — amber panel, Cancel, "Install anyway" passes `--force`; `changeHostname toggle` — input shown/hidden, pre-filled from `getVmHostname`; `AI Tools — Claude Code` — category visible in grid, script-args form, banners, correct scriptRelPath; `markVmProvisioned calls` — called after success, already-installed, and Base Setup; NOT called after failure | 71 |
+| `src/__tests__/VmEditPage.test.tsx` | `Installed tools section` — "Nothing installed yet" empty state; labels rendered from provisioned list; newest-first sort | 3 |
+| `electron/__tests__/ipc-handlers.test.js` | All IPC handlers: `parseVmList`, `parseChecksOutput`, `get-downloads-path`, `open-log-dir`, `read-doc`, `load-vm-credentials` (incl. provisioned array), `save-vm-credentials`, `mark-vm-provisioned` (create, upsert, multi-VM isolation), `check-vm-ready`, `list-vms`, `start-vm`, `stop-vm`, `delete-vm`, `get-vm-guest-logs-path`, `get-vm-info`, `run-share-folder`, `run-share-logs`, `run-provision-script`, `run-provision-setup`, `is-dev`, `get-vm-hostname`, `check-vm-credentials`, `run-sanity-checks`, `create-vm`, `install-virtualbox`, `log-error` | 121 |
+| `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input; `hasActiveScript`; `killActiveScript`; `runScript` | 19 |
 
 ### Debugging a failing test in VS Code
 

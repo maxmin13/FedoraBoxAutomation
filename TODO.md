@@ -19,5 +19,3 @@
 # provision claude code
 
 # eclipse ide use a drop down list for the version
-
-# update the docs and readme see if to attach new screenshots

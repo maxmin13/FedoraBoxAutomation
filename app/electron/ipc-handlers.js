@@ -383,20 +383,43 @@ function registerIpcHandlers(win) {
   })
 
   // ── load-vm-credentials ──────────────────────────────────
-  // Reads .credentials.json keyed by VM name.
-  // Returns { ok, user, pass, loginUser } or { ok: false } if not found.
+  // Reads vm-state.json keyed by VM name.
+  // Returns { ok, user, pass, loginUser, provisioned } or { ok: false } if not found.
   handleIpc('load-vm-credentials', async (_event, vmName) => {
     const store = await readCredsStore()
     const entry = store[vmName]
     if (!entry) return { ok: false }
-    return { ok: true, user: entry.user ?? '', pass: entry.pass ?? '', loginUser: entry.loginUser ?? '' }
+    return {
+      ok: true,
+      user:        entry.user        ?? '',
+      pass:        entry.pass        ?? '',
+      loginUser:   entry.loginUser   ?? '',
+      provisioned: entry.provisioned ?? [],
+    }
   })
 
   // ── save-vm-credentials ──────────────────────────────────
   handleIpc('save-vm-credentials', async (_event, { vmName, user, pass, loginUser }) => {
     const store = await readCredsStore()
     const existing = store[vmName] ?? {}
-    store[vmName] = { user, pass, loginUser: loginUser || existing.loginUser || '' }
+    store[vmName] = { ...existing, user, pass, loginUser: loginUser || existing.loginUser || '' }
+    await writeCredsStore(store)
+    return { ok: true }
+  })
+
+  // ── mark-vm-provisioned ───────────────────────────────────
+  // Upserts a provisioned-tool record in vm-state.json keyed by scriptRelPath.
+  // Re-running the same script updates the timestamp instead of adding a duplicate.
+  // Uses '__baseSetup__' as the sentinel scriptRelPath for Base Setup.
+  handleIpc('mark-vm-provisioned', async (_event, { vmName, scriptRelPath, label }) => {
+    const store = await readCredsStore()
+    const entry = store[vmName] ?? {}
+    const list  = entry.provisioned ?? []
+    const idx   = list.findIndex(p => p.scriptRelPath === scriptRelPath)
+    const record = { scriptRelPath, label, at: new Date().toISOString() }
+    if (idx >= 0) list[idx] = record
+    else          list.push(record)
+    store[vmName] = { ...entry, provisioned: list }
     await writeCredsStore(store)
     return { ok: true }
   })

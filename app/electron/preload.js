@@ -66,6 +66,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Runs the full base setup (system-prep, network, selinux, desktop, utilities) and streams output
   runProvisionSetup: (params) => ipcRenderer.invoke('run-provision-setup', params),
 
+  // Records a successfully provisioned tool in vm-state.json (upsert by scriptRelPath)
+  markVmProvisioned: (params) => ipcRenderer.invoke('mark-vm-provisioned', params),
+
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results
   runSanityChecks: () => ipcRenderer.invoke('run-sanity-checks'),

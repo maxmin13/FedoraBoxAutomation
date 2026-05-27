@@ -11,6 +11,7 @@ beforeEach(() => {
     saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     runProvisionScript: vi.fn().mockResolvedValue({ ok: true }),
     runProvisionSetup:  vi.fn().mockResolvedValue({ ok: true }),
+    markVmProvisioned:  vi.fn().mockResolvedValue({ ok: true }),
     getVmHostname:      vi.fn().mockResolvedValue({ ok: true, hostname: 'fedorabox' }),
     onScriptLine:       vi.fn().mockReturnValue(() => {}),
     onScriptDone:       vi.fn().mockReturnValue(() => {}),
@@ -789,5 +790,53 @@ describe('changeHostname toggle', () => {
     expect(screen.getByPlaceholderText('e.g. fedorabox')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('checkbox'))
     expect(screen.queryByPlaceholderText('e.g. fedorabox')).not.toBeInTheDocument()
+  })
+})
+
+// ── markVmProvisioned calls ───────────────────────────────────────────────────
+
+describe('markVmProvisioned calls', () => {
+  it('calls markVmProvisioned with correct args after a script succeeds', async () => {
+    await navigateToJavaReady()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK completed successfully.')).toBeInTheDocument())
+    expect(window.electronAPI.markVmProvisioned).toHaveBeenCalledWith({
+      vmName:        'FedoraBox',
+      scriptRelPath: 'tools/languages/java.sh',
+      label:         'Oracle JDK',
+    })
+  })
+
+  it('calls markVmProvisioned after an already-installed run (exit 0)', async () => {
+    await navigateToJavaReady()
+    wireRunWithLines(0, ['[INFO  ] java.sh Oracle JDK already installed: 21.0.1'])
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK is already installed.')).toBeInTheDocument())
+    expect(window.electronAPI.markVmProvisioned).toHaveBeenCalledWith({
+      vmName:        'FedoraBox',
+      scriptRelPath: 'tools/languages/java.sh',
+      label:         'Oracle JDK',
+    })
+  })
+
+  it('calls markVmProvisioned with __baseSetup__ after Base Setup succeeds', async () => {
+    wireSetupRun(0)
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() => expect(screen.getByText('Base Setup completed successfully.')).toBeInTheDocument())
+    expect(window.electronAPI.markVmProvisioned).toHaveBeenCalledWith({
+      vmName:        'FedoraBox',
+      scriptRelPath: '__baseSetup__',
+      label:         'Base Setup',
+    })
+  })
+
+  it('does NOT call markVmProvisioned after a script failure', async () => {
+    await navigateToJavaReady()
+    wireRun(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK failed.')).toBeInTheDocument())
+    expect(window.electronAPI.markVmProvisioned).not.toHaveBeenCalled()
   })
 })

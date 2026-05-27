@@ -236,7 +236,7 @@ Full setup and usage instructions are in link:FedoraBoxAutomation/docs/TESTING.m
 | Windows or Linux (Node.js)
 |===
 
-Current totals: *419 Vitest tests* across 7 files.
+Current totals: *409 Vitest tests* across 16 files.
 
 == Troubleshooting
 

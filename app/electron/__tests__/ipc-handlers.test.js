@@ -328,7 +328,7 @@ describe('load-vm-credentials handler', () => {
   it('returns credentials for a known VM', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' })
+    expect(result).toEqual({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora', provisioned: [] })
   })
 
   it('returns ok: false for an unknown VM', async () => {
@@ -354,7 +354,20 @@ describe('load-vm-credentials handler', () => {
   it('returns empty strings for missing optional credential fields', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: {} }))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, user: '', pass: '', loginUser: '' })
+    expect(result).toEqual({ ok: true, user: '', pass: '', loginUser: '', provisioned: [] })
+  })
+
+  it('returns the provisioned array when present in the store', async () => {
+    const store = {
+      FedoraBox: {
+        user: 'root', pass: 'secret', loginUser: 'fedora',
+        provisioned: [{ scriptRelPath: '__baseSetup__', label: 'Base Setup', at: '2026-05-26T14:00:00.000Z' }],
+      },
+    }
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(store))
+    const result = await loadCredsHandler({}, 'FedoraBox')
+    expect(result.provisioned).toHaveLength(1)
+    expect(result.provisioned[0].label).toBe('Base Setup')
   })
 })
 
@@ -417,6 +430,74 @@ describe('save-vm-credentials handler', () => {
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'new', loginUser: 'newuser' })
     const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
     expect(written.FedoraBox.loginUser).toBe('newuser')
+  })
+})
+
+// ── mark-vm-provisioned handler ───────────────────────────────────────────────
+
+describe('mark-vm-provisioned handler', () => {
+  let markProvisionedHandler
+  let mockReadFile, mockMkdir, mockWriteFile
+
+  beforeAll(() => {
+    mockReadFile  = vi.spyOn(fs.promises, 'readFile')
+    mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
+    mockWriteFile = vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
+    markProvisionedHandler = loadHandlers()('mark-vm-provisioned')
+  })
+
+  afterAll(() => {
+    mockReadFile.mockRestore()
+    mockMkdir.mockRestore()
+    mockWriteFile.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockReadFile.mockReset()
+    mockWriteFile.mockClear()
+  })
+
+  it('creates a new provisioned entry for a VM', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'x', loginUser: 'fedora' } }))
+    const result = await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
+    expect(result).toEqual({ ok: true })
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    expect(written.FedoraBox.provisioned).toHaveLength(1)
+    expect(written.FedoraBox.provisioned[0]).toMatchObject({ scriptRelPath: '__baseSetup__', label: 'Base Setup' })
+    expect(written.FedoraBox.provisioned[0].at).toBeTruthy()
+  })
+
+  it('upserts (updates timestamp) when the same scriptRelPath is run again', async () => {
+    const existing = {
+      FedoraBox: {
+        user: 'root', pass: 'x', loginUser: 'fedora',
+        provisioned: [{ scriptRelPath: '__baseSetup__', label: 'Base Setup', at: '2026-01-01T00:00:00.000Z' }],
+      },
+    }
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(existing))
+    await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    // Still exactly one entry — no duplicate
+    expect(written.FedoraBox.provisioned).toHaveLength(1)
+    // Timestamp must have been updated (new Date().toISOString() > '2026-01-01...')
+    expect(written.FedoraBox.provisioned[0].at).not.toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('does not overwrite provisioned entries for other VMs', async () => {
+    const store = {
+      FedoraBox: { user: 'root', pass: 'x', loginUser: 'fedora', provisioned: [] },
+      OtherVM:   { user: 'root', pass: 'y', loginUser: 'bob',    provisioned: [
+        { scriptRelPath: 'tools/databases/postgresql.sh', label: 'PostgreSQL', at: '2026-05-01T00:00:00.000Z' },
+      ]},
+    }
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(store))
+    await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
+    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    expect(written.OtherVM.provisioned).toHaveLength(1)
+    expect(written.OtherVM.provisioned[0].label).toBe('PostgreSQL')
+    expect(written.FedoraBox.provisioned).toHaveLength(1)
+    expect(written.FedoraBox.provisioned[0].label).toBe('Base Setup')
   })
 })
 
