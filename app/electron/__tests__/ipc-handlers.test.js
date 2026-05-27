@@ -328,7 +328,7 @@ describe('load-vm-credentials handler', () => {
   it('returns credentials for a known VM', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora', provisioned: [] })
+    expect(result).toEqual({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' })
   })
 
   it('returns ok: false for an unknown VM', async () => {
@@ -354,20 +354,7 @@ describe('load-vm-credentials handler', () => {
   it('returns empty strings for missing optional credential fields', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: {} }))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, user: '', pass: '', loginUser: '', provisioned: [] })
-  })
-
-  it('returns the provisioned array when present in the store', async () => {
-    const store = {
-      FedoraBox: {
-        user: 'root', pass: 'secret', loginUser: 'fedora',
-        provisioned: [{ scriptRelPath: '__baseSetup__', label: 'Base Setup', at: '2026-05-26T14:00:00.000Z' }],
-      },
-    }
-    mockReadFile.mockResolvedValueOnce(JSON.stringify(store))
-    const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result.provisioned).toHaveLength(1)
-    expect(result.provisioned[0].label).toBe('Base Setup')
+    expect(result).toEqual({ ok: true, user: '', pass: '', loginUser: '' })
   })
 })
 
@@ -433,71 +420,82 @@ describe('save-vm-credentials handler', () => {
   })
 })
 
-// ── mark-vm-provisioned handler ───────────────────────────────────────────────
+// ── query-vm-installed handler ────────────────────────────────────────────────
 
-describe('mark-vm-provisioned handler', () => {
-  let markProvisionedHandler
-  let mockReadFile, mockMkdir, mockWriteFile
+describe('query-vm-installed handler', () => {
+  let queryVmInstalledHandler
+  let mockExecSync
+  let mockReadFile
+
+  const INSTALLED_JSON = JSON.stringify({
+    baseSetup: true, java: true, php: false, python: false, node: true,
+    maven: false, httpd: false, tomcat: false, mariadb: false, postgresql: false,
+    dbeaver: false, eclipse: false, visualStudioCode: false, docker: true,
+    minikube: false, k3s: false, awsCli: false, ecsCli: false, openssl: false,
+    wireshark: false, git: true, vim: true, chrome: false, ansible: false, claudeCode: false,
+  })
 
   beforeAll(() => {
-    mockReadFile  = vi.spyOn(fs.promises, 'readFile')
-    mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
-    mockWriteFile = vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
-    markProvisionedHandler = loadHandlers()('mark-vm-provisioned')
+    const cpId = require.resolve('child_process')
+    mockExecSync = vi.fn()
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: mockExecSync },
+    }
+    mockReadFile = vi.spyOn(fs.promises, 'readFile')
+    queryVmInstalledHandler = loadHandlers()('query-vm-installed')
   })
 
   afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
     mockReadFile.mockRestore()
-    mockMkdir.mockRestore()
-    mockWriteFile.mockRestore()
     cleanupHandlers()
   })
 
   beforeEach(() => {
+    mockExecSync.mockReset()
     mockReadFile.mockReset()
-    mockWriteFile.mockClear()
   })
 
-  it('creates a new provisioned entry for a VM', async () => {
-    mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'x', loginUser: 'fedora' } }))
-    const result = await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
-    expect(result).toEqual({ ok: true })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
-    expect(written.FedoraBox.provisioned).toHaveLength(1)
-    expect(written.FedoraBox.provisioned[0]).toMatchObject({ scriptRelPath: '__baseSetup__', label: 'Base Setup' })
-    expect(written.FedoraBox.provisioned[0].at).toBeTruthy()
+  it('returns { ok: false, vmStopped: true } when the VM is not running', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="poweroff"\n')  // isVmRunning
+    const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, vmStopped: true })
   })
 
-  it('upserts (updates timestamp) when the same scriptRelPath is run again', async () => {
-    const existing = {
-      FedoraBox: {
-        user: 'root', pass: 'x', loginUser: 'fedora',
-        provisioned: [{ scriptRelPath: '__baseSetup__', label: 'Base Setup', at: '2026-01-01T00:00:00.000Z' }],
-      },
-    }
-    mockReadFile.mockResolvedValueOnce(JSON.stringify(existing))
-    await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
-    // Still exactly one entry — no duplicate
-    expect(written.FedoraBox.provisioned).toHaveLength(1)
-    // Timestamp must have been updated (new Date().toISOString() > '2026-01-01...')
-    expect(written.FedoraBox.provisioned[0].at).not.toBe('2026-01-01T00:00:00.000Z')
+  it('returns { ok: false, noCredentials: true } when no credentials are saved', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="running"\n')  // isVmRunning
+    mockReadFile.mockResolvedValueOnce('{}')                  // empty store
+    const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, noCredentials: true })
   })
 
-  it('does not overwrite provisioned entries for other VMs', async () => {
-    const store = {
-      FedoraBox: { user: 'root', pass: 'x', loginUser: 'fedora', provisioned: [] },
-      OtherVM:   { user: 'root', pass: 'y', loginUser: 'bob',    provisioned: [
-        { scriptRelPath: 'tools/databases/postgresql.sh', label: 'PostgreSQL', at: '2026-05-01T00:00:00.000Z' },
-      ]},
-    }
-    mockReadFile.mockResolvedValueOnce(JSON.stringify(store))
-    await markProvisionedHandler({}, { vmName: 'FedoraBox', scriptRelPath: '__baseSetup__', label: 'Base Setup' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
-    expect(written.OtherVM.provisioned).toHaveLength(1)
-    expect(written.OtherVM.provisioned[0].label).toBe('PostgreSQL')
-    expect(written.FedoraBox.provisioned).toHaveLength(1)
-    expect(written.FedoraBox.provisioned[0].label).toBe('Base Setup')
+  it('returns { ok: true, installed } when guestcontrol succeeds', async () => {
+    mockExecSync
+      .mockReturnValueOnce('VMState="running"\n')  // isVmRunning
+      .mockReturnValueOnce('')                      // copyto
+      .mockReturnValueOnce(INSTALLED_JSON)          // run detect-installed.sh
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({ FedoraBox: { user: 'root', pass: 'secret' } })
+    )
+    const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
+    expect(result.ok).toBe(true)
+    expect(result.installed.baseSetup).toBe(true)
+    expect(result.installed.java).toBe(true)
+    expect(result.installed.php).toBe(false)
+    expect(result.installed.docker).toBe(true)
+  })
+
+  it('returns { ok: false, error } when guestcontrol throws', async () => {
+    mockExecSync
+      .mockReturnValueOnce('VMState="running"\n')
+      .mockImplementationOnce(() => { throw new Error('VERR_AUTHENTICATION_FAILURE') })
+    mockReadFile.mockResolvedValueOnce(
+      JSON.stringify({ FedoraBox: { user: 'root', pass: 'wrong' } })
+    )
+    const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/VERR_AUTHENTICATION_FAILURE/)
   })
 })
 

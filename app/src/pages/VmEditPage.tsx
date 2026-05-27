@@ -1,9 +1,38 @@
 import { useState, useEffect } from 'react'
-import type { Vm, VmInfo, ProvisionedEntry } from '../electron.d'
+import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
 import ProvisionPage from './ProvisionPage'
 import VmRunningBadge from '../components/VmRunningBadge'
+
+// Maps detect-installed.sh JSON keys to user-facing labels.
+const TOOL_LABELS: { key: string; label: string }[] = [
+  { key: 'baseSetup',        label: 'Base Setup' },
+  { key: 'java',             label: 'Oracle JDK' },
+  { key: 'php',              label: 'PHP' },
+  { key: 'python',           label: 'Python' },
+  { key: 'node',             label: 'Node.js' },
+  { key: 'maven',            label: 'Apache Maven' },
+  { key: 'httpd',            label: 'Apache HTTP Server' },
+  { key: 'tomcat',           label: 'Apache Tomcat' },
+  { key: 'mariadb',          label: 'MariaDB' },
+  { key: 'postgresql',       label: 'PostgreSQL' },
+  { key: 'dbeaver',          label: 'DBeaver CE' },
+  { key: 'eclipse',          label: 'Eclipse IDE' },
+  { key: 'visualStudioCode', label: 'Visual Studio Code' },
+  { key: 'docker',           label: 'Docker CE' },
+  { key: 'minikube',         label: 'Minikube' },
+  { key: 'k3s',              label: 'k3s' },
+  { key: 'awsCli',           label: 'AWS CLI' },
+  { key: 'ecsCli',           label: 'Amazon ECS CLI' },
+  { key: 'openssl',          label: 'OpenSSL 3.3.2' },
+  { key: 'wireshark',        label: 'Wireshark' },
+  { key: 'git',              label: 'Git' },
+  { key: 'vim',              label: 'Vim' },
+  { key: 'chrome',           label: 'Google Chrome' },
+  { key: 'ansible',          label: 'Ansible' },
+  { key: 'claudeCode',       label: 'Claude Code' },
+]
 
 interface VmEditPageProps {
   vm: Vm
@@ -35,16 +64,16 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-function formatProvisionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 
 export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView }: VmEditPageProps) {
+  type ToolsStatus = 'idle' | 'loading' | 'ok' | 'stopped' | 'no-credentials' | 'error'
+
   const [view, setView]               = useState<View>(initialView ?? 'detail')
   const [info, setInfo]               = useState<VmInfo | null>(null)
   const [loadError, setLoadError]     = useState<string | null>(null)
   const [infoKey, setInfoKey]         = useState(0)
-  const [provisioned, setProvisioned] = useState<ProvisionedEntry[]>([])
+  const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
+  const [installedTools, setInstalledTools] = useState<string[]>([])
 
   function backToDetail() {
     setView('detail')
@@ -63,11 +92,30 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     })
   }, [vm.name, refreshKey, infoKey])
 
+  // Query installed tools whenever VM state or VM name changes.
   useEffect(() => {
-    window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
-      setProvisioned(saved.provisioned ?? [])
+    if (!info) return
+    if (info.state !== 'running') {
+      setToolsStatus('stopped')
+      setInstalledTools([])
+      return
+    }
+    setToolsStatus('loading')
+    window.electronAPI.queryVmInstalled(vm.name).then((result) => {
+      if (result.ok) {
+        setInstalledTools(
+          TOOL_LABELS.filter((t) => result.installed[t.key]).map((t) => t.label)
+        )
+        setToolsStatus('ok')
+      } else if (result.vmStopped) {
+        setToolsStatus('stopped')
+      } else if (result.noCredentials) {
+        setToolsStatus('no-credentials')
+      } else {
+        setToolsStatus('error')
+      }
     })
-  }, [vm.name, infoKey])
+  }, [info?.state, vm.name])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
@@ -197,18 +245,34 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               />
             </Section>
 
-            <Section title="Installed tools">
-              {provisioned.length > 0 ? (
+            <Section
+              title="Installed tools"
+              action={info.state === 'running' && (
+                <button
+                  onClick={() => setInfoKey((k) => k + 1)}
+                  disabled={toolsStatus === 'loading'}
+                  className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
+                </button>
+              )}
+            >
+              {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
+                <p className="text-zinc-500 text-sm">Checking...</p>
+              ) : toolsStatus === 'stopped' ? (
+                <p className="text-zinc-500 text-sm">VM is stopped — data not available</p>
+              ) : toolsStatus === 'no-credentials' ? (
+                <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
+              ) : toolsStatus === 'error' ? (
+                <p className="text-zinc-500 text-sm">Could not connect to VM</p>
+              ) : installedTools.length > 0 ? (
                 <div className="space-y-1.5">
-                  {[...provisioned]
-                    .sort((a, b) => b.at.localeCompare(a.at))
-                    .map((entry) => (
-                      <div key={entry.scriptRelPath} className="flex items-center gap-2 text-sm">
-                        <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                        <span className="text-zinc-300 flex-1 min-w-0 truncate">{entry.label}</span>
-                        <span className="text-zinc-500 text-xs shrink-0">{formatProvisionDate(entry.at)}</span>
-                      </div>
-                    ))}
+                  {installedTools.map((label) => (
+                    <div key={label} className="flex items-center gap-2 text-sm">
+                      <span className="text-green-400 text-xs shrink-0">&#10003;</span>
+                      <span className="text-zinc-300">{label}</span>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-zinc-500 text-sm">Nothing installed yet</p>

@@ -384,17 +384,16 @@ function registerIpcHandlers(win) {
 
   // ── load-vm-credentials ──────────────────────────────────
   // Reads vm-state.json keyed by VM name.
-  // Returns { ok, user, pass, loginUser, provisioned } or { ok: false } if not found.
+  // Returns { ok, user, pass, loginUser } or { ok: false } if not found.
   handleIpc('load-vm-credentials', async (_event, vmName) => {
     const store = await readCredsStore()
     const entry = store[vmName]
     if (!entry) return { ok: false }
     return {
       ok: true,
-      user:        entry.user        ?? '',
-      pass:        entry.pass        ?? '',
-      loginUser:   entry.loginUser   ?? '',
-      provisioned: entry.provisioned ?? [],
+      user:      entry.user      ?? '',
+      pass:      entry.pass      ?? '',
+      loginUser: entry.loginUser ?? '',
     }
   })
 
@@ -407,21 +406,33 @@ function registerIpcHandlers(win) {
     return { ok: true }
   })
 
-  // ── mark-vm-provisioned ───────────────────────────────────
-  // Upserts a provisioned-tool record in vm-state.json keyed by scriptRelPath.
-  // Re-running the same script updates the timestamp instead of adding a duplicate.
-  // Uses '__baseSetup__' as the sentinel scriptRelPath for Base Setup.
-  handleIpc('mark-vm-provisioned', async (_event, { vmName, scriptRelPath, label }) => {
+  // ── query-vm-installed ────────────────────────────────────
+  // Copies detect-installed.sh into the guest and runs it via guestcontrol.
+  // Returns { ok: true, installed: Record<string,boolean> } on success.
+  // Returns { ok: false, vmStopped: true } if the VM is not running.
+  // Returns { ok: false, noCredentials: true } if no credentials are saved.
+  // Returns { ok: false, error: string } if guestcontrol fails.
+  handleIpc('query-vm-installed', async (_event, { vmName }) => {
+    if (!isVmRunning(vmName)) return { ok: false, vmStopped: true }
     const store = await readCredsStore()
-    const entry = store[vmName] ?? {}
-    const list  = entry.provisioned ?? []
-    const idx   = list.findIndex(p => p.scriptRelPath === scriptRelPath)
-    const record = { scriptRelPath, label, at: new Date().toISOString() }
-    if (idx >= 0) list[idx] = record
-    else          list.push(record)
-    store[vmName] = { ...entry, provisioned: list }
-    await writeCredsStore(store)
-    return { ok: true }
+    const entry = store[vmName]
+    if (!entry?.user || !entry?.pass) return { ok: false, noCredentials: true }
+    const { user, pass } = entry
+    const scriptSrc = path.join(__dirname, '..', '..', 'vm', 'detect-installed.sh')
+    try {
+      execSync(
+        `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/detect-installed.sh --username "${user}" --password "${pass}"`,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 15000 }
+      )
+      const stdout = execSync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/detect-installed.sh`,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 30000 }
+      )
+      return { ok: true, installed: JSON.parse(stdout.trim()) }
+    } catch (error) {
+      log.error(`[ipc][query-vm-installed] "${vmName}":`, error.message)
+      return { ok: false, error: error.message }
+    }
   })
 
   // ── run-provision-script ─────────────────────────────────
