@@ -630,6 +630,111 @@ describe('forceConfirm (OpenSSL already installed)', () => {
   })
 })
 
+// ── AI Tools category — Claude Code ──────────────────────────────────────────
+
+/** Navigate: creds verified → By Category → AI Tools → Claude Code script-args. */
+async function navigateToClaudeCode() {
+  window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+    ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+  })
+  await renderAndFlush()
+  fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+  await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+  await waitFor(() => expect(screen.getByText('AI Tools')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('AI Tools'))
+  await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Claude Code'))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run Claude Code' })).toBeInTheDocument())
+}
+
+describe('AI Tools category — Claude Code', () => {
+  it('"AI Tools" category appears in the category grid', async () => {
+    await renderAndFlush()
+    await fillAndTestCreds()
+    fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+    await waitFor(() => expect(screen.getByText('AI Tools')).toBeInTheDocument())
+  })
+
+  it('clicking "AI Tools" shows the Claude Code script in the script list', async () => {
+    await renderAndFlush()
+    await fillAndTestCreds()
+    fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+    await waitFor(() => expect(screen.getByText('AI Tools')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('AI Tools'))
+    await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument())
+  })
+
+  it('clicking "Claude Code" shows the script-args form with a "Desktop username" input', async () => {
+    await navigateToClaudeCode()
+    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
+  })
+
+  it('"Run Claude Code" button is disabled when loginUser is empty', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
+    await renderAndFlush()
+    await fillAndTestCreds()
+    fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+    await waitFor(() => expect(screen.getByText('AI Tools')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('AI Tools'))
+    await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Claude Code'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Claude Code' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Run Claude Code' })).toBeDisabled()
+  })
+
+  it('"Run Claude Code" button is enabled when loginUser is filled', async () => {
+    await navigateToClaudeCode()
+    expect(screen.getByRole('button', { name: 'Run Claude Code' })).not.toBeDisabled()
+  })
+
+  it('calls runProvisionScript with the correct relPath and loginUser as scriptArgs', async () => {
+    await navigateToClaudeCode()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Claude Code' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runProvisionScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vmName:     'FedoraBox',
+          scriptArgs: 'fedora',
+        })
+      )
+    )
+    expect(window.electronAPI.runProvisionScript).toHaveBeenCalledWith(
+      expect.objectContaining({ scriptRelPath: expect.stringContaining('claude-code.sh') })
+    )
+  })
+
+  it('shows green success banner after Claude Code completes', async () => {
+    await navigateToClaudeCode()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Claude Code' }))
+    await waitFor(() => expect(screen.getByText('Claude Code completed successfully.')).toBeInTheDocument())
+  })
+
+  it('shows red failure banner after Claude Code fails', async () => {
+    await navigateToClaudeCode()
+    wireRun(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Claude Code' }))
+    await waitFor(() => expect(screen.getByText('Claude Code failed.')).toBeInTheDocument())
+  })
+
+  it('shows blue "already installed" banner when the script reports claude is already installed', async () => {
+    await navigateToClaudeCode()
+    wireRunWithLines(0, ['[INFO  ] claude-code.sh Claude Code already installed: 1.0.0'])
+    fireEvent.click(screen.getByRole('button', { name: 'Run Claude Code' }))
+    await waitFor(() => expect(screen.getByText('Claude Code is already installed.')).toBeInTheDocument())
+  })
+
+  it('does not show green success banner when already-installed is detected', async () => {
+    await navigateToClaudeCode()
+    wireRunWithLines(0, ['[INFO  ] claude-code.sh Claude Code already installed: 1.0.0'])
+    fireEvent.click(screen.getByRole('button', { name: 'Run Claude Code' }))
+    await waitFor(() => expect(screen.getByText('Claude Code is already installed.')).toBeInTheDocument())
+    expect(screen.queryByText('Claude Code completed successfully.')).not.toBeInTheDocument()
+  })
+})
+
 // ── changeHostname toggle ─────────────────────────────────────────────────────
 
 describe('changeHostname toggle', () => {
