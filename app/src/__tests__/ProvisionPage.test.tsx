@@ -50,6 +50,26 @@ function wireSetupRun(exitCode: number) {
   })
 }
 
+/**
+ * Wire onScriptLine + onScriptDone + runProvisionScript so that the given
+ * text lines are emitted through the line callback before onScriptDone fires.
+ * This lets tests trigger the forceConfirm and alreadyInstalled code paths
+ * that depend on scanning live script output.
+ */
+function wireRunWithLines(exitCode: number, emitLines: string[], errorDetail?: string) {
+  let doneCb: ((code: number) => void) | null = null
+  let lineCb: ((line: { text: string; source: 'stdout' | 'stderr' }) => void) | null = null
+  window.electronAPI.onScriptLine = vi.fn().mockImplementation((cb) => { lineCb = cb; return () => {} })
+  window.electronAPI.onScriptDone = vi.fn().mockImplementation((cb) => { doneCb = cb; return () => {} })
+  window.electronAPI.runProvisionScript = vi.fn().mockImplementation(async () => {
+    for (const text of emitLines) {
+      lineCb?.({ text, source: 'stdout' })
+    }
+    doneCb!(exitCode)
+    return exitCode === 0 ? { ok: true } : { ok: false, errorDetail: errorDetail ?? null }
+  })
+}
+
 /** Render, pre-fill saved credentials, click Test Connection, navigate to Oracle JDK script-args. */
 async function navigateToJavaReady() {
   window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
@@ -76,6 +96,22 @@ async function navigateToBaseSetup() {
   await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
   fireEvent.click(screen.getByRole('button', { name: /Base Setup/ }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Run Base Setup' })).toBeInTheDocument())
+}
+
+/** Render, pre-fill saved credentials, click Test Connection, navigate to the OpenSSL script-args. */
+async function navigateToOpenSSL() {
+  window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+    ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+  })
+  await renderAndFlush()
+  fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+  await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+  await waitFor(() => expect(screen.getByText('Security')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Security'))
+  await waitFor(() => expect(screen.getByText('OpenSSL 3.3.2')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('OpenSSL 3.3.2'))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run OpenSSL 3.3.2' })).toBeInTheDocument())
 }
 
 // ── credentials section ───────────────────────────────────────────────────────
@@ -364,6 +400,41 @@ describe('Test Connection error messages', () => {
     expect(screen.getByRole('button', { name: /Base Setup/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: /By Category/ })).toBeDisabled()
   })
+
+  it('shows "Access denied — SELinux" on VERR_ACCESS_DENIED', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_ACCESS_DENIED' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Access denied/)).toBeInTheDocument())
+  })
+
+  it('shows "VM not found" on VERR_NOT_FOUND', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_NOT_FOUND' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/VM not found/)).toBeInTheDocument())
+  })
+
+  it('shows "Guest control service is busy" on VERR_RESOURCE_BUSY', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_RESOURCE_BUSY' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Guest control service is busy/)).toBeInTheDocument())
+  })
+
+  it('shows "Connection timed out" on ETIMEDOUT', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'ETIMEDOUT' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Connection timed out/)).toBeInTheDocument())
+  })
+
+  it('shows "Connection failed" when no known pattern matches', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'some unknown error' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Connection failed/)).toBeInTheDocument())
+  })
 })
 
 // ── checkBeforeRun gate ───────────────────────────────────────────────────────
@@ -428,5 +499,170 @@ describe('"Run another" after Base Setup', () => {
     await runBaseSetupToDone(1)
     fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
+  })
+})
+
+// ── running state ─────────────────────────────────────────────────────────────
+
+describe('running state', () => {
+  it('shows "Running Oracle JDK..." while the script is in flight', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+    })
+    window.electronAPI.runProvisionScript = vi.fn().mockReturnValue(new Promise(() => {}))
+    await renderAndFlush()
+    fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+    await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+    await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Languages'))
+    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Oracle JDK'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Running Oracle JDK...')).toBeInTheDocument())
+  })
+
+  it('shows "Running Base Setup..." while the setup script is in flight', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+    })
+    window.electronAPI.runProvisionSetup = vi.fn().mockReturnValue(new Promise(() => {}))
+    await renderAndFlush()
+    fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+    await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /Base Setup/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Base Setup' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() => expect(screen.getByText('Running Base Setup...')).toBeInTheDocument())
+  })
+})
+
+// ── done state banners ────────────────────────────────────────────────────────
+
+describe('done state banners', () => {
+  it('shows green success banner after a script completes', async () => {
+    await navigateToJavaReady()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK completed successfully.')).toBeInTheDocument())
+  })
+
+  it('shows red failure banner after a script fails', async () => {
+    await navigateToJavaReady()
+    wireRun(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK failed.')).toBeInTheDocument())
+  })
+
+  it('shows errorDetail text below the failure banner when provided', async () => {
+    await navigateToJavaReady()
+    wireRun(1, 'ERROR: dnf install failed with code 1')
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('ERROR: dnf install failed with code 1')).toBeInTheDocument())
+  })
+
+  it('shows blue "already installed" banner when the script exits 0 with an already-installed info line', async () => {
+    await navigateToJavaReady()
+    wireRunWithLines(0, ['[INFO  ] java.sh already installed'])
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK is already installed.')).toBeInTheDocument())
+  })
+
+  it('does not show the green success banner when alreadyInstalled is true', async () => {
+    await navigateToJavaReady()
+    wireRunWithLines(0, ['[INFO  ] java.sh already installed'])
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Oracle JDK is already installed.')).toBeInTheDocument())
+    expect(screen.queryByText('Oracle JDK completed successfully.')).not.toBeInTheDocument()
+  })
+
+  it('shows "Run another" and "My VMs" buttons in done state', async () => {
+    await navigateToJavaReady()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /My VMs/i })).toBeInTheDocument()
+  })
+})
+
+// ── forceConfirm (OpenSSL already installed) ──────────────────────────────────
+
+describe('forceConfirm (OpenSSL already installed)', () => {
+  it('shows the amber "OpenSSL is already installed" panel when output signals a force-install', async () => {
+    await navigateToOpenSSL()
+    wireRunWithLines(1, ["Use 'Install anyway' to overwrite the existing build"])
+    fireEvent.click(screen.getByRole('button', { name: 'Run OpenSSL 3.3.2' }))
+    await waitFor(() => expect(screen.getByText(/OpenSSL is already installed on this system/)).toBeInTheDocument())
+  })
+
+  it('does not show the red failure banner when forceConfirm is active', async () => {
+    await navigateToOpenSSL()
+    wireRunWithLines(1, ["Use 'Install anyway' to overwrite the existing build"])
+    fireEvent.click(screen.getByRole('button', { name: 'Run OpenSSL 3.3.2' }))
+    await waitFor(() => expect(screen.getByText(/OpenSSL is already installed on this system/)).toBeInTheDocument())
+    expect(screen.queryByText(/OpenSSL 3\.3\.2 failed\./)).not.toBeInTheDocument()
+  })
+
+  it('clicking "Cancel" dismisses the panel without running the script again', async () => {
+    await navigateToOpenSSL()
+    wireRunWithLines(1, ["Use 'Install anyway' to overwrite the existing build"])
+    fireEvent.click(screen.getByRole('button', { name: 'Run OpenSSL 3.3.2' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Install anyway' })).toBeInTheDocument())
+    const callsBefore = vi.mocked(window.electronAPI.runProvisionScript).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText(/OpenSSL is already installed on this system/)).not.toBeInTheDocument()
+    expect(vi.mocked(window.electronAPI.runProvisionScript).mock.calls.length).toBe(callsBefore)
+  })
+
+  it('clicking "Install anyway" calls runProvisionScript with --force in scriptArgs', async () => {
+    await navigateToOpenSSL()
+    wireRunWithLines(1, ["Use 'Install anyway' to overwrite the existing build"])
+    fireEvent.click(screen.getByRole('button', { name: 'Run OpenSSL 3.3.2' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Install anyway' })).toBeInTheDocument())
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Install anyway' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runProvisionScript).toHaveBeenCalledWith(
+        expect.objectContaining({ scriptArgs: expect.stringContaining('--force') })
+      )
+    )
+  })
+})
+
+// ── changeHostname toggle ─────────────────────────────────────────────────────
+
+describe('changeHostname toggle', () => {
+  it('hostname input is hidden by default in the Base Setup form', async () => {
+    await navigateToBaseSetup()
+    expect(screen.queryByPlaceholderText('e.g. fedorabox')).not.toBeInTheDocument()
+  })
+
+  it('hostname input appears when the "Set hostname" checkbox is checked', async () => {
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(screen.getByPlaceholderText('e.g. fedorabox')).toBeInTheDocument()
+  })
+
+  it('calls getVmHostname with the VM name and credentials when the checkbox is first checked', async () => {
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('checkbox'))
+    await waitFor(() =>
+      expect(window.electronAPI.getVmHostname).toHaveBeenCalledWith('FedoraBox', 'root', 'secret')
+    )
+  })
+
+  it('pre-fills the hostname input with the value returned by getVmHostname', async () => {
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('checkbox'))
+    await waitFor(() => expect(screen.getByPlaceholderText('e.g. fedorabox')).toHaveValue('fedorabox'))
+  })
+
+  it('hostname input disappears when the checkbox is unchecked again', async () => {
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(screen.getByPlaceholderText('e.g. fedorabox')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(screen.queryByPlaceholderText('e.g. fedorabox')).not.toBeInTheDocument()
   })
 })
