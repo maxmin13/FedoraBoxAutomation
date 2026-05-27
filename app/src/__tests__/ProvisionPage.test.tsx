@@ -40,6 +40,44 @@ function wireRun(exitCode: number, errorDetail?: string) {
   })
 }
 
+/** Wire onScriptDone to fire immediately with the given exitCode when runProvisionSetup resolves. */
+function wireSetupRun(exitCode: number) {
+  let doneCb: ((code: number) => void) | null = null
+  window.electronAPI.onScriptDone = vi.fn().mockImplementation((cb) => { doneCb = cb; return () => {} })
+  window.electronAPI.runProvisionSetup = vi.fn().mockImplementation(async () => {
+    doneCb!(exitCode)
+    return exitCode === 0 ? { ok: true } : { ok: false, errorDetail: null }
+  })
+}
+
+/** Render, pre-fill saved credentials, click Test Connection, navigate to Oracle JDK script-args. */
+async function navigateToJavaReady() {
+  window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+    ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+  })
+  await renderAndFlush()
+  fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+  await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
+  await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Languages'))
+  await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Oracle JDK'))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
+}
+
+/** Render, pre-fill saved credentials, click Test Connection, navigate to Base Setup form. */
+async function navigateToBaseSetup() {
+  window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+    ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+  })
+  await renderAndFlush()
+  fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+  await waitFor(() => expect(screen.getByText(/Connected/)).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /Base Setup/ }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run Base Setup' })).toBeInTheDocument())
+}
+
 // ── credentials section ───────────────────────────────────────────────────────
 
 describe('credentials section', () => {
@@ -278,5 +316,117 @@ describe('"Run another" behaviour', () => {
     fireEvent.click(screen.getByText('Oracle JDK'))
     await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
+  })
+})
+
+// ── Test Connection error messages ────────────────────────────────────────────
+
+describe('Test Connection error messages', () => {
+  async function testCreds() {
+    fireEvent.change(screen.getByPlaceholderText('root'), { target: { value: 'root' } })
+    fireEvent.change(screen.getByPlaceholderText(/•+/), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Test Connection' }))
+  }
+
+  it('shows "VM is not running" when the error mentions "powered off"', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VM is powered off' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/VM is not running/)).toBeInTheDocument())
+  })
+
+  it('shows "Wrong username or password" on VERR_AUTHENTICATION_FAILURE', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_AUTHENTICATION_FAILURE' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Wrong username or password/)).toBeInTheDocument())
+  })
+
+  it('shows "Guest Additions not responding" when the error mentions "execution service is not ready"', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'execution service is not ready' })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Guest Additions not responding/)).toBeInTheDocument())
+  })
+
+  it('shows the "Live ISO" amber warning when isLive is true', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: true, isLive: true })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Live ISO/)).toBeInTheDocument())
+  })
+
+  it('keeps both mode buttons disabled after a Live ISO result', async () => {
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: true, isLive: true })
+    await renderAndFlush()
+    await testCreds()
+    await waitFor(() => expect(screen.getByText(/Live ISO/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Base Setup/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /By Category/ })).toBeDisabled()
+  })
+})
+
+// ── checkBeforeRun gate ───────────────────────────────────────────────────────
+
+describe('checkBeforeRun gate', () => {
+  it('does not call runProvisionScript when checkVmCredentials fails before a script run', async () => {
+    await navigateToJavaReady()
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VM is powered off' })
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
+    expect(window.electronAPI.runProvisionScript).not.toHaveBeenCalled()
+  })
+
+  it('redirects to mode view and shows the mapped error when checkVmCredentials fails before a script run', async () => {
+    await navigateToJavaReady()
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VM is powered off' })
+    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText(/VM is not running/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument()
+  })
+
+  it('does not call runProvisionSetup when checkVmCredentials fails before Base Setup', async () => {
+    await navigateToBaseSetup()
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_AUTHENTICATION_FAILURE' })
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
+    expect(window.electronAPI.runProvisionSetup).not.toHaveBeenCalled()
+  })
+
+  it('redirects to mode view and shows the mapped error when checkVmCredentials fails before Base Setup', async () => {
+    await navigateToBaseSetup()
+    window.electronAPI.checkVmCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_AUTHENTICATION_FAILURE' })
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() => expect(screen.getByText(/Wrong username or password/)).toBeInTheDocument())
+  })
+})
+
+// ── "Run another" after Base Setup ───────────────────────────────────────────
+
+describe('"Run another" after Base Setup', () => {
+  async function runBaseSetupToDone(exitCode: number) {
+    wireSetupRun(exitCode)
+    await navigateToBaseSetup()
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
+  }
+
+  it('shows the mode view (Test Connection button) after clicking "Run another"', async () => {
+    await runBaseSetupToDone(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
+  })
+
+  it('does NOT show the category grid after "Run another" following Base Setup', async () => {
+    await runBaseSetupToDone(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
+    expect(screen.queryByText('Languages')).not.toBeInTheDocument()
+  })
+
+  it('shows mode view after a failed Base Setup run too', async () => {
+    await runBaseSetupToDone(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Connection' })).toBeInTheDocument())
   })
 })

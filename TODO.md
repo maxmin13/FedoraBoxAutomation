@@ -22,7 +22,6 @@
 
 # provision claude code
 
-# review and rationalize privison-full and provision-script, then try to fix the provision with paused/stopped vm
 
 # eclipse ide use a drop down list for the version
 
