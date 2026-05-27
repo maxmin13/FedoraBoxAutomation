@@ -381,7 +381,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   async function handleRunFull() {
     setRunningLabel('Base Setup')
     await startRun(() =>
-      window.electronAPI.runProvisionFull({
+      window.electronAPI.runProvisionSetup({
         vmName: vm.name,
         vmUser,
         vmPass,

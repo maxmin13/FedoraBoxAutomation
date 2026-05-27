@@ -103,7 +103,7 @@ declare global {
       getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>
       runShareLogs: (params: ShareLogsParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       runProvisionScript: (params: ProvisionScriptParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
-      runProvisionFull:   (params: ProvisionFullParams)   => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+      runProvisionSetup:  (params: ProvisionFullParams)   => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>

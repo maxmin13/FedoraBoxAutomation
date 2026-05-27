@@ -418,9 +418,9 @@ function registerIpcHandlers(win) {
     return { ok: false, errorDetail: extractError(lines) }
   })
 
-  // ── run-provision-full ───────────────────────────────────
+  // ── run-provision-setup ──────────────────────────────────
   // Runs all base setup scripts (system-prep, network, selinux, desktop, utilities). Streams output.
-  handleIpc('run-provision-full', async (_event, params) => {
+  handleIpc('run-provision-setup', async (_event, params) => {
     const psArgs = [
       '-VmName',    params.vmName,
       '-VmUser',    params.vmUser,
@@ -429,7 +429,7 @@ function registerIpcHandlers(win) {
       '-Hostname',  params.hostname,
       '-NonInteractive',
     ]
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionFull, psArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionSetup, psArgs)
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })

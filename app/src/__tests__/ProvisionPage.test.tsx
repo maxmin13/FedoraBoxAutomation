@@ -10,7 +10,7 @@ beforeEach(() => {
     checkVmCredentials: vi.fn().mockResolvedValue({ ok: true, isLive: false }),
     saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     runProvisionScript: vi.fn().mockResolvedValue({ ok: true }),
-    runProvisionFull:   vi.fn().mockResolvedValue({ ok: true }),
+    runProvisionSetup:  vi.fn().mockResolvedValue({ ok: true }),
     getVmHostname:      vi.fn().mockResolvedValue({ ok: true, hostname: 'fedorabox' }),
     onScriptLine:       vi.fn().mockReturnValue(() => {}),
     onScriptDone:       vi.fn().mockReturnValue(() => {}),

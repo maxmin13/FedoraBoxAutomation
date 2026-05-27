@@ -1352,10 +1352,10 @@ describe('run-provision-script handler', () => {
   })
 })
 
-// ── run-provision-full handler ────────────────────────────────────────────────
+// ── run-provision-setup handler ───────────────────────────────────────────────
 
-describe('run-provision-full handler', () => {
-  let runProvisionFullHandler
+describe('run-provision-setup handler', () => {
+  let runProvisionSetupHandler
   let mockRunScript
 
   const PARAMS = {
@@ -1373,7 +1373,7 @@ describe('run-provision-full handler', () => {
       id: srId, filename: srId, loaded: true,
       exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
     }
-    runProvisionFullHandler = loadHandlers()('run-provision-full')
+    runProvisionSetupHandler = loadHandlers()('run-provision-setup')
   })
 
   afterAll(() => {
@@ -1387,7 +1387,7 @@ describe('run-provision-full handler', () => {
 
   it('returns ok: true when the script exits 0', async () => {
     mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
-    const result = await runProvisionFullHandler({}, PARAMS)
+    const result = await runProvisionSetupHandler({}, PARAMS)
     expect(result).toEqual({ ok: true })
   })
 
@@ -1397,14 +1397,14 @@ describe('run-provision-full handler', () => {
       onLine({ text: 'ERROR: system prep failed', source: 'stdout' })
       onDone(1)
     })
-    const result = await runProvisionFullHandler({}, PARAMS)
+    const result = await runProvisionSetupHandler({}, PARAMS)
     expect(result.ok).toBe(false)
     expect(result.errorDetail).toBe('system prep failed')
   })
 
   it('passes -Hostname in the PowerShell args', async () => {
     mockRunScript.mockImplementation((_p, _a, _onLine, onDone) => onDone(0))
-    await runProvisionFullHandler({}, PARAMS)
+    await runProvisionSetupHandler({}, PARAMS)
     const psArgs = mockRunScript.mock.calls[0][1]
     const idx = psArgs.indexOf('-Hostname')
     expect(idx).toBeGreaterThan(-1)

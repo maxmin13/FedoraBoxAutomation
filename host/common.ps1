@@ -95,3 +95,129 @@ function Remove-VmCredentials {
     $store | ConvertTo-Json -Depth 3 | Set-Content -Path $path -Encoding UTF8
     Write-Host "  Saved credentials deleted." -ForegroundColor DarkGray
 }
+
+# ── Guest-control helpers ─────────────────────────────────────────────────────
+#
+#  All three functions below rely on four script-level variables that the
+#  calling script must set before dot-sourcing common.ps1 or before the first
+#  call — whichever comes later:
+#
+#    $script:vbox    – full path to VBoxManage.exe (from Find-VBoxManage)
+#    $script:vmName  – registered VM name
+#    $script:vmUser  – guestcontrol username (typically root)
+#    $script:vmPass  – guestcontrol password
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Converts raw 2>&1 output (a mix of strings and ErrorRecord objects) into a
+# plain string and maps common VBoxManage errors to human-readable sentences.
+function Get-VBoxErrMsg {
+    param([object[]]$Output)
+    $text = ($Output | ForEach-Object {
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+        else { [string]$_ }
+    }) -join ' '
+
+    # VM-state errors: "current status is: <state>"
+    if ($text -match 'current status is: (\w+)') {
+        $state = $Matches[1]
+        $stateMsg = @{
+            starting = 'Guest Additions are not yet ready - start the VM, wait 30 seconds, then try again'
+            paused   = 'VM is paused - resume it before running guest scripts'
+            saved    = 'VM is in saved state - start it before running guest scripts'
+            poweroff = 'VM is powered off - start it before running guest scripts'
+            aborted  = 'VM was force-stopped - start it before running guest scripts'
+        }
+        if ($stateMsg.ContainsKey($state)) { return $stateMsg[$state] }
+        return "VM is not ready (state: $state) - start it before running guest scripts"
+    }
+    if ($text -match 'VERR_DUPLICATE') {
+        return 'A previous guest session is still active - wait a few seconds and try again'
+    }
+    if ($text -match 'VERR_AUTHENTICATION_FAILURE|authentication failure') {
+        return 'Wrong username or password'
+    }
+    return $text
+}
+
+# Uploads vm/lib/common.sh to /tmp/common.sh inside the guest (best-effort).
+# Warns on failure but never aborts the calling script.
+function Copy-GuestCommonSh {
+    param([string]$ProjectRoot)
+    $src = Join-Path $ProjectRoot "vm\lib\common.sh"
+    if (-not (Test-Path $src)) { return }
+    Write-Host "  Uploading common.sh..." -NoNewline
+    $ua = @('guestcontrol', $script:vmName, 'copyto', $src, '/tmp/common.sh',
+            '--username', $script:vmUser, '--password', $script:vmPass)
+    $ErrorActionPreference = 'SilentlyContinue'
+    $r    = & $script:vbox @ua 2>&1
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($code -ne 0) { Write-Host " WARNING: $(Get-VBoxErrMsg $r)" -ForegroundColor Yellow }
+    else             { Write-Host " OK" -ForegroundColor Green }
+}
+
+# Uploads a local script to /tmp/<filename> inside the guest, strips CRLF,
+# makes it executable, and runs it via /bin/bash.
+# Returns the guest exit code (0 = success).  On upload failure, prints an
+# ERROR: line and returns 1 so the caller can decide whether to abort.
+function Invoke-GuestScript {
+    param([string]$LocalPath, [string]$ScriptArgs = '')
+
+    $fileName  = [System.IO.Path]::GetFileName($LocalPath)
+    $guestPath = "/tmp/$fileName"
+
+    # Upload
+    Write-Host "  Uploading $fileName..." -NoNewline
+    $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $LocalPath, $guestPath,
+                    '--username', $script:vmUser, '--password', $script:vmPass)
+    $ErrorActionPreference = 'SilentlyContinue'
+    $r          = & $script:vbox @uploadArgs 2>&1
+    $uploadCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($uploadCode -ne 0) {
+        Write-Host " FAILED" -ForegroundColor Red
+        Write-Host "  ERROR: $(Get-VBoxErrMsg $r)" -ForegroundColor Red
+        return 1
+    }
+    Write-Host " OK" -ForegroundColor Green
+
+    # Strip CRLF and chmod +x (best-effort; failure is non-fatal)
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox guestcontrol $script:vmName run --exe /bin/bash `
+        --username $script:vmUser --password $script:vmPass `
+        --wait-stdout --wait-stderr `
+        -- -c "sed -i 's/\r//' $guestPath && chmod +x $guestPath" 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+
+    # Root executes directly; any other user prefixes with sudo
+    $cmd = if ($script:vmUser -eq 'root') {
+        if ($ScriptArgs) { "$guestPath $ScriptArgs" } else { $guestPath }
+    } else {
+        if ($ScriptArgs) { "sudo $guestPath $ScriptArgs" } else { "sudo $guestPath" }
+    }
+
+    Write-Host "  Running: $cmd" -ForegroundColor DarkGray
+
+    $runArgs = @(
+        'guestcontrol', $script:vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', $script:vmUser, '--password', $script:vmPass,
+        '--wait-stdout', '--wait-stderr',
+        '--timeout', '3600000',
+        '--', '-c', $cmd
+    )
+
+    $ErrorActionPreference = 'SilentlyContinue'
+    $result   = & $script:vbox @runArgs 2>&1
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+
+    $result | ForEach-Object {
+        $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+                else { [string]$_ }
+        Write-Host $line
+    }
+
+    return $exitCode
+}

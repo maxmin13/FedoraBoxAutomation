@@ -11,8 +11,8 @@ const SCRIPTS = {
   installVirtualBox:   path.join(HOST_DIR, 'virtualbox-install.ps1'),
   createVm:            path.join(HOST_DIR, 'create-vm.ps1'),
   runProvisionScript:  path.join(HOST_DIR, 'provision-script.ps1'),
-  runProvisionFull:    path.join(HOST_DIR, 'provision-full.ps1'),
-shareFolder:         path.join(HOST_DIR, 'share-folder.ps1'),
+  runProvisionSetup:   path.join(HOST_DIR, 'provision-setup.ps1'),
+  shareFolder:         path.join(HOST_DIR, 'share-folder.ps1'),
   shareLogs:           path.join(HOST_DIR, 'share-logs.ps1'),
 }
 

@@ -64,7 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runProvisionScript: (params) => ipcRenderer.invoke('run-provision-script', params),
 
   // Runs the full base setup (system-prep, network, selinux, desktop, utilities) and streams output
-  runProvisionFull: (params) => ipcRenderer.invoke('run-provision-full', params),
+  runProvisionSetup: (params) => ipcRenderer.invoke('run-provision-setup', params),
 
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results
