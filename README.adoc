@@ -36,6 +36,18 @@ image::docs/screenshots/my-vms-page.png[My VMs page, width=800]
 .Shared folder — VM readiness banner and mount configuration
 image::docs/screenshots/share-folder-page.png[Share folder page, width=800]
 
+.Provision — credentials and entry point (Base Setup / By Category)
+image::docs/screenshots/provision-landing.png[Provision landing, width=800]
+
+.Provision — Base Setup detail with hostname option
+image::docs/screenshots/provision-base-setup.png[Provision base setup, width=800]
+
+.Provision — By Category grid (13 categories)
+image::docs/screenshots/provision-by-category.png[Provision by category, width=800]
+
+.Provision — category drill-down (Databases example)
+image::docs/screenshots/provision-detail.png[Provision detail, width=800]
+
 == Requirements
 
 [cols="1,2",options="header"]
@@ -66,7 +78,7 @@ npm run dev        # opens the desktop app
 
 . Click *Setup* → *Run Analysis* to check your host
 . Click *Create VM* and follow the 4-step wizard
-. After creating the VM, open *My VMs* → *Edit* to access provisioning and shared folder options
+. After creating the VM, open *My VMs* and click the VM name to access provisioning and shared folder options
 
 === Option B — PowerShell scripts
 
@@ -83,11 +95,11 @@ powershell -ExecutionPolicy Bypass -File ".\host\virtualbox-install.ps1"
 # 3. Create a Fedora VM
 powershell -ExecutionPolicy Bypass -File ".\host\create-vm.ps1"
 
-# 4. Provision the VM with dev tools
-powershell -ExecutionPolicy Bypass -File ".\host\provision-vm.ps1"
+# 4. Run base OS setup inside the VM (system-prep, network, SELinux, desktop, utilities)
+powershell -ExecutionPolicy Bypass -File ".\host\provision-setup.ps1" -VmName "FedoraBox" -VmUser root -VmPass <password> -LoginUser <username> -NonInteractive
 
-# 5. Clean up a failed VM (preserves ISO files)
-powershell -ExecutionPolicy Bypass -File ".\host\cleanup.ps1"
+# 5. Install a single tool inside the VM (e.g. Docker)
+powershell -ExecutionPolicy Bypass -File ".\host\provision-script.ps1" -VmName "FedoraBox" -VmUser root -VmPass <password> -LoginUser <username> -ScriptRelPath "tools/containers/docker.sh" -NonInteractive
 ----
 
 == GUI Overview
@@ -99,7 +111,13 @@ The desktop app is built with Electron + React and runs at a fixed 1100×750 win
 | Page | Description
 
 | *My VMs*
-| Lists all registered VirtualBox VMs with Start / Stop / Delete controls
+| Lists all registered VirtualBox VMs with Start / Stop / Delete controls; click a VM name to open its detail page
+
+| *VM detail — Provision*
+| Test Connection verifies guestcontrol credentials; choose Base Setup (system-prep, hostname, SELinux, desktop, utilities) or install individual tools by category; success / failure / already-installed / force-install banners after each run
+
+| *VM detail — Share Folder*
+| Mount a host directory inside the VM; VM readiness banner checks running state and Guest Additions
 
 | *Setup*
 | Runs the environment analysis; left panel lists all checks, right panel shows detail and fix instructions for the selected check; first failing check is auto-selected
@@ -120,18 +138,19 @@ NOTE: Setup and Create VM stay mounted in the background so analysis results and
 
 [source]
 ----
+host/common.ps1                  shared helpers: Find-VBoxManage, Invoke-VBox, credential store
 host/virtualbox-sanity-checks.ps1   checks RAM, disk, CPU virt, Hyper-V, VirtualBox version
 host/virtualbox-install.ps1         downloads and silently installs VirtualBox
 host/create-vm.ps1                  creates a Fedora 64-bit VM from ISO
-host/provision-vm.ps1               runs Bash scripts inside the VM via Guest Control
-host/cleanup.ps1                    removes failed VMs (preserves ISOs)
-host/share-folder.ps1               manages VirtualBox shared folders
-host/share-logs.ps1                 exports VM logs to the host
+host/provision-setup.ps1            runs all base OS setup scripts (system-prep, network, SELinux, desktop, utilities)
+host/provision-script.ps1           uploads and runs a single guest Bash script via Guest Control
+host/share-folder.ps1               mounts a host directory inside the VM as a shared folder
+host/share-logs.ps1                 exports VM logs to the host via a shared folder
 ----
 
 === Guest Additions
 
-`provision-vm.ps1` requires Guest Additions installed inside the VM.
+Provisioning requires Guest Additions installed inside the VM.
 `create-vm.ps1` offers to attach the ISO automatically.
 After Fedora OS installation completes:
 
@@ -159,11 +178,12 @@ IMPORTANT: Always authenticate as `root`, not a regular user. `sudo` requires a 
 ----
 FedoraBoxAutomation/
 ├── host/                     PowerShell scripts (run on Windows)
+│   ├── common.ps1
 │   ├── virtualbox-sanity-checks.ps1
 │   ├── virtualbox-install.ps1
 │   ├── create-vm.ps1
-│   ├── provision-vm.ps1
-│   ├── cleanup.ps1
+│   ├── provision-setup.ps1
+│   ├── provision-script.ps1
 │   ├── share-folder.ps1
 │   └── share-logs.ps1
 │
@@ -204,7 +224,7 @@ Full setup and usage instructions are in link:FedoraBoxAutomation/docs/TESTING.m
 | Suite | Command | Where
 
 | PowerShell — Pester v5
-| `Invoke-Pester -Path ".\host\virtualbox-sanity-checks.Tests.ps1" -Output Detailed`
+| `Invoke-Pester -Path ".\host\" -Output Detailed`
 | Windows PowerShell
 
 | Bash — bats-core
@@ -216,7 +236,7 @@ Full setup and usage instructions are in link:FedoraBoxAutomation/docs/TESTING.m
 | Windows or Linux (Node.js)
 |===
 
-Current totals: *207 Vitest tests* across 12 files.
+Current totals: *409 Vitest tests* across 7 files.
 
 == Troubleshooting
 
