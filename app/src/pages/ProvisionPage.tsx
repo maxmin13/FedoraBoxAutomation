@@ -506,6 +506,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 }
               }
               setAlreadyInstalled(false)
+              setCredsStatus('idle')
+              setCredsError(null)
               setPageState('idle')
               setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
             }}

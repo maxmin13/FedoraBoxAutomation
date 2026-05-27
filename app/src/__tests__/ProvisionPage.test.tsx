@@ -353,6 +353,26 @@ describe('"Run another" behaviour', () => {
     await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
   })
+
+  it('clicking "Run another" clears the Connected status', async () => {
+    await runToDone(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
+    // "Run another" from a script run lands on the categories view (not mode),
+    // so there is no credentials section in the DOM — Connected must not appear anywhere.
+    await act(async () => {})
+    expect(screen.queryByText(/Connected/)).not.toBeInTheDocument()
+  })
+
+  it('clicking "Run another" then Back shows disabled mode buttons until Test Connection is run again', async () => {
+    await runToDone(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
+    // "Run another" lands on categories view; Back from there goes to mode view.
+    await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Base Setup/ })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Base Setup/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /By Category/ })).toBeDisabled()
+  })
 })
 
 // ── Test Connection error messages ────────────────────────────────────────────
