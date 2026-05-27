@@ -314,17 +314,28 @@ These run on the Windows host and control VirtualBox.
 
 Open the Extensions panel in VS Code (`Ctrl+Shift+X`). Search for **PowerShell** and install the one published by Microsoft. You only need to do this once.
 
-**Step 2 — Open the script**
+**Step 2 — Open the script and set a breakpoint**
 
-Open the `.ps1` file you want to debug, for example `host/virtualbox-sanity-checks.ps1`.
+Open the `.ps1` file you want to debug and click in the gutter to the left of a line number. A red dot appears. Breakpoints also work inside dot-sourced files like `host/common.ps1`.
 
-**Step 3 — Set a breakpoint**
+**Step 3 — Select the right launch config**
 
-Click in the gutter to the left of the line number where you want execution to pause. A red dot appears.
+Press `Ctrl+Shift+D` to open the Run and Debug panel. Click the dropdown at the top and choose the appropriate config:
 
-**Step 4 — Press F5**
+| Configuration | Use it when... |
+|--------------|----------------|
+| **PowerShell: Launch Current File** | The script needs no parameters (e.g. `virtualbox-sanity-checks.ps1`) |
+| **PowerShell: provision-script (debug)** | Debugging `provision-script.ps1` — parameters are pre-filled in `.vscode/launch.json` |
 
-Press **F5**. VS Code opens a PowerShell terminal at the bottom and runs the script. When it reaches your breakpoint it freezes and the **Variables** panel on the left shows every variable's current value.
+> **Important:** do not rely on just pressing F5 with a `.ps1` file open. VS Code will use whichever config is currently selected in the dropdown. If "PowerShell: Launch Current File" is selected and the script requires parameters, it will start running without them and immediately prompt for input at the terminal instead of hitting your breakpoint.
+
+**Step 4 — Edit parameters if needed (provision-script only)**
+
+Before pressing F5 for the `provision-script` config, open `.vscode/launch.json` and update the `-VmName`, `-VmPass`, `-LoginUser`, and `-ScriptRelPath` values to match your VM and the script you want to test.
+
+**Step 5 — Press F5**
+
+VS Code opens a PowerShell Debug Terminal and runs the script. When it reaches your breakpoint it freezes and the **Variables** panel on the left shows every variable's current value.
 
 Use the toolbar buttons to step through the code:
 - **F10** — run the current line and move to the next one
@@ -332,11 +343,11 @@ Use the toolbar buttons to step through the code:
 - **Shift+F11** — step out of the current function back to the caller
 - **F5** — continue running until the next breakpoint
 
-**Step 5 — Stop when done**
+**Step 6 — Stop when done**
 
 Press **Shift+F5** or close the terminal.
 
-> **Note:** this only works when you run the script directly from VS Code. When the Electron app launches a `.ps1` as a child process, VS Code cannot attach to it automatically. In that case, add `Write-Host` lines to print values to the Debug Console instead.
+> **Note:** this approach runs the script directly in VS Code, independently of the Electron app. The Electron app spawns `.ps1` scripts as child processes and VS Code cannot attach to those automatically. Use the dedicated launch configs above to reproduce the same execution path with a live debugger attached.
 
 ---
 

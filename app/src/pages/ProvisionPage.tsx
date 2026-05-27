@@ -250,6 +250,24 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setIsLive(false)
   }, [vmUser, vmPass])
 
+  function mapCredsError(raw: string): string {
+    return /is not running|powered off/i.test(raw)
+      ? 'VM is not running — start it first'
+      : /not installed or not ready|execution service is not ready/i.test(raw)
+      ? 'Guest Additions not responding — start the VM and wait 30 seconds, then retry'
+      : /VERR_AUTHENTICATION_FAILURE|authentication failure/i.test(raw)
+      ? 'Wrong username or password'
+      : /VERR_ACCESS_DENIED|access.?denied/i.test(raw)
+      ? 'Access denied — SELinux may be blocking the connection; disable it and reboot'
+      : /VERR_NOT_FOUND/i.test(raw)
+      ? 'VM not found — check the VM name'
+      : /VERR_RESOURCE_BUSY/i.test(raw)
+      ? 'Guest control service is busy — the VM may be frozen. Hard-reset it from My VMs and try again.'
+      : /ETIMEDOUT|timed out/i.test(raw)
+      ? 'Connection timed out — the VM is not responding. Hard-reset it from My VMs and try again.'
+      : 'Connection failed — see Logs for details'
+  }
+
   async function handleTestCreds() {
     setCredsStatus('checking')
     setCredsError(null)
@@ -260,25 +278,26 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
     } else {
       setCredsStatus('fail')
-      const raw = result.error ?? ''
-      const friendly =
-        /is not running|powered off/i.test(raw)
-          ? 'VM is not running — start it first'
-        : /not installed or not ready|execution service is not ready/i.test(raw)
-          ? 'Guest Additions not responding — start the VM and wait 30 seconds, then retry'
-        : /VERR_AUTHENTICATION_FAILURE|authentication failure/i.test(raw)
-          ? 'Wrong username or password'
-        : /VERR_ACCESS_DENIED|access.?denied/i.test(raw)
-          ? 'Access denied — SELinux may be blocking the connection; disable it and reboot'
-        : /VERR_NOT_FOUND/i.test(raw)
-          ? 'VM not found — check the VM name'
-        : /VERR_RESOURCE_BUSY/i.test(raw)
-          ? 'Guest control service is busy — the VM may be frozen. Hard-reset it from My VMs and try again.'
-        : /ETIMEDOUT|timed out/i.test(raw)
-          ? 'Connection timed out — the VM is not responding. Hard-reset it from My VMs and try again.'
-        : 'Connection failed — see Logs for details'
-      setCredsError(friendly)
+      setCredsError(mapCredsError(result.error ?? ''))
     }
+  }
+
+  /** Verifies credentials before a run. On failure, redirects to the mode view
+   *  and shows the error next to the Test Connection button. Returns false to abort. */
+  async function checkBeforeRun(): Promise<boolean> {
+    const result = await window.electronAPI.checkVmCredentials(vm.name, vmUser, vmPass)
+    if (result.ok && !result.isLive) return true
+    setIdleView('mode')
+    if (!result.ok) {
+      setCredsStatus('fail')
+      setCredsError(mapCredsError(result.error ?? ''))
+    } else {
+      // isLive — credentials are fine but VM is on a live ISO
+      setCredsStatus('ok')
+      setIsLive(true)
+      setCredsError(null)
+    }
+    return false
   }
 
   function handleNavBack() {
@@ -346,29 +365,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     }
   }
 
-  async function handleRunScript() {
+  async function handleRunScript(force = false) {
     if (!selectedScript || !selectedCategory) return
+    if (!await checkBeforeRun()) return
+    if (force) setForceConfirm(false)
     setRunningLabel(selectedScript.label)
-    const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser)
+    const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + (force ? ' --force' : '')
     await startRun(() =>
       window.electronAPI.runProvisionScript({
-        vmName:      vm.name,
-        vmUser,
-        vmPass,
-        loginUser,
-        scriptRelPath: `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
-        scriptArgs,
-      })
-    )
-  }
-
-  async function handleRunForce() {
-    if (!selectedScript || !selectedCategory) return
-    setForceConfirm(false)
-    const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + ' --force'
-    await startRun(() =>
-      window.electronAPI.runProvisionScript({
-        vmName:      vm.name,
+        vmName:        vm.name,
         vmUser,
         vmPass,
         loginUser,
@@ -379,6 +384,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   async function handleRunFull() {
+    if (!await checkBeforeRun()) return
     setRunningLabel('Base Setup')
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
@@ -452,7 +458,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             </ul>
             <div className="flex gap-2">
               <button
-                onClick={handleRunForce}
+                onClick={() => handleRunScript(true)}
                 className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
               >
                 Install anyway
@@ -494,7 +500,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               }
               setAlreadyInstalled(false)
               setPageState('idle')
-              setIdleView('categories')
+              setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
             }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
@@ -849,7 +855,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
 
             <button
-              onClick={handleRunScript}
+              onClick={() => handleRunScript()}
               disabled={!canRunScript}
               className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

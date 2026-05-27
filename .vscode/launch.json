@@ -11,6 +11,23 @@
             "args": []
         },
 
+        // Edit VmName / VmPass / ScriptRelPath before using.
+        // Set breakpoints in provision-script.ps1 or common.ps1, then press F5.
+        {
+            "name": "PowerShell: provision-script (debug)",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}/host/provision-script.ps1",
+            "args": [
+                "-VmName",        "FedoraBox",
+                "-VmUser",        "root",
+                "-VmPass",        "secret",
+                "-LoginUser",     "fedora",
+                "-ScriptRelPath", "tools/languages/java.sh",
+                "-NonInteractive"
+            ]
+        },
+
         // ── Electron main process ─────────────────────────────────
         // Debugs the Node.js code in app/electron/ (main.js, ipc-handlers.js, etc.)
         // You can set breakpoints in those files and they will be hit.
