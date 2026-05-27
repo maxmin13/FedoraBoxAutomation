@@ -22,13 +22,16 @@ app/
       CheckCard.test.tsx
       SetupPage.test.tsx
       CreateVmPage.test.tsx
+      LogsPage.test.tsx
+      ProvisionPage.test.tsx
     pages/            <- one component per page
-      LandingPage.tsx <- lists all registered VMs with start/stop controls
-      SetupPage.tsx   <- environment analysis and fix actions
-      CreateVmPage.tsx <- form to configure and create a new Fedora VM
-      LogsPage.tsx    <- viewer for gui.log and host.log (last 500 lines each)
-      DocsPage.tsx    <- renders markdown docs from docs/ inside the app
-      VmEditPage.tsx  <- sub-page for a selected VM: provision, share folder, logs
+      LandingPage.tsx    <- lists all registered VMs with start/stop controls
+      SetupPage.tsx      <- environment analysis and fix actions
+      CreateVmPage.tsx   <- form to configure and create a new Fedora VM
+      LogsPage.tsx       <- viewer for gui.log and host.log (last 500 lines each)
+      DocsPage.tsx       <- renders markdown docs from docs/ inside the app
+      VmEditPage.tsx     <- sub-page for a selected VM: provision, share folder, logs
+      ProvisionPage.tsx  <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx <- shared folder management for a selected VM
     components/       <- reusable UI components
   package.json
@@ -38,9 +41,12 @@ app/
 
 vm/
   lib/common.sh       <- shared helpers sourced by all provisioning scripts
-  tests/              <- bats-core tests for Bash scripts
+  tests/              <- bats-core tests for Bash scripts (31 files, one per script)
     common.bats       <- tests for vm/lib/common.sh
     selinux-config.bats <- tests for vm/setup/selinux-config.sh
+    java.bats         <- tests for vm/tools/languages/java.sh
+    node.bats         <- tests for vm/tools/languages/node.sh
+    ...               <- one .bats file per tool/setup script
   setup/              <- Bash setup scripts
   tools/              <- Bash tool installation scripts
 ```

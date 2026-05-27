@@ -46,6 +46,7 @@ app/
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
       VmEditPage.tsx             <- sub-page for a selected VM: provision, share folder, logs
+      ProvisionPage.tsx          <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx        <- shared folder management for a selected VM
     components/
       NavBar.tsx                 <- My VMs / Setup / Create VM / Console / Docs navigation
@@ -55,6 +56,7 @@ app/
       SetupPage.test.tsx
       CreateVmPage.test.tsx
       LogsPage.test.tsx
+      ProvisionPage.test.tsx
       setup.ts                   <- jest-dom matchers setup
   __mocks__/
     electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
@@ -85,9 +87,16 @@ app/
   - `open-log-dir` — opens a log folder in the native file explorer; `'app'` opens `%APPDATA%\FedoraBoxAutomation\logs\`; `'vbox'` opens `%USERPROFILE%\VirtualBox VMs`; uses `shell.openPath()`
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
   - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are installed; returns `{ ok, running, guestAdditions, version? }`
-  - `load-vm-credentials` — reads credentials for a named VM from `.credentials/credentials.json`; returns `{ ok, username?, password?, desktopUsername? }`
-  - `save-vm-credentials` — writes credentials for a named VM to `.credentials/credentials.json`; returns `{ ok }`
-  - `run-share-folder` — runs `share-folder.ps1` with the given VM name and folder path; streams output; returns `{ ok }`
+  - `check-vm-credentials` — tests guestcontrol credentials by running a no-op echo inside the guest; also detects live-ISO boot by checking for `/run/initramfs/live`; returns `{ ok, isLive? }` or `{ ok: false, error }` — excluded from IPC logging (contains passwords)
+  - `load-vm-credentials` — reads credentials for a named VM from `.vm-data/vm-state.json`; returns `{ ok, user, pass, loginUser }` or `{ ok: false }` if no entry exists
+  - `save-vm-credentials` — writes credentials for a named VM to `.vm-data/vm-state.json`; merges with existing entries; returns `{ ok }`
+  - `get-vm-hostname` — runs `/bin/hostname` inside the guest via guestcontrol; returns `{ ok, hostname }`; excluded from IPC logging — excluded from IPC logging (contains passwords)
+  - `get-vm-info` — returns all displayable VM parameters: `osType`, `state`, `ramMB`, `cpus`, `vramMB`, `nic`, `mac`, `diskCapacityMB`, `diskType`, `sharedFolders`, `gaVersion`, `logSyncPath`; reads disk capacity via `showmediuminfo` and GA version via `guestproperty`
+  - `get-vm-guest-logs-path` — resolves `<VM folder>\guest-logs` from the `CfgFile` line of `showvminfo --machinereadable`; returns `{ ok, path }`
+  - `run-provision-script` — runs a single guest Bash script via `provision-script.ps1`; accepts `vmName`, `vmUser`, `vmPass`, `loginUser`, `scriptRelPath`, optional `scriptArgs`; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
+  - `run-provision-setup` — runs all base setup scripts (system-prep, network, SELinux, desktop, utilities) via `provision-setup.ps1`; accepts `vmName`, `vmUser`, `vmPass`, `loginUser`, `hostname`; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
+  - `run-share-folder` — runs `share-folder.ps1` with the given VM name, host path, mount point, and credentials; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
+  - `run-share-logs` — runs `share-logs.ps1` to set up the guest-logs shared folder and rsync service; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
   - `pick-folder` — opens a native folder picker; returns `{ folderPath }` or `{ folderPath: null }` if cancelled
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
@@ -114,11 +123,12 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
-| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM |
-| 2 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
-| 3 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
-| 4 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
-| 5 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
+| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; click a VM name to open its detail page |
+| 2 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Tabs: Provision / Share Folder / Logs; **Provision** shows Test Connection, flat and by-category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials saved per VM |
+| 3 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
+| 4 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
+| 5 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
+| 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
 
 A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
 
@@ -138,14 +148,18 @@ Each element has four fields: `id`, `label`, `status` (`"pass"` | `"warn"` | `"f
 
 ## Unit Tests
 
-### PowerShell — `host/virtualbox-sanity-checks.Tests.ps1`
+### PowerShell — `host/*.Tests.ps1`
 
-Uses **Pester v5**. All WMI/CIM calls are mocked so the suite runs without
-VirtualBox or specific hardware.
+Uses **Pester v5**. Run both suites together:
 
 ```powershell
-Invoke-Pester -Path ".\host\virtualbox-sanity-checks.Tests.ps1" -Output Detailed
+Invoke-Pester -Path ".\host\" -Output Detailed
 ```
+
+| Test file | Script under test | Notes |
+|-----------|------------------|-------|
+| `virtualbox-sanity-checks.Tests.ps1` | `virtualbox-sanity-checks.ps1` | All WMI/CIM calls mocked — runs without VirtualBox or specific hardware |
+| `common.Tests.ps1` | `common.ps1` | `Get-VBoxErrMsg`, `Find-VBoxManage`, credential store (`Get`/`Save`/`Remove-VmCredentials`) — uses real file I/O with per-test backup/restore |
 
 #### Check thresholds tested
 
@@ -214,13 +228,19 @@ via a temporary `bin/` directory prepended to `PATH`.
 bats vm/tests/
 ```
 
+There are 31 test files in `vm/tests/`, one per script. A representative sample:
+
 | Test file | Script under test | Key behaviours covered |
 |-----------|------------------|-----------------------|
 | `common.bats` | `vm/lib/common.sh` | root check, log-level labels, timestamp format, tee to log file |
-| `selinux-config.bats` | `vm/setup/selinux-config.sh` | skips dnf when already installed, calls dnf when not, always starts auditd, propagates failures |
+| `selinux-config.bats` | `vm/setup/selinux-config.sh` | skips dnf when already installed, calls dnf when not, always starts auditd |
+| `java.bats` | `vm/tools/languages/java.sh` | login-user gate, skip when already installed, download + install, JAVA_HOME detection and .bash_profile update |
+| `node.bats` | `vm/tools/languages/node.sh` | login-user gate, skip when correct version installed, NodeSource curl + dnf install, conflicting-package removal, default/custom major version |
+| `docker.bats` | `vm/tools/docker.sh` | dnf install, systemctl enable/start, docker group membership via sg |
+| `openssl.bats` | `vm/tools/security/openssl.sh` | version detection via `rpm -q openssl-libs`, build from source, `--force` flag bypass |
 
-`FEDORA_BOX_LOG` — an environment variable added to `common.sh` — lets tests
-redirect the tee output to a writable temp path instead of `/var/log/`.
+`FEDORA_BOX_LOG` — an environment variable in `common.sh` — lets tests redirect
+the tee output to a writable temp path instead of `/var/log/`.
 
 ---
 
@@ -260,6 +280,7 @@ npm test
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, left-panel rows rendered, summary counts, "Ready"/"Fix" banners, error message, auto-selection of first failing check, clicking a row loads detail in right panel, "No action needed" for pass checks, panel switching |
 | `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
 | `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading, "App logs" and "VirtualBox VMs" folder buttons visible, each calls `openLogDir` with the correct key |
+| `ProvisionPage.test.tsx` | `ProvisionPage` | credentials form and Save; Test Connection success/failure and 8 `mapCredsError` branches (VERR_ACCESS_DENIED, VERR_NOT_FOUND, VERR_RESOURCE_BUSY, VERR_DUPLICATE, VERR_AUTHENTICATION_FAILURE, ETIMEDOUT, and fallback); flat and by-category script list; running-state label; success/failure/already-installed/forceConfirm banners; "Install anyway" passes `--force` arg; changeHostname toggle shows/hides hostname input and pre-fills from `getVmHostname` |
 
 ---
 

@@ -15,8 +15,12 @@ There are four independent test suites in the project:
 
 ## PowerShell Tests (Pester)
 
-The PowerShell sanity checks have a Pester v5 test suite at
-`host/virtualbox-sanity-checks.Tests.ps1`.
+There are two Pester v5 test suites under `host/`:
+
+| File | Script under test | What it covers |
+|------|-------------------|---------------|
+| `host/virtualbox-sanity-checks.Tests.ps1` | `virtualbox-sanity-checks.ps1` | OS arch, RAM, disk, CPU virtualisation, Hyper-V, Secure Boot, VirtualBox version — all checks mocked via WMI/CIM |
+| `host/common.Tests.ps1` | `common.ps1` | `Get-VBoxErrMsg` error mapping, `Find-VBoxManage` path discovery, `Get-VmCredentials` / `Save-VmCredentials` / `Remove-VmCredentials` credential store |
 
 ### Install Pester
 
@@ -46,18 +50,29 @@ Open a PowerShell terminal and navigate to the project root first:
 cd C:\Projects\Pipelines\FedoraBoxAutomation
 ```
 
-Then run the tests:
+Run all PowerShell tests together:
+
+```powershell
+Invoke-Pester -Path ".\host\" -Output Detailed
+```
+
+Or run a single suite:
 
 ```powershell
 Invoke-Pester -Path ".\host\virtualbox-sanity-checks.Tests.ps1" -Output Detailed
+Invoke-Pester -Path ".\host\common.Tests.ps1" -Output Detailed
 ```
 
-Each test mocks the WMI/CIM calls so the suite runs without a real VirtualBox
-installation or specific hardware. A passing run looks like:
+`virtualbox-sanity-checks.Tests.ps1` mocks all WMI/CIM calls so the suite runs
+without a real VirtualBox installation or specific hardware. `common.Tests.ps1`
+uses real file I/O for the credential store tests and backs up/restores the
+`.vm-data/vm-state.json` file around each test for isolation.
+
+A passing run looks like:
 
 ```
-Tests completed in 1.2s
-Passed: 28, Failed: 0, Skipped: 0
+Tests completed in 1.8s
+Passed: 47, Failed: 0, Skipped: 0
 ```
 
 ### Run a single test block
@@ -181,16 +196,15 @@ common.bats
  ok exits 1 with an error when not run as root
  ok log_info line contains INFO and the message
  ok log_info timestamp matches YYYY-MM-DD HH:MM:SS
- ok log_warn line contains WARN and the message
- ok log_error line contains ERROR and the message
- ok STEP line contains STEP level and wraps the message with ===[ ]===
- ok log output is teed to the log file
-
-selinux-config.bats
- ok exits 0 when audit tools are already installed
  ...
 
-143 tests, 0 failures
+node.bats
+ ok exits 1 when no login-user argument is provided
+ ok exits 0 when Node.js 22.x is already installed
+ ok does not call curl when the correct Node.js version is already installed
+ ...
+
+N tests, 0 failures
 ```
 
 ### Run a single test file
@@ -216,9 +230,11 @@ Everything is cleaned up in `teardown()` so tests are safe to run repeatedly.
 ### Adding a new Bash test
 
 Create a new file in `vm/tests/` named after the script you are testing
-(`vm/tests/my-script.bats`). Use `selinux-config.bats` as a template —
-copy the `_stub` helper and the `setup`/`teardown` blocks, then write
-`@test` blocks for each behaviour you want to cover.
+(`vm/tests/my-script.bats`). Use `java.bats` or `node.bats` as a template for
+tool-install scripts — copy the `_stub` helper and the `setup`/`teardown` blocks,
+then write `@test` blocks for each behaviour you want to cover. Use
+`selinux-config.bats` as a template for simpler setup scripts that only call
+`dnf` and `systemctl`.
 
 ---
 
@@ -258,15 +274,16 @@ npm test -- -t "parseVmList"
 A passing run looks like:
 
 ```
- ✓ src/__tests__/CheckCard.test.tsx         (15 tests)
- ✓ src/__tests__/SetupPage.test.tsx         (24 tests)
- ✓ src/__tests__/CreateVmPage.test.tsx      (25 tests)
- ✓ src/__tests__/LogsPage.test.tsx          (12 tests)
- ✓ electron/__tests__/ipc-handlers.test.js  (21 tests)
- ✓ electron/__tests__/script-runner.test.js (11 tests)
+ ✓ src/__tests__/CheckCard.test.tsx          (15 tests)
+ ✓ src/__tests__/SetupPage.test.tsx          (24 tests)
+ ✓ src/__tests__/CreateVmPage.test.tsx       (25 tests)
+ ✓ src/__tests__/LogsPage.test.tsx           (12 tests)
+ ✓ src/__tests__/ProvisionPage.test.tsx     (301 tests)
+ ✓ electron/__tests__/ipc-handlers.test.js   (21 tests)
+ ✓ electron/__tests__/script-runner.test.js  (11 tests)
 
-Test Files  6 passed (6)
-     Tests  108 passed (108)
+Test Files  7 passed (7)
+     Tests  409 passed (409)
 ```
 
 ### What is tested
@@ -277,6 +294,7 @@ Test Files  6 passed (6)
 | `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — left-panel rows rendered, summary counts (pass/warn/fail), pass/fail message, re-run; `live log stream` — emitted lines appear in right panel; `error state` — script failure message; `detail panel` — auto-selects first failing check, clicking a row shows its detail and fix content, "No action needed" for passing checks, switching selection clears previous detail; `InstallVirtualBox action` — button states and success message | 24 |
 | `src/__tests__/CreateVmPage.test.tsx` | `step 1 next button` — disabled when fields empty/partial, enabled when both filled; `step indicator` — all step labels shown, advances on Next, Back returns to step 1, "Review" label on step 3, confirm summary on step 4, fields preserved on back; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating VM..." replaces wizard, correct args passed, live log lines; `success state` — green banner, navigation button, "What to do next"; `failure state` — red banner, script output toggle; `log toggle` — hidden by default, Show/Hide lifecycle, toggle button visible when lines emitted | 25 |
 | `src/__tests__/LogsPage.test.tsx` | default log selection, content rendered, empty/error states, switching logs, Refresh button, Refresh disabled while loading, folder buttons visible, correct `openLogDir` keys | 12 |
+| `src/__tests__/ProvisionPage.test.tsx` | `idle / credentials form` — fields, Save button state; `Test Connection` — success banner, credential persistence, error messages (8 `mapCredsError` branches); `script list` — flat list, by-category grouping, category drill-down; `running state` — label while in flight; `done state banners` — green success, red failure with `errorDetail`, blue already-installed, mutual exclusion, action buttons; `forceConfirm` — amber panel, Cancel, "Install anyway" passes `--force`; `changeHostname toggle` — input shown/hidden, pre-filled from `getVmHostname`, cleared on uncheck | 301 |
 | `electron/__tests__/ipc-handlers.test.js` | `parseVmList` — single VM, multiple, spaces in name, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-item array, bare-object Array.isArray guard, error paths with stdout/stderr snippets; `get-downloads-path`; `open-log-dir` — success, correct paths, error string, unknown key | 21 |
 | `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input; `hasActiveScript`; `killActiveScript` | 11 |
 
