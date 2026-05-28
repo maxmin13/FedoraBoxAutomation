@@ -18,21 +18,9 @@
 
 # eclipse ide use a drop down list for the version
 
-# do aws provision
+# check aws provision
 
 # provision claude code
 
 
-# Details list
-after installing, the following seem missing, not detected:
 
-dbeaver ce
-docker ceminikube
-k3s
-openssl
-wireshark
-git
-vim
-chrome
-ansible
-ai tools

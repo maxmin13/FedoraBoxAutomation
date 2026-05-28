@@ -5,33 +5,108 @@ import ShareLogsPage from './ShareLogsPage'
 import ProvisionPage from './ProvisionPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
-// Maps detect-installed.sh JSON keys to user-facing labels.
-const TOOL_LABELS: { key: string; label: string }[] = [
-  { key: 'baseSetup',        label: 'Base Setup' },
-  { key: 'java',             label: 'Oracle JDK' },
-  { key: 'php',              label: 'PHP' },
-  { key: 'python',           label: 'Python' },
-  { key: 'node',             label: 'Node.js' },
-  { key: 'maven',            label: 'Apache Maven' },
-  { key: 'httpd',            label: 'Apache HTTP Server' },
-  { key: 'tomcat',           label: 'Apache Tomcat' },
-  { key: 'mariadb',          label: 'MariaDB' },
-  { key: 'postgresql',       label: 'PostgreSQL' },
-  { key: 'dbeaver',          label: 'DBeaver CE' },
-  { key: 'eclipse',          label: 'Eclipse IDE' },
-  { key: 'visualStudioCode', label: 'Visual Studio Code' },
-  { key: 'docker',           label: 'Docker CE' },
-  { key: 'minikube',         label: 'Minikube' },
-  { key: 'k3s',              label: 'k3s' },
-  { key: 'awsCli',           label: 'AWS CLI' },
-  { key: 'ecsCli',           label: 'Amazon ECS CLI' },
-  { key: 'openssl',          label: 'OpenSSL 3.3.2' },
-  { key: 'wireshark',        label: 'Wireshark' },
-  { key: 'git',              label: 'Git' },
-  { key: 'vim',              label: 'Vim' },
-  { key: 'chrome',           label: 'Google Chrome' },
-  { key: 'ansible',          label: 'Ansible' },
-  { key: 'claudeCode',       label: 'Claude Code' },
+// Maps detect-installed.sh JSON keys to user-facing labels, grouped by category.
+const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }[] = [
+  {
+    category: 'System',
+    tools: [
+      { key: 'baseSetup', label: 'Base Setup' },
+    ],
+  },
+  {
+    category: 'Languages',
+    tools: [
+      { key: 'java',   label: 'Oracle JDK' },
+      { key: 'php',    label: 'PHP' },
+      { key: 'python', label: 'Python' },
+      { key: 'node',   label: 'Node.js' },
+    ],
+  },
+  {
+    category: 'Build Tools',
+    tools: [
+      { key: 'maven', label: 'Apache Maven' },
+    ],
+  },
+  {
+    category: 'Web Servers',
+    tools: [
+      { key: 'httpd',  label: 'Apache HTTP Server' },
+      { key: 'tomcat', label: 'Apache Tomcat' },
+    ],
+  },
+  {
+    category: 'Databases',
+    tools: [
+      { key: 'mariadb',    label: 'MariaDB' },
+      { key: 'postgresql', label: 'PostgreSQL' },
+      { key: 'dbeaver',    label: 'DBeaver CE' },
+    ],
+  },
+  {
+    category: 'IDEs',
+    tools: [
+      { key: 'eclipse',          label: 'Eclipse IDE' },
+      { key: 'visualStudioCode', label: 'Visual Studio Code' },
+    ],
+  },
+  {
+    category: 'Containers',
+    tools: [
+      { key: 'docker',   label: 'Docker CE' },
+      { key: 'minikube', label: 'Minikube' },
+      { key: 'k3s',      label: 'k3s' },
+    ],
+  },
+  {
+    category: 'Cloud',
+    tools: [
+      { key: 'awsCli', label: 'AWS CLI' },
+      { key: 'ecsCli', label: 'Amazon ECS CLI' },
+    ],
+  },
+  {
+    category: 'Security',
+    tools: [
+      { key: 'openssl', label: 'OpenSSL 3.3.2' },
+    ],
+  },
+  {
+    category: 'Network',
+    tools: [
+      { key: 'wireshark', label: 'Wireshark' },
+    ],
+  },
+  {
+    category: 'Version Control',
+    tools: [
+      { key: 'git', label: 'Git' },
+    ],
+  },
+  {
+    category: 'Editors',
+    tools: [
+      { key: 'vim', label: 'Vim' },
+    ],
+  },
+  {
+    category: 'Browsers',
+    tools: [
+      { key: 'chrome', label: 'Google Chrome' },
+    ],
+  },
+  {
+    category: 'Automation',
+    tools: [
+      { key: 'ansible', label: 'Ansible' },
+    ],
+  },
+  {
+    category: 'AI Tools',
+    tools: [
+      { key: 'claudeCode', label: 'Claude Code' },
+    ],
+  },
 ]
 
 interface VmEditPageProps {
@@ -105,7 +180,9 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     window.electronAPI.queryVmInstalled(vm.name).then((result) => {
       if (result.ok) {
         setInstalledTools(
-          TOOL_LABELS.filter((t) => result.installed[t.key]).map((t) => t.label)
+          TOOL_GROUPS.flatMap((g) => g.tools)
+            .filter((t) => result.installed[t.key])
+            .map((t) => t.key)
         )
         setToolsStatus('ok')
       } else if (result.vmStopped) {
@@ -268,16 +345,32 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                 <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
               ) : toolsStatus === 'error' ? (
                 <p className="text-zinc-500 text-sm">Could not connect to VM</p>
-              ) : installedTools.length > 0 ? (
-                <div className="grid grid-cols-3 gap-x-2 gap-y-1">
-                  {installedTools.map((label) => (
-                    <div key={label} className="flex items-center gap-1 min-w-0">
-                      <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                      <span className="text-zinc-300 text-xs truncate">{label}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+              ) : installedTools.length > 0 ? (() => {
+                const installedSet = new Set(installedTools)
+                return (
+                  <div className="space-y-1.5 max-h-[10rem] overflow-y-auto">
+                    {TOOL_GROUPS
+                      .map((group) => ({
+                        category: group.category,
+                        installed: group.tools.filter((t) => installedSet.has(t.key)),
+                      }))
+                      .filter((group) => group.installed.length > 0)
+                      .map((group) => (
+                        <div key={group.category} className="flex gap-2 min-w-0">
+                          <span className="text-zinc-500 text-xs shrink-0 w-[7rem]">{group.category}</span>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 min-w-0">
+                            {group.installed.map((tool) => (
+                              <div key={tool.key} className="flex items-center gap-1">
+                                <span className="text-green-400 text-xs shrink-0">&#10003;</span>
+                                <span className="text-zinc-300 text-xs">{tool.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )
+              })() : (
                 <p className="text-zinc-500 text-sm">Nothing installed yet</p>
               )}
             </Section>

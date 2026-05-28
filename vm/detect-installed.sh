@@ -4,10 +4,15 @@
 # Called by the Electron GUI via VBoxManage guestcontrol.
 # Always exits 0. Never sources /tmp/common.sh.
 
+# Ensure /usr/local/bin is in PATH regardless of how guestcontrol invokes this.
+# Needed for tools installed there: minikube, k3s, openssl, claude, aws, ecs-cli.
+export PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
+
 cmd_ok()  { command -v "$1" >/dev/null 2>&1 && echo true || echo false; }
 svc_ok()  { systemctl is-active "$1" >/dev/null 2>&1 && echo true || echo false; }
 path_ok() { [ -e "$1" ] && echo true || echo false; }
 glob_ok() { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
+rpm_ok()  { rpm -q "$1" &>/dev/null && echo true || echo false; }
 
 python_ok() {
   compgen -G "/usr/local/bin/python3.*" >/dev/null 2>&1 && echo true || echo false
@@ -29,19 +34,19 @@ cat <<JSON
   "tomcat":           $(glob_ok '/opt/tomcat-*'),
   "mariadb":          $(svc_ok mariadb),
   "postgresql":       $(svc_ok postgresql),
-  "dbeaver":          $(path_ok /opt/dbeaver/dbeaver),
+  "dbeaver":          $(rpm_ok dbeaver-ce),
   "eclipse":          $(glob_ok '/opt/eclipse*'),
   "visualStudioCode": $(cmd_ok code),
-  "docker":           $(svc_ok docker),
-  "minikube":         $(cmd_ok minikube),
-  "k3s":              $(cmd_ok k3s),
+  "docker":           $(cmd_ok docker),
+  "minikube":         $(path_ok /usr/local/bin/minikube),
+  "k3s":              $(path_ok /usr/local/bin/k3s),
   "awsCli":           $(cmd_ok aws),
   "ecsCli":           $(cmd_ok ecs-cli),
   "openssl":          $(path_ok /usr/local/ssl/bin/openssl),
-  "wireshark":        $(cmd_ok wireshark),
+  "wireshark":        $(cmd_ok tshark),
   "git":              $(cmd_ok git),
   "vim":              $(cmd_ok vim),
-  "chrome":           $(cmd_ok google-chrome-stable),
+  "chrome":           $(rpm_ok google-chrome-stable),
   "ansible":          $(cmd_ok ansible),
   "claudeCode":       $(cmd_ok claude)
 }
