@@ -10,6 +10,11 @@ const { registerIpcHandlers } = require('./ipc-handlers')
 const { killActiveScript, hasActiveScript } = require('./script-runner')
 const log = require('./logger')
 
+// Suppress "Gpu Cache Creation failed: -2" — Chromium tries to create a GPU
+// shader disk cache in the user-data dir; disabling it silences the warning
+// with no visible effect on this app (no WebGL / heavy canvas usage).
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache')
+
 // isDev is true when running via `npm run dev` (Vite dev server).
 // We check NODE_ENV first so `npm start` (build + electron .) works too.
 const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
