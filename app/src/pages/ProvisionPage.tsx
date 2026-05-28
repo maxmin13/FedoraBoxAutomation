@@ -194,9 +194,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
 
-  const [credsStatus, setCredsStatus] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle')
-  const [credsError,  setCredsError]  = useState<string | null>(null)
-  const [isLive,      setIsLive]      = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   const [pageState,    setPageState]    = useState<PageState>('idle')
   const [idleView,     setIdleView]     = useState<IdleView>('mode')
@@ -206,23 +204,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showLog,      setShowLog]      = useState(false)
   const [runningLabel, setRunningLabel] = useState('')
 
-  const [showSetupGuide,    setShowSetupGuide]    = useState(false)
   const [forceConfirm,      setForceConfirm]      = useState(false)
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
-  const setupGuideRef          = useRef<HTMLDivElement>(null)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
-
-  useEffect(() => {
-    if (!showSetupGuide) return
-    function handleClick(e: MouseEvent) {
-      if (setupGuideRef.current && !setupGuideRef.current.contains(e.target as Node)) {
-        setShowSetupGuide(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showSetupGuide])
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
@@ -231,7 +216,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [hostname,         setHostname]         = useState('')
 
   useEffect(() => {
-    if (!changeHostname || !credsVerified || hostname) return
+    if (!changeHostname || !vmUser || !vmPass || hostname) return
     window.electronAPI.getVmHostname(vm.name, vmUser, vmPass).then((result) => {
       if (result.ok && result.hostname) setHostname(result.hostname)
     })
@@ -251,12 +236,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running')
   }, [pageState, onScriptRunning])
 
-  useEffect(() => {
-    setCredsStatus('idle')
-    setCredsError(null)
-    setIsLive(false)
-  }, [vmUser, vmPass])
-
   function mapCredsError(raw: string): string {
     return /is not running|powered off/i.test(raw)
       ? 'VM is not running — start it first'
@@ -275,39 +254,23 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       : 'Connection failed — see Logs for details'
   }
 
-  async function handleTestCreds() {
-    setCredsStatus('checking')
-    setCredsError(null)
-    const result = await window.electronAPI.checkVmCredentials(vm.name, vmUser, vmPass)
-    if (result.ok) {
-      setCredsStatus('ok')
-      setIsLive(result.isLive ?? false)
-      window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
-    } else {
-      setCredsStatus('fail')
-      setCredsError(mapCredsError(result.error ?? ''))
-    }
-  }
-
-  /** Verifies credentials before a run. On failure, redirects to the mode view
-   *  and shows the error next to the Test Connection button. Returns false to abort. */
+  /** Verifies credentials before a run. On failure, shows an error on the current
+   *  form without navigating away. Returns false to abort. */
   async function checkBeforeRun(): Promise<boolean> {
+    setConnectionError(null)
     const result = await window.electronAPI.checkVmCredentials(vm.name, vmUser, vmPass)
     if (result.ok && !result.isLive) return true
-    setIdleView('mode')
     if (!result.ok) {
-      setCredsStatus('fail')
-      setCredsError(mapCredsError(result.error ?? ''))
+      setConnectionError(mapCredsError(result.error ?? ''))
     } else {
       // isLive — credentials are fine but VM is on a live ISO
-      setCredsStatus('ok')
-      setIsLive(true)
-      setCredsError(null)
+      setConnectionError('VM is booting from the live ISO — install Fedora on disk and reboot before provisioning.')
     }
     return false
   }
 
   function handleNavBack() {
+    setConnectionError(null)
     switch (idleView) {
       case 'mode':        onBack();                   break
       case 'full-form':   setIdleView('mode');        break
@@ -409,16 +372,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     'focus:outline-none focus:border-blue-500 ' +
     (val ? 'border-zinc-400' : 'border-zinc-600')
 
-  const icr = (val: string) =>
-    'flex-1 min-w-0 px-2.5 py-1.5 bg-zinc-700 border rounded text-zinc-100 text-sm ' +
-    'focus:outline-none focus:border-blue-500 ' +
-    (val ? 'border-zinc-400' : 'border-zinc-600')
-
-  const credsFilled   = !!vmUser && !!vmPass
-  const credsVerified = credsStatus === 'ok'
-  const credsReady    = credsFilled && credsVerified && !isLive
-  const canRunFull    = credsReady && !!loginUser
-  const canRunScript  = credsReady && !!loginUser && !!selectedScript
 
   // ── Running ──────────────────────────────────────────────────────────────────
   if (pageState === 'running') {
@@ -506,8 +459,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 }
               }
               setAlreadyInstalled(false)
-              setCredsStatus('idle')
-              setCredsError(null)
+              setConnectionError(null)
               setPageState('idle')
               setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
             }}
@@ -548,105 +500,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       {idleView === 'mode' && (
         <div className="flex flex-col gap-3">
 
-          {/* Credentials — single row */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3 shrink-0">
-            <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-2">Credentials</h2>
-            <div className="flex gap-2 mb-2 max-w-sm">
-              <div className="flex-1 min-w-0">
-                <label className="block text-zinc-400 text-xs mb-1">VM root username</label>
-                <input
-                  type="text"
-                  value={vmUser}
-                  onChange={(e) => setVmUser(e.target.value)}
-                  placeholder="root"
-                  autoComplete="off"
-                  className={'w-full ' + icr(vmUser)}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <label className="block text-zinc-400 text-xs mb-1">VM root password</label>
-                <input
-                  type="password"
-                  value={vmPass}
-                  onChange={(e) => setVmPass(e.target.value)}
-                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
-                  autoComplete="new-password"
-                  className={'w-full ' + icr(vmPass)}
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleTestCreds}
-                  disabled={!credsFilled || credsStatus === 'checking'}
-                  className="shrink-0 whitespace-nowrap px-3 py-1.5 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {credsStatus === 'checking' ? 'Testing...' : 'Test Connection'}
-                </button>
-                {credsStatus === 'ok' && !isLive && <span className="text-green-300 text-sm">&#10003; Connected</span>}
-                {credsStatus === 'ok' && isLive  && <span className="text-amber-400 text-sm">&#9888; Live ISO</span>}
-              </div>
-              {credsStatus === 'fail' && credsError && (
-                <p className="text-red-400 text-xs">{credsError}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Hint text */}
-          {!credsFilled && (
-            <p className="text-zinc-500 text-xs shrink-0">Fill in VM credentials to continue.</p>
-          )}
-          {credsFilled && !credsVerified && (
-            <p className="text-zinc-500 text-xs shrink-0">Test your credentials to unlock provisioning.</p>
-          )}
-          {credsVerified && isLive && (
-            <p className="text-amber-400 text-xs shrink-0">VM is booting from the live ISO — install Fedora on disk and reboot before provisioning.</p>
-          )}
-
-          {/* Before you can connect — collapsible setup guide (floats over content below) */}
-          {!credsVerified && (
-            <div className="relative shrink-0" ref={setupGuideRef}>
-              <button
-                onClick={() => setShowSetupGuide(v => !v)}
-                className={
-                  'w-full flex items-center justify-between px-3 py-2 text-xs text-zinc-400 ' +
-                  'hover:text-zinc-200 hover:bg-zinc-800 transition-colors border border-zinc-700 ' +
-                  (showSetupGuide ? 'rounded-t-lg' : 'rounded-lg')
-                }
-              >
-                <span className="font-semibold uppercase tracking-wider">Before you can connect</span>
-                <span>{showSetupGuide ? '▲' : '▼'}</span>
-              </button>
-              {showSetupGuide && (
-                <div className="absolute top-full left-0 right-0 z-20 border-x border-b border-zinc-700 rounded-b-lg px-3 pt-2 pb-3 space-y-2 bg-zinc-800">
-                  <p className="text-zinc-500 text-xs">Run these steps inside the VM once after installing Fedora:</p>
-                  {[
-                    { n: 1, label: 'Update system',             cmd: 'sudo dnf update -y  ->  reboot' },
-                    { n: 2, label: 'Reinstall Guest Additions',  cmd: 'sudo dnf install -y kernel-devel-$(uname -r) kernel-headers gcc make perl\nsudo mkdir -p /mnt/ga && sudo mount /dev/sr1 /mnt/ga  # sr0 if sr1 not found\nsudo /mnt/ga/VBoxLinuxAdditions.run' },
-                    { n: 3, label: 'Set root password',          cmd: 'sudo passwd root' },
-                    { n: 4, label: 'Disable SELinux',            cmd: "sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config  ->  reboot" },
-                  ].map(({ n, label, cmd }) => (
-                    <div key={n} className="flex gap-2 text-xs">
-                      <span className="shrink-0 text-zinc-600 w-4 text-right">{n}.</span>
-                      <div className="min-w-0">
-                        <p className="text-zinc-300 font-medium">{label}</p>
-                        <pre className="text-zinc-500 font-mono whitespace-pre-wrap break-all mt-0.5">{cmd}</pre>
-                      </div>
-                    </div>
-                  ))}
-                  <p className="text-zinc-600 text-xs pt-1">See <span className="text-zinc-400">Docs &rarr; Post-Install Setup</span> for full details.</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Mode buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setIdleView('full-form')}
-              disabled={!credsReady}
-              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">Base Setup</p>
               <p className="text-zinc-400 text-xs leading-relaxed">
@@ -655,8 +513,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             </button>
             <button
               onClick={() => setIdleView('categories')}
-              disabled={!credsReady}
-              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">By Category</p>
               <p className="text-zinc-400 text-xs leading-relaxed">
@@ -714,10 +571,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora — not the VirtualBox VM name.</p>
               </div>
             )}
+            {connectionError && (
+              <div className="bg-red-950 border border-red-700 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+                <p className="text-red-300 text-xs">{connectionError}</p>
+                <button onClick={() => setConnectionError(null)} className="shrink-0 text-red-500 hover:text-red-300 text-xs leading-none">&times;</button>
+              </div>
+            )}
             <button
               onClick={handleRunFull}
-              disabled={!canRunFull}
-              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
             >
               Run Base Setup
             </button>
@@ -757,7 +619,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               {selectedCategory.scripts.map((script) => (
                 <button
                   key={script.name}
-                  onClick={() => { setSelectedScript(script); setArgValues(['', '']); setIdleView('script-args') }}
+                  onClick={() => { setSelectedScript(script); setArgValues(['', '']); setConnectionError(null); setIdleView('script-args') }}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors"
                 >
                   <p className="text-zinc-200 text-sm font-medium">{script.label}</p>
@@ -863,10 +725,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </div>
             )}
 
+            {connectionError && (
+              <div className="bg-red-950 border border-red-700 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+                <p className="text-red-300 text-xs">{connectionError}</p>
+                <button onClick={() => setConnectionError(null)} className="shrink-0 text-red-500 hover:text-red-300 text-xs leading-none">&times;</button>
+              </div>
+            )}
             <button
               onClick={() => handleRunScript()}
-              disabled={!canRunScript}
-              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
             >
               Run {selectedScript.label}
             </button>

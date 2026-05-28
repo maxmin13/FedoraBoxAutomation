@@ -16,6 +16,23 @@
 
 # in case of script error, give the user to rollback, at least for openssl
 
+# eclipse ide use a drop down list for the version
+
+# do aws provision
+
 # provision claude code
 
-# eclipse ide use a drop down list for the version
+
+# Details list
+after installing, the following seem missing, not detected:
+
+dbeaver ce
+docker ceminikube
+k3s
+openssl
+wireshark
+git
+vim
+chrome
+ansible
+ai tools

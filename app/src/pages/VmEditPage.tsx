@@ -72,6 +72,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   const [info, setInfo]               = useState<VmInfo | null>(null)
   const [loadError, setLoadError]     = useState<string | null>(null)
   const [infoKey, setInfoKey]         = useState(0)
+  const [toolsKey, setToolsKey]       = useState(0)
   const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
   const [installedTools, setInstalledTools] = useState<string[]>([])
 
@@ -115,7 +116,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
         setToolsStatus('error')
       }
     })
-  }, [info?.state, vm.name])
+  }, [info?.state, vm.name, toolsKey])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
@@ -215,12 +216,14 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                     <span className="text-zinc-500 text-xs">Host folder</span>
                     <span className="text-zinc-500 text-xs">VM folder</span>
                   </div>
-                  {info.sharedFolders.map((sf) => (
-                    <div key={sf.name} className="grid grid-cols-2 gap-3">
-                      <CopyCell value={sf.hostPath} missing={!sf.existsOnHost} />
-                      <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
-                    </div>
-                  ))}
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {info.sharedFolders.map((sf) => (
+                      <div key={sf.name} className="grid grid-cols-2 gap-3">
+                        <CopyCell value={sf.hostPath} missing={!sf.existsOnHost} />
+                        <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p className="text-zinc-500 text-sm">None configured</p>
@@ -249,7 +252,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               title="Installed tools"
               action={info.state === 'running' && (
                 <button
-                  onClick={() => setInfoKey((k) => k + 1)}
+                  onClick={() => setToolsKey((k) => k + 1)}
                   disabled={toolsStatus === 'loading'}
                   className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -266,11 +269,11 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               ) : toolsStatus === 'error' ? (
                 <p className="text-zinc-500 text-sm">Could not connect to VM</p>
               ) : installedTools.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-3 gap-x-2 gap-y-1">
                   {installedTools.map((label) => (
-                    <div key={label} className="flex items-center gap-2 text-sm">
+                    <div key={label} className="flex items-center gap-1 min-w-0">
                       <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                      <span className="text-zinc-300">{label}</span>
+                      <span className="text-zinc-300 text-xs truncate">{label}</span>
                     </div>
                   ))}
                 </div>
