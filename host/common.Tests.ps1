@@ -50,6 +50,37 @@ Describe 'Get-VBoxErrMsg' {
         $result | Should -BeLike '*restoring*'
     }
 
+    It 'maps "not currently running" to the VM-not-running message' {
+        $result = Get-VBoxErrMsg -Output @('VirtualBox error: not currently running')
+        $result | Should -BeLike '*not running*'
+        $result | Should -BeLike '*start it*'
+    }
+
+    It 'maps "is not running" to the VM-not-running message' {
+        $result = Get-VBoxErrMsg -Output @('The machine is not running')
+        $result | Should -BeLike '*not running*'
+    }
+
+    It 'maps "execution service is not ready" to the Guest Additions not ready message' {
+        $result = Get-VBoxErrMsg -Output @('execution service is not ready')
+        $result | Should -BeLike '*Guest Additions are not ready*'
+    }
+
+    It 'maps "not installed or not ready" to the Guest Additions not ready message' {
+        $result = Get-VBoxErrMsg -Output @('Guest Additions not installed or not ready')
+        $result | Should -BeLike '*Guest Additions are not ready*'
+    }
+
+    It 'maps empty output to the VM-not-responding message' {
+        $result = Get-VBoxErrMsg -Output @('')
+        $result | Should -BeLike '*not responding*'
+    }
+
+    It 'maps whitespace-only output to the VM-not-responding message' {
+        $result = Get-VBoxErrMsg -Output @('   ')
+        $result | Should -BeLike '*not responding*'
+    }
+
     It 'maps VERR_DUPLICATE to the duplicate-session message' {
         $result = Get-VBoxErrMsg -Output @('VERR_DUPLICATE: session conflict')
         $result | Should -BeLike '*previous guest session*'

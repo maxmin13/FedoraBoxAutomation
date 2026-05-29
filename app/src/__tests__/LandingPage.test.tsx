@@ -245,4 +245,14 @@ describe('VM detail navigation', () => {
     // Back to the grid — the heading is "My VMs"
     expect(screen.getByRole('heading', { name: 'My VMs', level: 1 })).toBeInTheDocument()
   })
+
+  it('opens ProvisionPage when the Provision button is clicked', async () => {
+    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
+    await renderAndFlush()
+    fireEvent.click(screen.getByRole('button', { name: 'Provision' }))
+    await act(async () => {})
+    // ProvisionPage shows mode-selection buttons on initial mount
+    expect(screen.getByRole('button', { name: /Base Setup/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /By Category/ })).toBeInTheDocument()
+  })
 })
