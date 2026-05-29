@@ -72,26 +72,22 @@ if (Test-Path $bgLocalPath) {
 }
 
 $steps = [System.Collections.Generic.List[hashtable]]::new()
-$steps.Add(@{ Path = Join-Path $setupRoot 'system-prep.sh';    Args = $LoginUser })
+$steps.Add(@{ Path = Join-Path $setupRoot 'system-prep.sh';    Label = 'System preparation';    Args = $LoginUser })
 if (-not [string]::IsNullOrWhiteSpace($Hostname)) {
-    $steps.Add(@{ Path = Join-Path $setupRoot 'network-config.sh'; Args = $Hostname })
+    $steps.Add(@{ Path = Join-Path $setupRoot 'network-config.sh'; Label = 'Network configuration'; Args = $Hostname })
 }
-$steps.Add(@{ Path = Join-Path $setupRoot 'selinux-config.sh'; Args = '' })
-$steps.Add(@{ Path = Join-Path $setupRoot 'desktop-config.sh'; Args = "$LoginUser $bgFileName".Trim() })
-$steps.Add(@{ Path = Join-Path $setupRoot 'utilities.sh';      Args = '' })
+$steps.Add(@{ Path = Join-Path $setupRoot 'selinux-config.sh'; Label = 'SELinux configuration'; Args = '' })
+$steps.Add(@{ Path = Join-Path $setupRoot 'desktop-config.sh'; Label = 'Desktop configuration'; Args = "$LoginUser $bgFileName".Trim() })
+$steps.Add(@{ Path = Join-Path $setupRoot 'utilities.sh';      Label = 'Utilities';             Args = '' })
 
 foreach ($step in $steps) {
     if (-not (Test-Path $step.Path)) {
-        Write-Host "  SKIPPED (not found): $($step.Path)" -ForegroundColor Yellow
+        Write-Host "  SKIPPED (not found): $($step.Label)" -ForegroundColor Yellow
         continue
     }
-    Write-Header (Split-Path $step.Path -Leaf)
-    $exitCode = Invoke-GuestScript -LocalPath $step.Path -ScriptArgs $step.Args
-    if ($exitCode -ne 0) {
-        Write-Host ""
-        Write-Host "  ERROR: base setup failed at $(Split-Path $step.Path -Leaf)" -ForegroundColor Red
-        exit 1
-    }
+    Write-Header $step.Label
+    $exitCode = Invoke-GuestScript -LocalPath $step.Path -ScriptArgs $step.Args -Label $step.Label
+    if ($exitCode -ne 0) { exit 1 }
 }
 
 Write-Host ""

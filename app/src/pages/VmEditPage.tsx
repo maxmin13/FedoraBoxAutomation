@@ -78,7 +78,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     ],
   },
   {
-    category: 'Version Control',
+    category: 'VCS',
     tools: [
       { key: 'git', label: 'Git' },
     ],
@@ -157,6 +157,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   }
 
   useEffect(() => {
+    if (view === 'provision') return
     setInfo(null)
     setLoadError(null)
     window.electronAPI.getVmInfo(vm.name).then((result) => {
@@ -166,10 +167,11 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
         setLoadError(result.error ?? 'Could not load VM info')
       }
     })
-  }, [vm.name, refreshKey, infoKey])
+  }, [vm.name, refreshKey, infoKey, view])
 
   // Query installed tools whenever VM state or VM name changes.
   useEffect(() => {
+    if (view === 'provision') return
     if (!info) return
     if (info.state !== 'running') {
       setToolsStatus('stopped')
@@ -193,7 +195,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
         setToolsStatus('error')
       }
     })
-  }, [info?.state, vm.name, toolsKey])
+  }, [info?.state, vm.name, toolsKey, view])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
@@ -271,6 +273,24 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               <Row label="Version" value={gaValue} />
             </Section>
 
+            <Section
+              title="Log sync"
+              action={!info.logSyncPath && (
+                <button
+                  onClick={() => setView('share-logs')}
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                >
+                  Sync
+                </button>
+              )}
+            >
+              <Row
+                label="Destination"
+                value={info.logSyncPath ?? 'Not configured'}
+                mono={!!info.logSyncPath}
+              />
+            </Section>
+
           </div>
 
           {/* Right column — action sections */}
@@ -308,24 +328,6 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
             </Section>
 
             <Section
-              title="Log sync"
-              action={
-                <button
-                  onClick={() => setView('share-logs')}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
-                >
-                  Sync
-                </button>
-              }
-            >
-              <Row
-                label="Destination"
-                value={info.logSyncPath ?? 'Not configured'}
-                mono={!!info.logSyncPath}
-              />
-            </Section>
-
-            <Section
               title="Installed tools"
               action={info.state === 'running' && (
                 <button
@@ -347,27 +349,31 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                 <p className="text-zinc-500 text-sm">Could not connect to VM</p>
               ) : installedTools.length > 0 ? (() => {
                 const installedSet = new Set(installedTools)
+                const groups = TOOL_GROUPS
+                  .map((group) => ({
+                    category: group.category,
+                    installed: group.tools.filter((t) => installedSet.has(t.key)),
+                  }))
+                  .filter((group) => group.installed.length > 0)
                 return (
-                  <div className="space-y-1.5 max-h-[10rem] overflow-y-auto">
-                    {TOOL_GROUPS
-                      .map((group) => ({
-                        category: group.category,
-                        installed: group.tools.filter((t) => installedSet.has(t.key)),
-                      }))
-                      .filter((group) => group.installed.length > 0)
-                      .map((group) => (
-                        <div key={group.category} className="flex gap-2 min-w-0">
-                          <span className="text-zinc-500 text-xs shrink-0 w-[7rem]">{group.category}</span>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 min-w-0">
-                            {group.installed.map((tool) => (
-                              <div key={tool.key} className="flex items-center gap-1">
-                                <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                                <span className="text-zinc-300 text-xs">{tool.label}</span>
-                              </div>
-                            ))}
+                  <div className="flex gap-6">
+                    {[0, 1].map((col) => (
+                      <div key={col} className="flex-1 space-y-1">
+                        {groups.filter((_, i) => i % 2 === col).map((group) => (
+                          <div key={group.category} className="flex gap-1.5 min-w-0">
+                            <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
+                              {group.installed.map((tool) => (
+                                <div key={tool.key} className="flex items-center gap-0.5">
+                                  <span className="text-green-400 text-xs shrink-0">&#10003;</span>
+                                  <span className="text-zinc-300 text-xs">{tool.label}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )
               })() : (

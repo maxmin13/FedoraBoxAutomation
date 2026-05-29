@@ -131,11 +131,20 @@ function Get-VBoxErrMsg {
         if ($stateMsg.ContainsKey($state)) { return $stateMsg[$state] }
         return "VM is not ready (state: $state) - start it before running guest scripts"
     }
+    if ($text -match 'not currently running|is not running') {
+        return 'VM is not running - start it before running guest scripts'
+    }
+    if ($text -match 'execution service is not ready|not installed or not ready') {
+        return 'Guest Additions are not ready - start the VM, wait 30 seconds, then try again'
+    }
     if ($text -match 'VERR_DUPLICATE') {
         return 'A previous guest session is still active - wait a few seconds and try again'
     }
     if ($text -match 'VERR_AUTHENTICATION_FAILURE|authentication failure') {
         return 'Wrong username or password'
+    }
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return 'VM is not responding - check that it is running and Guest Additions are active'
     }
     return $text
 }
@@ -159,10 +168,13 @@ function Copy-GuestCommonSh {
 
 # Uploads a local script to /tmp/<filename> inside the guest, strips CRLF,
 # makes it executable, and runs it via /bin/bash.
-# Returns the guest exit code (0 = success).  On upload failure, prints an
-# ERROR: line and returns 1 so the caller can decide whether to abort.
+# Returns 0 on success; non-zero on failure.  Always emits the definitive
+# ERROR: line itself — callers only need to check the return value and exit.
+#   - Upload/connection failure: emits the mapped VBox error, returns 2.
+#   - Script execution failure:  emits "ERROR: <Label> failed …" when Label is
+#     supplied; otherwise leaves the guest's own ERROR: line as the last one.
 function Invoke-GuestScript {
-    param([string]$LocalPath, [string]$ScriptArgs = '')
+    param([string]$LocalPath, [string]$ScriptArgs = '', [string]$Label = '')
 
     $fileName  = [System.IO.Path]::GetFileName($LocalPath)
     $guestPath = "/tmp/$fileName"
@@ -177,8 +189,8 @@ function Invoke-GuestScript {
     $ErrorActionPreference = 'Stop'
     if ($uploadCode -ne 0) {
         Write-Host " FAILED" -ForegroundColor Red
-        Write-Host "  ERROR: $(Get-VBoxErrMsg $r)" -ForegroundColor Red
-        return 1
+        Write-Host "ERROR: $(Get-VBoxErrMsg $r)" -ForegroundColor Red
+        return 2
     }
     Write-Host " OK" -ForegroundColor Green
 
@@ -217,6 +229,11 @@ function Invoke-GuestScript {
         $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
                 else { [string]$_ }
         Write-Host $line
+    }
+
+    if ($exitCode -ne 0 -and $Label) {
+        Write-Host ""
+        Write-Host "ERROR: $Label failed - expand script output for details" -ForegroundColor Red
     }
 
     return $exitCode

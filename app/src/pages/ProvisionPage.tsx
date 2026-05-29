@@ -12,6 +12,12 @@ interface ArgOption {
   label: string
 }
 
+interface ForceConfirmDef {
+  title: string        // heading shown in the amber panel
+  details?: string[]  // bullet points below the heading
+  actionLabel: string // label on the confirm button ("Install anyway", "Update", …)
+}
+
 interface ScriptDef {
   name: string
   label: string
@@ -21,6 +27,7 @@ interface ScriptDef {
   argPrompts?: string[]
   argDefaults?: string[]
   argOptions?: ArgOption[][]   // per-position; if set, renders a <select> instead of <input>
+  forceConfirmDef?: ForceConfirmDef  // if set, script can emit "Use 'Install anyway'" to trigger confirmation
 }
 
 interface CategoryDef {
@@ -104,14 +111,30 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Cloud', dir: 'cloud',
     scripts: [
-      { name: 'aws-cli.sh', label: 'AWS CLI',          relPath: 'aws-cli.sh', description: 'AWS CLI v2 - creates ~/.aws config directory', argType: 'user' },
+      { name: 'aws-cli.sh', label: 'AWS CLI', relPath: 'aws-cli.sh', description: 'AWS CLI v2 - creates ~/.aws config directory', argType: 'user',
+        forceConfirmDef: {
+          title: 'AWS CLI is already installed',
+          details: ['The existing installation will be updated to the latest version.'],
+          actionLabel: 'Update',
+        },
+      },
       { name: 'ecs-cli.sh', label: 'Amazon ECS CLI',   relPath: 'ecs-cli.sh', description: 'Amazon ECS CLI for managing ECS clusters',    argType: 'none' },
     ],
   },
   {
     name: 'Security', dir: 'security',
     scripts: [
-      { name: 'openssl.sh', label: 'OpenSSL 3.3.2', relPath: 'openssl.sh', description: 'OpenSSL 3.3.2 built from source to /usr/local/ssl; adds /usr/local/ssl/bin to PATH in ~/.bash_profile', argType: 'user' },
+      { name: 'openssl.sh', label: 'OpenSSL 3.3.2', relPath: 'openssl.sh', description: 'OpenSSL 3.3.2 built from source to /usr/local/ssl; adds /usr/local/ssl/bin to PATH in ~/.bash_profile', argType: 'user',
+        forceConfirmDef: {
+          title: 'OpenSSL is already installed on this system',
+          details: [
+            'System tools (curl, wget, sshd) may silently link against the new libraries',
+            'dnf update will not patch /usr/local/ssl — you must rebuild manually when CVEs drop',
+            'The system OpenSSL still wins in the terminal unless PATH is manually adjusted',
+          ],
+          actionLabel: 'Install anyway',
+        },
+      },
     ],
   },
   {
@@ -194,8 +217,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
 
-  const [connectionError, setConnectionError] = useState<string | null>(null)
-
   const [pageState,    setPageState]    = useState<PageState>('idle')
   const [idleView,     setIdleView]     = useState<IdleView>('mode')
   const [lines,        setLines]        = useState<ScriptLine[]>([])
@@ -236,41 +257,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running')
   }, [pageState, onScriptRunning])
 
-  function mapCredsError(raw: string): string {
-    return /is not running|powered off/i.test(raw)
-      ? 'VM is not running — start it first'
-      : /not installed or not ready|execution service is not ready/i.test(raw)
-      ? 'Guest Additions not responding — start the VM and wait 30 seconds, then retry'
-      : /VERR_AUTHENTICATION_FAILURE|authentication failure/i.test(raw)
-      ? 'Wrong username or password'
-      : /VERR_ACCESS_DENIED|access.?denied/i.test(raw)
-      ? 'Access denied — SELinux may be blocking the connection; disable it and reboot'
-      : /VERR_NOT_FOUND/i.test(raw)
-      ? 'VM not found — check the VM name'
-      : /VERR_RESOURCE_BUSY/i.test(raw)
-      ? 'Guest control service is busy — the VM may be frozen. Hard-reset it from My VMs and try again.'
-      : /ETIMEDOUT|timed out/i.test(raw)
-      ? 'Connection timed out — the VM is not responding. Hard-reset it from My VMs and try again.'
-      : 'Connection failed — see Logs for details'
-  }
-
-  /** Verifies credentials before a run. On failure, shows an error on the current
-   *  form without navigating away. Returns false to abort. */
-  async function checkBeforeRun(): Promise<boolean> {
-    setConnectionError(null)
-    const result = await window.electronAPI.checkVmCredentials(vm.name, vmUser, vmPass)
-    if (result.ok && !result.isLive) return true
-    if (!result.ok) {
-      setConnectionError(mapCredsError(result.error ?? ''))
-    } else {
-      // isLive — credentials are fine but VM is on a live ISO
-      setConnectionError('VM is booting from the live ISO — install Fedora on disk and reboot before provisioning.')
-    }
-    return false
-  }
-
   function handleNavBack() {
-    setConnectionError(null)
     switch (idleView) {
       case 'mode':        onBack();                   break
       case 'full-form':   setIdleView('mode');        break
@@ -304,7 +291,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (exitCode === 0 && loginUser) {
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
-      if (forceConfirmNeededRef.current && selectedScript?.name === 'openssl.sh') {
+      if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
         setSuccess(false)
         setAlreadyInstalled(false)
@@ -337,7 +324,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   async function handleRunScript(force = false) {
     if (!selectedScript || !selectedCategory) return
-    if (!await checkBeforeRun()) return
     if (force) setForceConfirm(false)
     setRunningLabel(selectedScript.label)
     const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + (force ? ' --force' : '')
@@ -354,7 +340,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   async function handleRunFull() {
-    if (!await checkBeforeRun()) return
     setRunningLabel('Base Setup')
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
@@ -407,21 +392,23 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           </div>
         )}
 
-        {forceConfirm && (
+        {forceConfirm && selectedScript?.forceConfirmDef && (
           <div className="bg-amber-950 border border-amber-700 rounded-lg p-4 space-y-3 shrink-0">
-            <p className="text-amber-200 font-medium">OpenSSL is already installed on this system</p>
+            <p className="text-amber-200 font-medium">{selectedScript.forceConfirmDef.title}</p>
             {error && <p className="text-amber-300 text-sm">{error}</p>}
-            <ul className="text-amber-400 text-xs space-y-1 list-disc list-inside">
-              <li>System tools (curl, wget, sshd) may silently link against the new libraries</li>
-              <li>dnf update will not patch /usr/local/ssl — you must rebuild manually when CVEs drop</li>
-              <li>The system OpenSSL still wins in the terminal unless PATH is manually adjusted</li>
-            </ul>
+            {selectedScript.forceConfirmDef.details && (
+              <ul className="text-amber-400 text-xs space-y-1 list-disc list-inside">
+                {selectedScript.forceConfirmDef.details.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => handleRunScript(true)}
                 className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
               >
-                Install anyway
+                {selectedScript.forceConfirmDef.actionLabel}
               </button>
               <button
                 onClick={() => setForceConfirm(false)}
@@ -459,7 +446,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 }
               }
               setAlreadyInstalled(false)
-              setConnectionError(null)
               setPageState('idle')
               setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
             }}
@@ -571,15 +557,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora — not the VirtualBox VM name.</p>
               </div>
             )}
-            {connectionError && (
-              <div className="bg-red-950 border border-red-700 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
-                <p className="text-red-300 text-xs">{connectionError}</p>
-                <button onClick={() => setConnectionError(null)} className="shrink-0 text-red-500 hover:text-red-300 text-xs leading-none">&times;</button>
-              </div>
-            )}
             <button
               onClick={handleRunFull}
-              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+              disabled={!loginUser}
+              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Run Base Setup
             </button>
@@ -619,7 +600,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               {selectedCategory.scripts.map((script) => (
                 <button
                   key={script.name}
-                  onClick={() => { setSelectedScript(script); setArgValues(['', '']); setConnectionError(null); setIdleView('script-args') }}
+                  onClick={() => { setSelectedScript(script); setArgValues(['', '']); setIdleView('script-args') }}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors"
                 >
                   <p className="text-zinc-200 text-sm font-medium">{script.label}</p>
@@ -725,15 +706,14 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </div>
             )}
 
-            {connectionError && (
-              <div className="bg-red-950 border border-red-700 rounded-lg px-3 py-2 flex items-start justify-between gap-2">
-                <p className="text-red-300 text-xs">{connectionError}</p>
-                <button onClick={() => setConnectionError(null)} className="shrink-0 text-red-500 hover:text-red-300 text-xs leading-none">&times;</button>
-              </div>
-            )}
             <button
               onClick={() => handleRunScript()}
-              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+              disabled={
+                (selectedScript.argType === 'user' ||
+                 selectedScript.argType === 'user+custom' ||
+                 selectedScript.argType === 'user+custom2') && !loginUser
+              }
+              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Run {selectedScript.label}
             </button>

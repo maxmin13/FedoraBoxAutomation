@@ -64,7 +64,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
 
   if (selectedVm) {
     return (
-      <div className="h-full">
+      <div className="h-full overflow-y-auto">
         <VmEditPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} />
       </div>
     )

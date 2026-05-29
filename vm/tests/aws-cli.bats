@@ -21,6 +21,11 @@ setup() {
     mkdir -p "$TEST_TMPDIR/bin"
     export PATH="$TEST_TMPDIR/bin:$PATH"
 
+    # Point testable env vars at temp paths — not created here, so default is
+    # "not installed". Individual tests mkdir the install dir when they need it.
+    export FEDORA_BOX_AWS_INSTALL_DIR="$TEST_TMPDIR/aws-install"
+    export FEDORA_BOX_AWS_BIN="$TEST_TMPDIR/bin/aws"
+
     [[ -f /tmp/common.sh ]] && cp /tmp/common.sh "$TEST_TMPDIR/common.sh.bak"
     cat > /tmp/common.sh << 'STUB'
 #!/bin/bash
@@ -31,15 +36,36 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
-    # Default: AWS CLI already installed
-    _stub aws    0
-    _stub dnf    0
-    _stub curl   0
-    _stub unzip  0
-    _stub chown  0
-    _stub mkdir  0
+    _stub aws   0
+    _stub dnf   0
+    _stub curl  0
+    _stub chown 0
+    _stub mkdir 0
+
+    # unzip stub: logs the call and creates ${WORK_DIR}/aws/install so the
+    # script can proceed to run the installer.
+    cat > "$TEST_TMPDIR/bin/unzip" <<UNZIPSCRIPT
+#!/bin/bash
+printf "unzip %s\n" "\$*" >> "$CALLS_FILE"
+while [[ \$# -gt 0 ]]; do
+    if [[ "\$1" == "-d" ]]; then DEST="\$2"; break; fi
+    shift
+done
+mkdir -p "\${DEST}/aws"
+printf '#!/bin/bash\nprintf "aws_install %%s\\n" "\$*" >> $CALLS_FILE\nexit 0\n' > "\${DEST}/aws/install"
+chmod +x "\${DEST}/aws/install"
+exit 0
+UNZIPSCRIPT
+    chmod +x "$TEST_TMPDIR/bin/unzip"
 }
 
 teardown() {
@@ -54,22 +80,47 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
-@test "exits 0 when AWS CLI is already installed" {
+@test "exits 1 and emits 'Install anyway' message when already installed without --force" {
+    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
     run bash "$SCRIPT" testuser
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Use 'Install anyway'"* ]]
 }
 
-@test "skips download when AWS CLI is already installed" {
+@test "does not download when already installed without --force" {
+    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
     run bash "$SCRIPT" testuser
     ! grep -q "^curl " "$CALLS_FILE"
 }
 
-@test "installs unzip and downloads the CLI bundle when not present" {
-    _stub aws 1   # exit 1 = aws not found
+@test "downloads and installs when not previously installed" {
     run bash "$SCRIPT" testuser
-    grep -q "^dnf install -y unzip" "$CALLS_FILE"
-    grep -q "^curl "                "$CALLS_FILE"
+    grep -q "^curl " "$CALLS_FILE"
+    grep -q "^aws_install" "$CALLS_FILE"
+}
+
+@test "exits 0 after a fresh install" {
+    run bash "$SCRIPT" testuser
+    [ "$status" -eq 0 ]
+}
+
+@test "passes --update to the installer when --force and already installed" {
+    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
+    run bash "$SCRIPT" testuser --force
+    [ "$status" -eq 0 ]
+    grep -q "aws_install --update" "$CALLS_FILE"
+}
+
+@test "does not pass --update when performing a fresh install" {
+    run bash "$SCRIPT" testuser
+    # installer is called but without --update
+    grep -q "^aws_install$" "$CALLS_FILE"
+}
+
+@test "creates the ~/.aws directory for the login user" {
+    run bash "$SCRIPT" testuser
+    grep -q "^mkdir " "$CALLS_FILE"
 }

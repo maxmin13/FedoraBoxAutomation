@@ -138,5 +138,15 @@ if [[ "${FAIL}" -eq 1 ]]; then
     exit 1
 fi
 
-log_info "Install : ${OPENSSL_DIR}"
 log_info "All sanity checks passed."
+log_info "---"
+log_info "Next steps:"
+log_info "  Check version  : ${OPENSSL_DIR}/bin/openssl version"
+log_info "  Generate cert  : openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout key.pem -out cert.pem -subj '/CN=localhost'"
+log_info "  Encrypt file   : openssl enc -aes-256-cbc -pbkdf2 -in plain.txt -out enc.bin"
+log_info "  Decrypt file   : openssl enc -d -aes-256-cbc -pbkdf2 -in enc.bin -out plain.txt"
+log_info "  Check TLS site : openssl s_client -connect example.com:443"
+log_info "  SHA-256 hash   : openssl dgst -sha256 <file>"
+log_info "  Installed at   : ${OPENSSL_DIR}"
+log_info "  Note: run 'source ~/.bash_profile' (or log out and back in) to get openssl on PATH."
+log_info "---"
