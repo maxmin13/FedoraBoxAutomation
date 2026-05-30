@@ -387,14 +387,14 @@ describe('save-vm-credentials handler', () => {
   it('writes the new entry to the credentials file', async () => {
     mockReadFile.mockResolvedValueOnce('{}')
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'pw', loginUser: 'alice' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    const written = JSON.parse(Buffer.from(mockWriteFile.mock.calls.at(-1)[1], 'base64').toString('utf8'))
     expect(written.FedoraBox).toEqual({ user: 'root', pass: 'pw', loginUser: 'alice' })
   })
 
   it('merges with existing entries rather than overwriting them', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ OtherVM: { user: 'admin', pass: 'x', loginUser: 'y' } }))
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'pw', loginUser: 'alice' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    const written = JSON.parse(Buffer.from(mockWriteFile.mock.calls.at(-1)[1], 'base64').toString('utf8'))
     expect(written.OtherVM).toBeDefined()
     expect(written.FedoraBox).toBeDefined()
   })
@@ -408,14 +408,14 @@ describe('save-vm-credentials handler', () => {
   it('preserves the existing loginUser when the new value is empty', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'old', loginUser: 'fedora' } }))
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'new', loginUser: '' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    const written = JSON.parse(Buffer.from(mockWriteFile.mock.calls.at(-1)[1], 'base64').toString('utf8'))
     expect(written.FedoraBox.loginUser).toBe('fedora')
   })
 
   it('overwrites loginUser when the new value is non-empty', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: { user: 'root', pass: 'old', loginUser: 'olduser' } }))
     await saveCredsHandler({}, { vmName: 'FedoraBox', user: 'root', pass: 'new', loginUser: 'newuser' })
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    const written = JSON.parse(Buffer.from(mockWriteFile.mock.calls.at(-1)[1], 'base64').toString('utf8'))
     expect(written.FedoraBox.loginUser).toBe('newuser')
   })
 })
@@ -847,7 +847,7 @@ describe('delete-vm handler', () => {
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'x', loginUser: 'y' } })
     )
     await deleteVmHandler({}, 'FedoraBox')
-    const written = JSON.parse(mockWriteFile.mock.calls.at(-1)[1])
+    const written = JSON.parse(Buffer.from(mockWriteFile.mock.calls.at(-1)[1], 'base64').toString('utf8'))
     expect(written.FedoraBox).toBeUndefined()
   })
 

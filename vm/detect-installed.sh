@@ -14,6 +14,12 @@ path_ok() { [ -e "$1" ] && echo true || echo false; }
 glob_ok() { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
 rpm_ok()  { rpm -q "$1" &>/dev/null && echo true || echo false; }
 
+java_version() {
+  command -v java >/dev/null 2>&1 || { echo false; return; }
+  ver=$(java -version 2>&1 | head -1 | sed 's/.*version "\([^"]*\)".*/\1/')
+  echo "\"${ver}\""
+}
+
 python_ok() {
   compgen -G "/usr/local/bin/python3.*" >/dev/null 2>&1 && echo true || echo false
 }
@@ -25,7 +31,7 @@ base_setup_ok() {
 cat <<JSON
 {
   "baseSetup":        $(base_setup_ok),
-  "java":             $(cmd_ok java),
+  "java":             $(java_version),
   "php":              $(cmd_ok php),
   "python":           $(python_ok),
   "node":             $(cmd_ok node),

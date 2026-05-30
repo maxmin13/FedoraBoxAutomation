@@ -31,9 +31,14 @@ const CREDS_FILE = path.join(CREDS_DIR, 'vm-state.json')
 
 async function readCredsStore() {
   try {
-    const text = await fs.promises.readFile(CREDS_FILE, 'utf8')
-    // PowerShell 5.1 writes UTF-8 with BOM (U+FEFF); strip it before parsing
-    return JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text)
+    const raw = await fs.promises.readFile(CREDS_FILE, 'utf8')
+    try {
+      return JSON.parse(Buffer.from(raw.trim(), 'base64').toString('utf8'))
+    } catch {
+      // Migrate legacy plaintext JSON written by older versions
+      const text = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw
+      return JSON.parse(text)
+    }
   } catch {
     return {}
   }
@@ -41,7 +46,8 @@ async function readCredsStore() {
 
 async function writeCredsStore(store) {
   await fs.promises.mkdir(CREDS_DIR, { recursive: true })
-  await fs.promises.writeFile(CREDS_FILE, JSON.stringify(store, null, 2), 'utf8')
+  const encoded = Buffer.from(JSON.stringify(store, null, 2), 'utf8').toString('base64')
+  await fs.promises.writeFile(CREDS_FILE, encoded, 'utf8')
 }
 
 // Channels excluded from IPC logging.

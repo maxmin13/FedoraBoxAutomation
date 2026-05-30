@@ -61,7 +61,7 @@ function wireRunWithLines(exitCode: number, emitLines: string[], errorDetail?: s
   })
 }
 
-/** Render with saved credentials and navigate to Oracle JDK script-args. */
+/** Render with saved credentials and navigate to Java JDK script-args. */
 async function navigateToJavaReady() {
   window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
     ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
@@ -70,9 +70,9 @@ async function navigateToJavaReady() {
   fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
   await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
   fireEvent.click(screen.getByText('Languages'))
-  await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-  fireEvent.click(screen.getByText('Oracle JDK'))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+  fireEvent.click(screen.getByText('Java JDK'))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
 }
 
 /** Render with saved credentials and navigate to Base Setup form. */
@@ -132,8 +132,8 @@ describe('auto-load credentials', () => {
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
     await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
   })
@@ -196,21 +196,21 @@ describe('script-args form', () => {
     expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
   })
 
-  it('"Run Oracle JDK" button is disabled when loginUser is empty', async () => {
+  it('"Run Java JDK" button is disabled when loginUser is empty', async () => {
     // No saved credentials → loginUser stays ''
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeDisabled()
   })
 
-  it('"Run Oracle JDK" button is enabled when loginUser is filled', async () => {
+  it('"Run Java JDK" button is enabled when loginUser is filled', async () => {
     await navigateToJavaReady()
-    expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Run Java JDK' })).not.toBeDisabled()
   })
 })
 
@@ -226,10 +226,10 @@ describe('save credentials on script run', () => {
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' })) })
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' })) })
   }
 
   it('calls saveVmCredentials when script exits 0 and loginUser is set', async () => {
@@ -241,7 +241,7 @@ describe('save credentials on script run', () => {
 
   it('does NOT call saveVmCredentials when exitCode is non-zero', async () => {
     await setupForScriptRun(1)
-    await waitFor(() => expect(screen.queryByText('Running Oracle JDK...')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText('Running Java JDK...')).not.toBeInTheDocument())
     expect(window.electronAPI.saveVmCredentials).not.toHaveBeenCalled()
   })
 })
@@ -249,7 +249,7 @@ describe('save credentials on script run', () => {
 // ── "Run another" behaviour ───────────────────────────────────────────────────
 
 describe('"Run another" behaviour', () => {
-  /** Run Oracle JDK to the done state (success or failure). */
+  /** Run Java JDK to the done state (success or failure). */
   async function runToDone(exitCode: number) {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
       ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
@@ -259,10 +259,10 @@ describe('"Run another" behaviour', () => {
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
   }
 
@@ -272,8 +272,8 @@ describe('"Run another" behaviour', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
     await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
   })
@@ -283,8 +283,8 @@ describe('"Run another" behaviour', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
     await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
   })
@@ -334,7 +334,7 @@ describe('"Run another" after Base Setup', () => {
 // ── running state ─────────────────────────────────────────────────────────────
 
 describe('running state', () => {
-  it('shows "Running Oracle JDK..." while the script is in flight', async () => {
+  it('shows "Running Java JDK..." while the script is in flight', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
       ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
     })
@@ -343,11 +343,11 @@ describe('running state', () => {
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Oracle JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Oracle JDK'))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Oracle JDK' })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
-    await waitFor(() => expect(screen.getByText('Running Oracle JDK...')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Java JDK'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Running Java JDK...')).toBeInTheDocument())
   })
 
   it('shows "Running Base Setup..." while the setup script is in flight', async () => {
@@ -369,43 +369,43 @@ describe('done state banners', () => {
   it('shows green success banner after a script completes', async () => {
     await navigateToJavaReady()
     wireRun(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
-    await waitFor(() => expect(screen.getByText('Oracle JDK completed successfully.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK completed successfully.')).toBeInTheDocument())
   })
 
   it('shows red failure banner after a script fails', async () => {
     await navigateToJavaReady()
     wireRun(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
-    await waitFor(() => expect(screen.getByText('Oracle JDK failed.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK failed.')).toBeInTheDocument())
   })
 
   it('shows errorDetail text below the failure banner when provided', async () => {
     await navigateToJavaReady()
     wireRun(1, 'ERROR: dnf install failed with code 1')
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
     await waitFor(() => expect(screen.getByText('ERROR: dnf install failed with code 1')).toBeInTheDocument())
   })
 
   it('shows blue "already installed" banner when the script exits 0 with an already-installed info line', async () => {
     await navigateToJavaReady()
     wireRunWithLines(0, ['[INFO  ] java.sh already installed'])
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
-    await waitFor(() => expect(screen.getByText('Oracle JDK is already installed.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK is already installed.')).toBeInTheDocument())
   })
 
   it('does not show the green success banner when alreadyInstalled is true', async () => {
     await navigateToJavaReady()
     wireRunWithLines(0, ['[INFO  ] java.sh already installed'])
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
-    await waitFor(() => expect(screen.getByText('Oracle JDK is already installed.')).toBeInTheDocument())
-    expect(screen.queryByText('Oracle JDK completed successfully.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK is already installed.')).toBeInTheDocument())
+    expect(screen.queryByText('Java JDK completed successfully.')).not.toBeInTheDocument()
   })
 
   it('shows "Run another" and "My VMs" buttons in done state', async () => {
     await navigateToJavaReady()
     wireRun(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Run Oracle JDK' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /My VMs/i })).toBeInTheDocument()
   })

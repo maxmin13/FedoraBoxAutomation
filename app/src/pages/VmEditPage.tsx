@@ -16,7 +16,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
   {
     category: 'Languages',
     tools: [
-      { key: 'java',   label: 'Oracle JDK' },
+      { key: 'java',   label: 'Java JDK' },
       { key: 'php',    label: 'PHP' },
       { key: 'python', label: 'Python' },
       { key: 'node',   label: 'Node.js' },
@@ -149,7 +149,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   const [infoKey, setInfoKey]         = useState(0)
   const [toolsKey, setToolsKey]       = useState(0)
   const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
-  const [installedTools, setInstalledTools] = useState<string[]>([])
+  const [installedTools, setInstalledTools] = useState<Record<string, string | boolean>>({})
   const [missingOpen,    setMissingOpen]    = useState(false)
 
   function backToDetail() {
@@ -176,17 +176,18 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     if (!info) return
     if (info.state !== 'running') {
       setToolsStatus('stopped')
-      setInstalledTools([])
+      setInstalledTools({})
       return
     }
     setToolsStatus('loading')
     window.electronAPI.queryVmInstalled(vm.name).then((result) => {
       if (result.ok) {
-        setInstalledTools(
-          TOOL_GROUPS.flatMap((g) => g.tools)
-            .filter((t) => result.installed[t.key])
-            .map((t) => t.key)
-        )
+        const knownKeys = new Set(TOOL_GROUPS.flatMap((g) => g.tools).map((t) => t.key))
+        const filtered: Record<string, string | boolean> = {}
+        for (const [key, val] of Object.entries(result.installed)) {
+          if (knownKeys.has(key) && val) filtered[key] = val
+        }
+        setInstalledTools(filtered)
         setToolsStatus('ok')
       } else if (result.vmStopped) {
         setToolsStatus('stopped')
@@ -377,12 +378,11 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                 <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
               ) : toolsStatus === 'error' ? (
                 <p className="text-zinc-500 text-sm">Could not connect to VM</p>
-              ) : installedTools.length > 0 ? (() => {
-                const installedSet = new Set(installedTools)
+              ) : Object.keys(installedTools).length > 0 ? (() => {
                 const groups = TOOL_GROUPS
                   .map((group) => ({
                     category: group.category,
-                    installed: group.tools.filter((t) => installedSet.has(t.key)),
+                    installed: group.tools.filter((t) => installedTools[t.key]),
                   }))
                   .filter((group) => group.installed.length > 0)
                 return (
@@ -397,6 +397,9 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                                 <div key={tool.key} className="flex items-center gap-0.5">
                                   <span className="text-green-400 text-xs shrink-0">&#10003;</span>
                                   <span className="text-zinc-300 text-xs">{tool.label}</span>
+                                  {typeof installedTools[tool.key] === 'string' && (
+                                    <span className="text-zinc-500 text-xs">({installedTools[tool.key] as string})</span>
+                                  )}
                                 </div>
                               ))}
                             </div>

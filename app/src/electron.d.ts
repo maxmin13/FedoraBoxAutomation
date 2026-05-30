@@ -107,7 +107,7 @@ declare global {
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       queryVmInstalled: (vmName: string) => Promise<
-        | { ok: true; installed: Record<string, boolean> }
+        | { ok: true; installed: Record<string, boolean | string> }
         | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }
       >
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>

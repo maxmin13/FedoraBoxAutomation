@@ -355,11 +355,12 @@ describe('VmEditPage — Installed tools section', () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
       ok: true,
-      installed: { ...ALL_FALSE, baseSetup: true, java: true, docker: true },
+      installed: { ...ALL_FALSE, baseSetup: true, java: '21.0.3', docker: true },
     })
     render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Base Setup')).toBeInTheDocument())
-    expect(screen.getByText('Oracle JDK')).toBeInTheDocument()
+    expect(screen.getByText('Java JDK')).toBeInTheDocument()
+    expect(screen.getByText('(21.0.3)')).toBeInTheDocument()
     expect(screen.getByText('Docker CE')).toBeInTheDocument()
     expect(screen.queryByText('PHP')).not.toBeInTheDocument()
   })
