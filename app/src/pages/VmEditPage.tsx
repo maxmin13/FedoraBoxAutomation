@@ -150,6 +150,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   const [toolsKey, setToolsKey]       = useState(0)
   const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
   const [installedTools, setInstalledTools] = useState<string[]>([])
+  const [missingOpen,    setMissingOpen]    = useState(false)
 
   function backToDetail() {
     setView('detail')
@@ -307,24 +308,53 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                 </button>
               }
             >
-              {info.sharedFolders.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-3">
-                    <span className="text-zinc-500 text-xs">Host folder</span>
-                    <span className="text-zinc-500 text-xs">VM folder</span>
-                  </div>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {info.sharedFolders.map((sf) => (
-                      <div key={sf.name} className="grid grid-cols-2 gap-3">
-                        <CopyCell value={sf.hostPath} missing={!sf.existsOnHost} />
-                        <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+              {(() => {
+                const valid   = info.sharedFolders.filter((sf) =>  sf.existsOnHost)
+                const missing = info.sharedFolders.filter((sf) => !sf.existsOnHost)
+                if (info.sharedFolders.length === 0)
+                  return <p className="text-zinc-500 text-sm">None configured</p>
+                return (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <span className="text-zinc-500 text-xs">Host folder</span>
+                      <span className="text-zinc-500 text-xs">VM folder</span>
+                    </div>
+                    <div className="space-y-2">
+                      {valid.map((sf) => (
+                        <div key={sf.name} className="grid grid-cols-2 gap-3">
+                          <CopyCell value={sf.hostPath} />
+                          <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                        </div>
+                      ))}
+                    </div>
+                    {missing.length > 0 && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setMissingOpen((o) => !o)}
+                          className="flex items-center gap-1 text-amber-400 text-xs hover:text-amber-300 transition-colors"
+                        >
+                          <span>{missingOpen ? '▾' : '▸'}</span>
+                          <span>&#9888; {missing.length} host {missing.length === 1 ? 'folder' : 'folders'} not found</span>
+                        </button>
+                        {missingOpen && (
+                          <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-zinc-800 border border-zinc-700 rounded-lg p-3 space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <span className="text-zinc-500 text-xs">Host folder</span>
+                              <span className="text-zinc-500 text-xs">VM folder</span>
+                            </div>
+                            {missing.map((sf) => (
+                              <div key={sf.name} className="grid grid-cols-2 gap-3">
+                                <CopyCell value={sf.hostPath} missing />
+                                <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              ) : (
-                <p className="text-zinc-500 text-sm">None configured</p>
-              )}
+                )
+              })()}
             </Section>
 
             <Section
