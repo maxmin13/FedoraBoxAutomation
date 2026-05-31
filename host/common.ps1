@@ -161,8 +161,8 @@ function Copy-GuestCommonSh {
     $r    = & $script:vbox @ua 2>&1
     $code = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
-    if ($code -ne 0) { Write-Output "  Uploading common.sh WARNING: $(Get-VBoxErrMsg $r)" }
-    else             { Write-Output "  Uploading common.sh OK" }
+    if ($code -ne 0) { Write-Host "  Uploading common.sh WARNING: $(Get-VBoxErrMsg $r)" }
+    else             { Write-Host "  Uploading common.sh OK" }
 }
 
 # Uploads a local script to /tmp/<filename> inside the guest, strips CRLF,
@@ -186,11 +186,11 @@ function Invoke-GuestScript {
     $uploadCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($uploadCode -ne 0) {
-        Write-Output "  Uploading $fileName FAILED"
-        Write-Output "ERROR: $(Get-VBoxErrMsg $r)"
+        Write-Host "  Uploading $fileName FAILED"
+        Write-Host "ERROR: $(Get-VBoxErrMsg $r)"
         return 2
     }
-    Write-Output "  Uploading $fileName OK"
+    Write-Host "  Uploading $fileName OK"
 
     # Strip CRLF and chmod +x (best-effort; failure is non-fatal)
     $ErrorActionPreference = 'SilentlyContinue'
@@ -207,7 +207,7 @@ function Invoke-GuestScript {
         if ($ScriptArgs) { "sudo $guestPath $ScriptArgs" } else { "sudo $guestPath" }
     }
 
-    Write-Output "  Running: $cmd"
+    Write-Host "  Running: $cmd"
 
     $runArgs = @(
         'guestcontrol', $script:vmName,
@@ -220,15 +220,15 @@ function Invoke-GuestScript {
 
     $ErrorActionPreference = 'SilentlyContinue'
     & $script:vbox @runArgs 2>&1 | ForEach-Object {
-        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
-        else { [string]$_ }
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.Exception.Message }
+        else { Write-Host ([string]$_) }
     }
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
     if ($exitCode -ne 0 -and $Label) {
-        Write-Output ""
-        Write-Output "ERROR: $Label failed - expand script output for details"
+        Write-Host ""
+        Write-Host "ERROR: $Label failed - expand script output for details"
     }
 
     return $exitCode
