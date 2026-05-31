@@ -38,9 +38,11 @@ else
     CACHED_TAR="${CACHE_DIR}/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz"
     mkdir -p "${CACHE_DIR}"
 
+    ECLIPSE_URL="https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz"
+
     if [[ ! -f "${CACHED_TAR}" ]]; then
-        log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
-        wget -q "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${CACHED_TAR}"
+        log_info "Downloading Eclipse ${ECLIPSE_RELEASE} from ${ECLIPSE_URL} ..."
+        wget -q "${ECLIPSE_URL}" -O "${CACHED_TAR}"
         gzip -t "${CACHED_TAR}" 2>/dev/null || {
             rm -f "${CACHED_TAR}"
             log_error "Eclipse ${ECLIPSE_RELEASE} archive is corrupt or the download was incomplete. Check the release name and network connectivity."
