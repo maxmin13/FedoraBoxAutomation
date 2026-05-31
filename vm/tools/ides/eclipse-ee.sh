@@ -7,12 +7,16 @@
 ##              install the desired Eclipse flavour. Optionally pass a release
 ##              as the first argument (default: 2026-03).
 ## Usage:       sudo ./eclipse-ee.sh [release]
-## Parameters:  $1  [release]  Eclipse release to install (default: 2026-03)
+## Parameters:  $1  <release>  Eclipse release to install (e.g. 2026-03)
 ##
 
 source /tmp/common.sh
 
-ECLIPSE_RELEASE="${1:-2026-03}"
+if [[ -z "${1:-}" ]]; then
+    log_error "Eclipse release argument is required (e.g. 2026-03)"
+    exit 1
+fi
+ECLIPSE_RELEASE="$1"
 
 ####
 STEP "Eclipse Enterprise"
