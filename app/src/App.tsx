@@ -87,7 +87,7 @@ export default function App() {
             </div>
           )}
           <div style={{ display: currentPage === 'logs' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <LogsPage />
+            <LogsPage isActive={currentPage === 'logs'} />
           </div>
         </ErrorBoundary>
       </main>

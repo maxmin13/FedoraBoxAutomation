@@ -15,6 +15,11 @@ const log = require('./logger')
 // with no visible effect on this app (no WebGL / heavy canvas usage).
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache')
 
+// Prevent a second instance from opening — focus the existing window instead.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+
 // isDev is true when running via `npm run dev` (Vite dev server).
 // We check NODE_ENV first so `npm start` (build + electron .) works too.
 const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
@@ -85,6 +90,16 @@ function createWindow() {
 
   return win
 }
+
+// A second launch attempt arrives here — bring the existing window to front.
+app.on('second-instance', () => {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length > 0) {
+    const win = wins[0]
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+})
 
 // 'ready' fires when Electron has finished initialising.
 // You must not create windows before this event.

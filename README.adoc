@@ -27,11 +27,11 @@ image:https://img.shields.io/badge/license-MIT-green[License]
 .Setup — environment analysis with fix instructions
 image::docs/screenshots/setup-page.png[Setup page, width=800]
 
-.Create VM — 4-step wizard
-image::docs/screenshots/create-vm-wizard.png[Create VM wizard, width=800]
-
 .My VMs — VM list with start / stop / delete controls
 image::docs/screenshots/my-vms-page.png[My VMs page, width=800]
+
+.Create VM — 4-step wizard
+image::docs/screenshots/create-vm-wizard.png[Create VM wizard, width=800]
 
 .Shared folder — VM readiness banner and mount configuration
 image::docs/screenshots/share-folder-page.png[Share folder page, width=800]

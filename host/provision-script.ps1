@@ -59,5 +59,6 @@ if (-not (Test-Path $localPath)) {
 # Upload vm/lib/common.sh so guest scripts can source it
 Copy-GuestCommonSh -ProjectRoot $projectRoot
 
-$exitCode = Invoke-GuestScript -LocalPath $localPath -ScriptArgs $ScriptArgs
+$label    = [System.IO.Path]::GetFileNameWithoutExtension($localPath)
+$exitCode = Invoke-GuestScript -LocalPath $localPath -ScriptArgs $ScriptArgs -Label $label
 exit $exitCode

@@ -123,9 +123,9 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
-| 1 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; click a VM name to open its detail page |
-| 2 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Tabs: Provision / Share Folder / Logs; **Provision** shows Test Connection, flat and by-category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials saved per VM |
-| 3 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
+| 1 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
+| 2 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; click a VM name to open its detail page |
+| 3 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Tabs: Provision / Share Folder / Logs; **Provision** shows Test Connection, flat and by-category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials saved per VM |
 | 4 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
 | 5 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
 | 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |

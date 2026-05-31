@@ -15,30 +15,29 @@ describe('LogsPage', () => {
 
   describe('sidebar', () => {
     it('shows both log file buttons', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await act(async () => {})
       expect(screen.getByText('GUI log')).toBeInTheDocument()
       expect(screen.getByText('Host log')).toBeInTheDocument()
     })
 
     it('shows a Refresh button once loading completes', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
       })
     })
 
-    it('selects gui.log by default', async () => {
-      render(<LogsPage />)
+    it('selects host.log by default', async () => {
+      render(<LogsPage isActive={true} />)
       await act(async () => {})
-      // readLog should be called with 'gui.log' on mount
-      expect(window.electronAPI.readLog).toHaveBeenCalledWith('gui.log')
+      expect(window.electronAPI.readLog).toHaveBeenCalledWith('host.log')
     })
   })
 
   describe('log content', () => {
     it('renders log content after loading', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       // Use regex — getByText normalizes whitespace and won't match multi-line pre content exactly
       await waitFor(() => {
         expect(screen.getByText(/recv list-vms/)).toBeInTheDocument()
@@ -47,7 +46,7 @@ describe('LogsPage', () => {
 
     it('shows "Log file is empty." when content is an empty string', async () => {
       window.electronAPI.readLog = vi.fn().mockResolvedValue({ ok: true, content: '' })
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await waitFor(() => {
         expect(screen.getByText('Log file is empty.')).toBeInTheDocument()
       })
@@ -55,7 +54,7 @@ describe('LogsPage', () => {
 
     it('shows an error message when readLog returns ok: false', async () => {
       window.electronAPI.readLog = vi.fn().mockResolvedValue({ ok: false, error: 'Permission denied' })
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await waitFor(() => {
         expect(screen.getByText('Permission denied')).toBeInTheDocument()
       })
@@ -63,18 +62,18 @@ describe('LogsPage', () => {
   })
 
   describe('log switching', () => {
-    it('calls readLog with "host.log" when Host log is clicked', async () => {
-      render(<LogsPage />)
-      await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledWith('gui.log'))
+    it('calls readLog with "gui.log" when GUI log is clicked', async () => {
+      render(<LogsPage isActive={true} />)
+      await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledWith('host.log'))
 
-      fireEvent.click(screen.getByText('Host log'))
+      fireEvent.click(screen.getByText('GUI log'))
       await act(async () => {})
 
-      expect(window.electronAPI.readLog).toHaveBeenCalledWith('host.log')
+      expect(window.electronAPI.readLog).toHaveBeenCalledWith('gui.log')
     })
 
     it('reloads the current log when Refresh is clicked', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledTimes(1))
 
       // Sync is on by default which disables the Refresh button; turn it off first
@@ -83,27 +82,43 @@ describe('LogsPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
 
       await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledTimes(2))
-      expect(window.electronAPI.readLog).toHaveBeenLastCalledWith('gui.log')
+      expect(window.electronAPI.readLog).toHaveBeenLastCalledWith('host.log')
+    })
+
+    it('resets to host.log when navigated back after switching to GUI log', async () => {
+      const { rerender } = render(<LogsPage isActive={true} />)
+      await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledWith('host.log'))
+      vi.clearAllMocks()
+
+      fireEvent.click(screen.getByText('GUI log'))
+      await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledWith('gui.log'))
+      vi.clearAllMocks()
+
+      // Simulate navigating away and back
+      rerender(<LogsPage isActive={false} />)
+      rerender(<LogsPage isActive={true} />)
+
+      await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledWith('host.log'))
     })
   })
 
   describe('open folder buttons', () => {
     it('shows the App logs and VirtualBox VMs folder buttons', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await act(async () => {})
       expect(screen.getByRole('button', { name: /app logs/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /virtualbox vms/i })).toBeInTheDocument()
     })
 
     it('calls openLogDir("app") when App logs is clicked', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await act(async () => {})
       fireEvent.click(screen.getByRole('button', { name: /app logs/i }))
       expect(window.electronAPI.openLogDir).toHaveBeenCalledWith('app')
     })
 
     it('calls openLogDir("vbox") when VirtualBox VMs is clicked', async () => {
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await act(async () => {})
       fireEvent.click(screen.getByRole('button', { name: /virtualbox vms/i }))
       expect(window.electronAPI.openLogDir).toHaveBeenCalledWith('vbox')
@@ -113,7 +128,7 @@ describe('LogsPage', () => {
   describe('loading state', () => {
     it('disables the Refresh button while loading', async () => {
       window.electronAPI.readLog = vi.fn().mockReturnValue(new Promise(() => {}))
-      render(<LogsPage />)
+      render(<LogsPage isActive={true} />)
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled()
       })

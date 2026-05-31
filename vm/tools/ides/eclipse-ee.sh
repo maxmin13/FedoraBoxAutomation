@@ -27,7 +27,7 @@ fi
 
 if [[ -x '/opt/eclipse-installer/eclipse-inst' ]]
 then
-    log_info 'Eclipse Enterprise installer already downloaded.'
+    log_info 'Eclipse Enterprise installer already installed.'
 else
     log_info "Downloading Eclipse Enterprise installer ${ECLIPSE_RELEASE} ..."
 

@@ -11,13 +11,21 @@ const LOGS: { name: LogName; label: string; description: string }[] = [
   { name: 'host.log', label: 'Host log', description: 'PowerShell transcript — full output of every .ps1 run' },
 ]
 
-export default function LogsPage() {
-  const [selectedLog, setSelectedLog] = useState<LogName>('gui.log')
+interface LogsPageProps {
+  isActive: boolean
+}
+
+export default function LogsPage({ isActive }: LogsPageProps) {
+  const [selectedLog, setSelectedLog] = useState<LogName>('host.log')
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [syncEnabled, setSyncEnabled] = useState(true)
   const contentRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (isActive) setSelectedLog('host.log')
+  }, [isActive])
 
   useEffect(() => {
     loadLog(selectedLog)
@@ -36,12 +44,14 @@ export default function LogsPage() {
     return () => clearInterval(id)
   }, [syncEnabled, selectedLog])
 
-  // Scroll to the bottom whenever content changes
+  // Scroll to the bottom whenever content changes or the tab becomes active.
+  // When hidden (display:none ancestor), scrollHeight is 0 so scrollTop is zeroed out;
+  // re-running on isActive ensures we scroll once the element is visible again.
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight
     }
-  }, [content])
+  }, [content, isActive])
 
   async function loadLog(name: LogName, silent = false) {
     if (!silent) {

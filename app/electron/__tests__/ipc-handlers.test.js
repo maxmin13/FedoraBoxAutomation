@@ -424,7 +424,8 @@ describe('save-vm-credentials handler', () => {
 
 describe('query-vm-installed handler', () => {
   let queryVmInstalledHandler
-  let mockExecSync
+  let mockExec      // callback-based; used by isVmRunning (execAsync)
+  let mockExecSync  // used by the guestcontrol copyto / run calls
   let mockReadFile
 
   const INSTALLED_JSON = JSON.stringify({
@@ -437,10 +438,11 @@ describe('query-vm-installed handler', () => {
 
   beforeAll(() => {
     const cpId = require.resolve('child_process')
+    mockExec     = vi.fn()
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: mockExec },
     }
     mockReadFile = vi.spyOn(fs.promises, 'readFile')
     queryVmInstalledHandler = loadHandlers()('query-vm-installed')
@@ -453,28 +455,29 @@ describe('query-vm-installed handler', () => {
   })
 
   beforeEach(() => {
+    mockExec.mockReset()
     mockExecSync.mockReset()
     mockReadFile.mockReset()
   })
 
   it('returns { ok: false, vmStopped: true } when the VM is not running', async () => {
-    mockExecSync.mockReturnValueOnce('VMState="poweroff"\n')  // isVmRunning
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
     const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
     expect(result).toEqual({ ok: false, vmStopped: true })
   })
 
   it('returns { ok: false, noCredentials: true } when no credentials are saved', async () => {
-    mockExecSync.mockReturnValueOnce('VMState="running"\n')  // isVmRunning
-    mockReadFile.mockResolvedValueOnce('{}')                  // empty store
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
+    mockReadFile.mockResolvedValueOnce('{}')
     const result = await queryVmInstalledHandler({}, { vmName: 'FedoraBox' })
     expect(result).toEqual({ ok: false, noCredentials: true })
   })
 
   it('returns { ok: true, installed } when guestcontrol succeeds', async () => {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
     mockExecSync
-      .mockReturnValueOnce('VMState="running"\n')  // isVmRunning
-      .mockReturnValueOnce('')                      // copyto
-      .mockReturnValueOnce(INSTALLED_JSON)          // run detect-installed.sh
+      .mockReturnValueOnce('')             // copyto
+      .mockReturnValueOnce(INSTALLED_JSON) // run detect-installed.sh
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'secret' } })
     )
@@ -487,9 +490,8 @@ describe('query-vm-installed handler', () => {
   })
 
   it('returns { ok: false, error } when guestcontrol throws', async () => {
-    mockExecSync
-      .mockReturnValueOnce('VMState="running"\n')
-      .mockImplementationOnce(() => { throw new Error('VERR_AUTHENTICATION_FAILURE') })
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
+    mockExecSync.mockImplementationOnce(() => { throw new Error('VERR_AUTHENTICATION_FAILURE') })
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'wrong' } })
     )
@@ -511,7 +513,7 @@ describe('check-vm-ready handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     checkVmReadyHandler = loadHandlers()('check-vm-ready')
   })
@@ -684,7 +686,7 @@ describe('list-vms handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     listVmsHandler = loadHandlers()('list-vms')
   })
@@ -736,17 +738,19 @@ describe('list-vms handler', () => {
 })
 
 // ── start-vm handler ──────────────────────────────────────────────────────────
+// isVmRunning and the startvm call both use execAsync (promisified exec),
+// so we mock exec (callback-based) rather than execSync.
 
 describe('start-vm handler', () => {
   let startVmHandler
-  let mockExecSync
+  let mockExec
 
   beforeAll(() => {
     const cpId = require.resolve('child_process')
-    mockExecSync = vi.fn()
+    mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: vi.fn(), exec: mockExec },
     }
     startVmHandler = loadHandlers()('start-vm')
   })
@@ -757,33 +761,31 @@ describe('start-vm handler', () => {
   })
 
   beforeEach(() => {
-    mockExecSync.mockReset()
+    mockExec.mockReset()
   })
 
   it('returns ok: true without calling startvm when VM is already running', async () => {
-    mockExecSync.mockReturnValueOnce('VMState="running"\n') // isVmRunning
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
     const result = await startVmHandler({}, 'FedoraBox')
     expect(result).toEqual({ ok: true })
     // Only the showvminfo call, not startvm
-    expect(mockExecSync).toHaveBeenCalledTimes(1)
+    expect(mockExec).toHaveBeenCalledTimes(1)
   })
 
   it('calls VBoxManage startvm --type gui when VM is stopped', async () => {
-    mockExecSync
-      .mockReturnValueOnce('VMState="poweroff"\n') // isVmRunning
-      .mockReturnValueOnce('')                      // startvm
+    mockExec
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: '', stderr: '' }))
     const result = await startVmHandler({}, 'FedoraBox')
     expect(result).toEqual({ ok: true })
-    expect(mockExecSync).toHaveBeenLastCalledWith(
-      expect.stringContaining('startvm'),
-      expect.anything()
-    )
+    const cmds = mockExec.mock.calls.map(([cmd]) => cmd)
+    expect(cmds.some(c => c.includes('startvm'))).toBe(true)
   })
 
   it('returns ok: false when VBoxManage startvm throws', async () => {
-    mockExecSync
-      .mockReturnValueOnce('VMState="poweroff"\n')
-      .mockImplementationOnce(() => { throw new Error('VM not found') })
+    mockExec
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
+      .mockImplementationOnce((cmd, opts, cb) => cb(new Error('VM not found')))
     const result = await startVmHandler({}, 'FedoraBox')
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/VM not found/)
@@ -802,7 +804,7 @@ describe('delete-vm handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     mockReadFile  = vi.spyOn(fs.promises, 'readFile')
     mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
@@ -870,7 +872,7 @@ describe('get-vm-guest-logs-path handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     getVmGuestLogsPathHandler = loadHandlers()('get-vm-guest-logs-path')
   })
@@ -912,17 +914,19 @@ describe('get-vm-guest-logs-path handler', () => {
 })
 
 // ── stop-vm handler ───────────────────────────────────────────────────────────
+// isVmRunning, acpipowerbutton, and poweroff all use execAsync (promisified exec),
+// so we mock exec (callback-based) rather than execSync.
 
 describe('stop-vm handler', () => {
   let stopVmHandler
-  let mockExecSync
+  let mockExec
 
   beforeAll(() => {
     const cpId = require.resolve('child_process')
-    mockExecSync = vi.fn()
+    mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: vi.fn(), exec: mockExec },
     }
     stopVmHandler = loadHandlers()('stop-vm')
   })
@@ -933,30 +937,29 @@ describe('stop-vm handler', () => {
   })
 
   beforeEach(() => {
-    mockExecSync.mockReset()
+    mockExec.mockReset()
   })
 
   it('returns ok: true without calling ACPI when VM is already stopped', async () => {
-    mockExecSync.mockReturnValueOnce('VMState="poweroff"\r\n')
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\r\n', stderr: '' }))
     const result = await stopVmHandler({}, 'FedoraBox')
     expect(result).toEqual({ ok: true })
-    expect(mockExecSync).toHaveBeenCalledTimes(1)
+    expect(mockExec).toHaveBeenCalledTimes(1)
   })
 
   it('sends ACPI shutdown and returns ok when VM stops during polling', async () => {
     vi.useFakeTimers()
     try {
-      mockExecSync
-        .mockReturnValueOnce('VMState="running"\r\n')   // initial isVmRunning → running
-        .mockReturnValueOnce('')                          // acpipowerbutton
-        .mockReturnValueOnce('VMState="poweroff"\r\n')  // first poll → stopped
+      mockExec
+        .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\r\n', stderr: '' }))  // isVmRunning → running
+        .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: '', stderr: '' }))                        // acpipowerbutton
+        .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\r\n', stderr: '' })) // first poll → stopped
       const promise = stopVmHandler({}, 'FedoraBox')
       await vi.runAllTimersAsync()
       const result = await promise
       expect(result).toEqual({ ok: true })
-      expect(mockExecSync).toHaveBeenCalledWith(
-        expect.stringContaining('acpipowerbutton'), expect.anything()
-      )
+      const cmds = mockExec.mock.calls.map(([cmd]) => cmd)
+      expect(cmds.some(c => c.includes('acpipowerbutton'))).toBe(true)
     } finally {
       vi.useRealTimers()
     }
@@ -965,28 +968,25 @@ describe('stop-vm handler', () => {
   it('falls back to forced poweroff when ACPI shutdown times out', async () => {
     vi.useFakeTimers()
     try {
-      mockExecSync
-        .mockReturnValueOnce('VMState="running"\r\n')  // initial isVmRunning
-        .mockReturnValueOnce('')                         // acpipowerbutton
-        .mockReturnValue('VMState="running"\r\n')        // all polls: still running
+      mockExec
+        .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\r\n', stderr: '' }))  // initial isVmRunning
+        .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: '', stderr: '' }))                        // acpipowerbutton
+        .mockImplementation((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\r\n', stderr: '' }))       // all polls + final poweroff
       const promise = stopVmHandler({}, 'FedoraBox')
       await vi.runAllTimersAsync()
       const result = await promise
       expect(result).toEqual({ ok: true })
-      expect(mockExecSync).toHaveBeenCalledWith(
-        expect.stringContaining('poweroff'), expect.anything()
-      )
+      const cmds = mockExec.mock.calls.map(([cmd]) => cmd)
+      expect(cmds.some(c => c.includes('poweroff'))).toBe(true)
     } finally {
       vi.useRealTimers()
     }
   })
 
   it('returns ok: false when the acpipowerbutton command throws', async () => {
-    // isVmRunning has its own try/catch, so only errors outside it reach the outer catch.
-    // Throw on the acpipowerbutton call (second execSync), not the isVmRunning call.
-    mockExecSync
-      .mockReturnValueOnce('VMState="running"\r\n')                              // isVmRunning → running
-      .mockImplementationOnce(() => { throw new Error('VM is locked') })         // acpipowerbutton
+    mockExec
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\r\n', stderr: '' }))  // isVmRunning → running
+      .mockImplementationOnce((cmd, opts, cb) => cb(new Error('VM is locked')))                               // acpipowerbutton
     const result = await stopVmHandler({}, 'FedoraBox')
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/VM is locked/)
@@ -1037,7 +1037,7 @@ describe('get-vm-info handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     mockExistsSync = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     getVmInfoHandler = loadHandlers()('get-vm-info')
@@ -1536,7 +1536,7 @@ describe('get-vm-hostname handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     getVmHostnameHandler = loadHandlers()('get-vm-hostname')
   })
@@ -1580,7 +1580,7 @@ describe('check-vm-credentials handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync },
+      exports: { execSync: mockExecSync, exec: vi.fn() },
     }
     checkVmCredsHandler = loadHandlers()('check-vm-credentials')
   })

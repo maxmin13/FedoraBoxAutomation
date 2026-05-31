@@ -47,7 +47,13 @@ else
         log_info "Using cached archive: ${CACHED_TAR}"
     fi
     log_info "Extracting ..."
+    # Remove any stale /opt/eclipse left by a previous failed run before extracting.
+    [[ -d /opt/eclipse ]] && rm -rf /opt/eclipse
     tar -xf "${CACHED_TAR}" --directory /opt
+    if [[ ! -d /opt/eclipse ]]; then
+        log_error "Extraction produced no 'eclipse' directory under /opt — the archive may be corrupt or use an unexpected layout."
+        exit 1
+    fi
     mv /opt/eclipse "${ECLIPSE_DIR}"
     ln -sf "${ECLIPSE_DIR}/eclipse" "${ECLIPSE_BIN}"
     log_info "Extraction complete."
@@ -69,6 +75,7 @@ else
 	Terminal=0
 	EOF
 
+    update-desktop-database /usr/share/applications
     log_info 'Eclipse desktop entry registered.'
     log_info "Eclipse ${ECLIPSE_RELEASE} successfully installed."
 fi
