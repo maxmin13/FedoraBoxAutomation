@@ -42,7 +42,7 @@ else
 
     if [[ ! -f "${CACHED_TAR}" ]]; then
         log_info "Downloading Eclipse ${ECLIPSE_RELEASE} from ${ECLIPSE_URL} ..."
-        wget -q "${ECLIPSE_URL}" -O "${CACHED_TAR}"
+        wget -q --tries=3 "${ECLIPSE_URL}" -O "${CACHED_TAR}"
         gzip -t "${CACHED_TAR}" 2>/dev/null || {
             rm -f "${CACHED_TAR}"
             log_error "Eclipse ${ECLIPSE_RELEASE} archive is corrupt or the download was incomplete. Check the release name and network connectivity."
