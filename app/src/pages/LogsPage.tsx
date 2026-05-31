@@ -16,7 +16,7 @@ export default function LogsPage() {
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [syncEnabled, setSyncEnabled] = useState(false)
+  const [syncEnabled, setSyncEnabled] = useState(true)
   const contentRef = useRef<HTMLElement>(null)
 
   useEffect(() => {

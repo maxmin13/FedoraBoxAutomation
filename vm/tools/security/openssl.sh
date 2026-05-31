@@ -52,7 +52,7 @@ else
 
     mkdir -p "${OPENSSL_DIR}"
 
-    wget "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -O "${WORK_DIR}/openssl.tar.gz"
+    wget -q "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -O "${WORK_DIR}/openssl.tar.gz"
     tar -xf "${WORK_DIR}/openssl.tar.gz" -C "${WORK_DIR}"
     cd "${WORK_DIR}/openssl-${OPENSSL_VERSION}"
 

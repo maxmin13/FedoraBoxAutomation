@@ -34,7 +34,11 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget "https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+    wget -q "https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+    gzip -t "${WORK_DIR}/eclipse_ee.tar.gz" 2>/dev/null || {
+        log_error "Eclipse Enterprise installer archive is corrupt or the download was incomplete. Check the release name and network connectivity."
+        exit 1
+    }
     log_info "Download complete. Extracting ..."
     tar -xf "${WORK_DIR}/eclipse_ee.tar.gz" --directory /opt
     log_info "Extraction complete."

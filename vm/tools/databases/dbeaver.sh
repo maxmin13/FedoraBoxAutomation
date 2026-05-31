@@ -28,7 +28,7 @@ then
     fi
     log_info "Downloading: ${RPM_URL}"
 
-    wget "${RPM_URL}" -O "${WORK_DIR}/dbeaver.rpm"
+    wget -q "${RPM_URL}" -O "${WORK_DIR}/dbeaver.rpm"
     dnf install -y "${WORK_DIR}/dbeaver.rpm"
 
     log_info 'DBeaver Community Edition successfully installed.'

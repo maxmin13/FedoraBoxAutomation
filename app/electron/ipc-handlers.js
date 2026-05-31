@@ -12,8 +12,9 @@
 // ============================================================
 
 const { ipcMain, app, dialog, shell } = require('electron')
-const { execSync } = require('child_process')
-const { inspect } = require('util')
+const { execSync, exec } = require('child_process')
+const { inspect, promisify } = require('util')
+const execAsync = promisify(exec)
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
@@ -91,13 +92,13 @@ function handleIpc(channel, handler) {
  * @param {string} name
  * @returns {boolean}
  */
-function isVmRunning(name) {
+async function isVmRunning(name) {
   try {
-    const info = execSync(
+    const { stdout } = await execAsync(
       `VBoxManage showvminfo "${name}" --machinereadable`,
       { encoding: 'utf8' }
     )
-    return /^VMState="running"/m.test(info)
+    return /^VMState="running"/m.test(stdout)
   } catch {
     return false
   }
@@ -122,7 +123,7 @@ function streamScript(win, scriptPath, args) {
       args,
       (line) => {
         win.webContents.send('script-line', line)
-        log.hostLine(line.text)
+        log.hostLine(line.text, line.source)
         lines.push(line)
       },
       (exitCode) => {
@@ -205,12 +206,12 @@ function registerIpcHandlers(win) {
   // Starts a stopped VM with a GUI window. Idempotent: returns ok if already running.
   handleIpc('start-vm', async (_event, name) => {
     try {
-      if (isVmRunning(name)) {
+      if (await isVmRunning(name)) {
         log.info(`[ipc][start-vm] "${name}" already running — skipping`)
         return { ok: true }
       }
       log.info(`[ipc][start-vm] starting "${name}"`)
-      execSync(`VBoxManage startvm "${name}" --type gui`, { encoding: 'utf8' })
+      await execAsync(`VBoxManage startvm "${name}" --type gui`, { encoding: 'utf8' })
       return { ok: true }
     } catch (error) {
       log.error(`[ipc][start-vm] "${name}":`, error.message)
@@ -223,25 +224,25 @@ function registerIpcHandlers(win) {
   // running after 60 s.
   handleIpc('stop-vm', async (_event, name) => {
     try {
-      if (!isVmRunning(name)) {
+      if (!await isVmRunning(name)) {
         log.info(`[ipc][stop-vm] "${name}" already stopped — skipping`)
         return { ok: true }
       }
 
       log.info(`[ipc][stop-vm] sending ACPI shutdown to "${name}"`)
-      execSync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
+      await execAsync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
 
       const deadline = Date.now() + 60_000
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 1000))
-        if (!isVmRunning(name)) {
+        if (!await isVmRunning(name)) {
           log.info(`[ipc][stop-vm] "${name}" stopped (ACPI)`)
           return { ok: true }
         }
       }
 
       log.warn(`[ipc][stop-vm] ACPI timeout — forcing poweroff for "${name}"`)
-      execSync(`VBoxManage controlvm "${name}" poweroff`, { encoding: 'utf8' })
+      await execAsync(`VBoxManage controlvm "${name}" poweroff`, { encoding: 'utf8' })
       log.info(`[ipc][stop-vm] "${name}" stopped (forced)`)
       return { ok: true }
     } catch (error) {
@@ -419,7 +420,7 @@ function registerIpcHandlers(win) {
   // Returns { ok: false, noCredentials: true } if no credentials are saved.
   // Returns { ok: false, error: string } if guestcontrol fails.
   handleIpc('query-vm-installed', async (_event, { vmName }) => {
-    if (!isVmRunning(vmName)) return { ok: false, vmStopped: true }
+    if (!await isVmRunning(vmName)) return { ok: false, vmStopped: true }
     const store = await readCredsStore()
     const entry = store[vmName]
     if (!entry?.user || !entry?.pass) return { ok: false, noCredentials: true }

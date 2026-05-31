@@ -77,6 +77,9 @@ describe('LogsPage', () => {
       render(<LogsPage />)
       await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledTimes(1))
 
+      // Sync is on by default which disables the Refresh button; turn it off first
+      fireEvent.click(screen.getByRole('checkbox'))
+
       fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
 
       await waitFor(() => expect(window.electronAPI.readLog).toHaveBeenCalledTimes(2))

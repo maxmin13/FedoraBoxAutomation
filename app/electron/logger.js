@@ -52,20 +52,27 @@ function write(level, args) {
   }
 }
 
-function writeHost(text) {
+function writeHost(tag, text) {
   const ts   = new Date().toISOString().replace('T', ' ').slice(0, 23)
-  const line = `[${ts}] ${text}\n`
+  const line = `[${ts}] [${tag}] ${text}\n`
   try {
     rotate(HOST_FILE, MAX_HOST)
     fs.appendFileSync(HOST_FILE, line, 'utf8')
   } catch {}
 }
 
+// Detects lines emitted by common.sh's _log() function, which always starts
+// with a timestamp in the form "YYYY-MM-DD HH:MM:SS [LEVEL]".
+const SH_LINE_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[/
+
 module.exports = {
   LOG_DIR,
   info:     (...args) => write('info',  args),
   warn:     (...args) => write('warn',  args),
   error:    (...args) => write('error', args),
-  hostLine: (text) => writeHost(text),
-  hostMark: (text) => writeHost(`--- ${text} ---`),
+  hostLine: (text, source) => {
+    const tag = SH_LINE_RE.test(text) ? 'SH ' : (source === 'stderr' ? 'ERR' : 'PS ')
+    writeHost(tag, text)
+  },
+  hostMark: (text) => writeHost('APP', `--- ${text} ---`),
 }

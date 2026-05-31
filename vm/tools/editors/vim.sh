@@ -41,7 +41,7 @@ fi
 
 if [[ ! -f .vim/autoload/pathogen.vim ]]
 then
-    wget https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
+    wget -q https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
 fi
 
 if [[ -z "$(grep pathogen .vimrc)" ]]

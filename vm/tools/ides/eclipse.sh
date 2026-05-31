@@ -30,16 +30,32 @@ if [[ -x "${ECLIPSE_DIR}/eclipse" ]]
 then
     log_info "Eclipse ${ECLIPSE_RELEASE} already installed."
 else
-    WORK_DIR=$(mktemp -d)
-    trap 'rm -rf "${WORK_DIR}"' EXIT
+    CACHE_DIR="/opt/eclipse-cache"
+    CACHED_TAR="${CACHE_DIR}/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz"
+    mkdir -p "${CACHE_DIR}"
 
-    log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
-    wget "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${WORK_DIR}/eclipse.tar.gz"
-    log_info "Download complete. Extracting ..."
-    tar -xf "${WORK_DIR}/eclipse.tar.gz" --directory /opt
+    if [[ ! -f "${CACHED_TAR}" ]]; then
+        log_info "Downloading Eclipse ${ECLIPSE_RELEASE} ..."
+        wget -q "https://download.eclipse.org/technology/epp/downloads/release/${ECLIPSE_RELEASE}/R/eclipse-jee-${ECLIPSE_RELEASE}-R-linux-gtk-x86_64.tar.gz" -O "${CACHED_TAR}"
+        gzip -t "${CACHED_TAR}" 2>/dev/null || {
+            rm -f "${CACHED_TAR}"
+            log_error "Eclipse ${ECLIPSE_RELEASE} archive is corrupt or the download was incomplete. Check the release name and network connectivity."
+            exit 1
+        }
+        log_info "Download complete. Cached at ${CACHED_TAR}."
+    else
+        log_info "Using cached archive: ${CACHED_TAR}"
+    fi
+    log_info "Extracting ..."
+    tar -xf "${CACHED_TAR}" --directory /opt
     mv /opt/eclipse "${ECLIPSE_DIR}"
     ln -sf "${ECLIPSE_DIR}/eclipse" "${ECLIPSE_BIN}"
     log_info "Extraction complete."
+
+    # Force GTK2 to prevent the JVM hanging on VirtualBox's virtual display.
+    # Must appear before -vmargs in eclipse.ini.
+    sed -i 's/^-vmargs/--launcher.GTK_version\n2\n-vmargs/' "${ECLIPSE_DIR}/eclipse.ini"
+    log_info "eclipse.ini patched for VirtualBox compatibility (GTK2)."
 
     cat <<-EOF > "${ECLIPSE_DESKTOP}"
 	[Desktop Entry]

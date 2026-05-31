@@ -155,15 +155,14 @@ function Copy-GuestCommonSh {
     param([string]$ProjectRoot)
     $src = Join-Path $ProjectRoot "vm\lib\common.sh"
     if (-not (Test-Path $src)) { return }
-    Write-Host "  Uploading common.sh..." -NoNewline
     $ua = @('guestcontrol', $script:vmName, 'copyto', $src, '/tmp/common.sh',
             '--username', $script:vmUser, '--password', $script:vmPass)
     $ErrorActionPreference = 'SilentlyContinue'
     $r    = & $script:vbox @ua 2>&1
     $code = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
-    if ($code -ne 0) { Write-Host " WARNING: $(Get-VBoxErrMsg $r)" -ForegroundColor Yellow }
-    else             { Write-Host " OK" -ForegroundColor Green }
+    if ($code -ne 0) { Write-Output "  Uploading common.sh WARNING: $(Get-VBoxErrMsg $r)" }
+    else             { Write-Output "  Uploading common.sh OK" }
 }
 
 # Uploads a local script to /tmp/<filename> inside the guest, strips CRLF,
@@ -180,7 +179,6 @@ function Invoke-GuestScript {
     $guestPath = "/tmp/$fileName"
 
     # Upload
-    Write-Host "  Uploading $fileName..." -NoNewline
     $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $LocalPath, $guestPath,
                     '--username', $script:vmUser, '--password', $script:vmPass)
     $ErrorActionPreference = 'SilentlyContinue'
@@ -188,11 +186,11 @@ function Invoke-GuestScript {
     $uploadCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($uploadCode -ne 0) {
-        Write-Host " FAILED" -ForegroundColor Red
-        Write-Host "ERROR: $(Get-VBoxErrMsg $r)" -ForegroundColor Red
+        Write-Output "  Uploading $fileName FAILED"
+        Write-Output "ERROR: $(Get-VBoxErrMsg $r)"
         return 2
     }
-    Write-Host " OK" -ForegroundColor Green
+    Write-Output "  Uploading $fileName OK"
 
     # Strip CRLF and chmod +x (best-effort; failure is non-fatal)
     $ErrorActionPreference = 'SilentlyContinue'
@@ -209,7 +207,7 @@ function Invoke-GuestScript {
         if ($ScriptArgs) { "sudo $guestPath $ScriptArgs" } else { "sudo $guestPath" }
     }
 
-    Write-Host "  Running: $cmd" -ForegroundColor DarkGray
+    Write-Output "  Running: $cmd"
 
     $runArgs = @(
         'guestcontrol', $script:vmName,
@@ -221,19 +219,16 @@ function Invoke-GuestScript {
     )
 
     $ErrorActionPreference = 'SilentlyContinue'
-    $result   = & $script:vbox @runArgs 2>&1
+    & $script:vbox @runArgs 2>&1 | ForEach-Object {
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
+        else { [string]$_ }
+    }
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
-    $result | ForEach-Object {
-        $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message }
-                else { [string]$_ }
-        Write-Host $line
-    }
-
     if ($exitCode -ne 0 -and $Label) {
-        Write-Host ""
-        Write-Host "ERROR: $Label failed - expand script output for details" -ForegroundColor Red
+        Write-Output ""
+        Write-Output "ERROR: $Label failed - expand script output for details"
     }
 
     return $exitCode

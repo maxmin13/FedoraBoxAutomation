@@ -534,10 +534,21 @@ Two log files are written to `%APPDATA%\FedoraBoxAutomation\logs\`:
 
 | File | Written by | Content |
 |------|-----------|---------|
-| `gui.log` | `logger.js` | Every IPC call and reply, plus any errors from the main process |
-| `host.log` | PowerShell `Start-Transcript` | Full transcript of every `.ps1` script run |
+| `gui.log` | `logger.js` | Every IPC call (`[ipc] recv` / `[ipc] reply`) and main-process errors |
+| `host.log` | `logger.js` | Tagged output from all three script tiers (see below) |
 
 In dev mode `gui.log` entries also appear in the VS Code Debug Console. `logger.js` handles both destinations.
+
+#### host.log line tags
+
+| Tag | Source |
+|-----|--------|
+| `[APP]` | Script lifecycle markers emitted by `ipc-handlers.js` (`--- START / END script.ps1 ---`) |
+| `[PS ]` | PowerShell stdout (`Write-Host` from `host/*.ps1`) |
+| `[SH ]` | Bash guest-script output — lines whose timestamp matches `common.sh`'s `_log()` format |
+| `[ERR]` | PowerShell / script stderr |
+
+Because VBoxManage buffers guest stdout until the script exits, `[SH ]` lines appear in a batch after each guest script finishes rather than in real time.
 
 ### Separate dev and prod behaviour with an isDev flag
 

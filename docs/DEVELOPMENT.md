@@ -112,15 +112,34 @@ Bash scripts live under `vm/` and run inside the Fedora VM via `VBoxManage guest
    source "$(dirname "$0")/../lib/common.sh"
    ```
 
-   `common.sh` provides `log`, `warn`, `error`, and colour-coded output used across all scripts.
+   `common.sh` provides structured logging functions used across all scripts.
 
-3. **Use `log`, `warn`, and `error`** instead of plain `echo`:
+3. **Use `log_info`, `log_warn`, `log_error`, and `STEP`** instead of plain `echo`:
 
    ```bash
-   log "Installing curl..."
-   warn "curl already installed, skipping"
-   error "curl installation failed"   # also exits with code 1
+   STEP "curl"                              # section header — marks a major phase
+   log_info "Installing curl..."            # normal progress
+   log_warn "curl already installed, skipping"  # unexpected but non-fatal
+   log_error "curl installation failed"     # failure — script will exit via trap
    ```
+
+   Each call writes a timestamped line to stdout and to `/var/log/fedora-box-automation.log` inside the VM:
+
+   ```
+   2026-05-30 16:08:19 [STEP ] eclipse.sh  ===[ Eclipse ]===
+   2026-05-30 16:08:19 [INFO ] eclipse.sh  Downloading Eclipse 2026-03 ...
+   2026-05-30 16:08:52 [WARN ] eclipse.sh  Partial download detected, retrying
+   2026-05-30 16:08:55 [ERROR] eclipse.sh  Command failed (exit 2, line 39): tar -xf ...
+   ```
+
+   | Level | Function | When to use |
+   |-------|----------|-------------|
+   | `STEP` | `STEP "label"` | Start of a major section — one per logical phase of the script |
+   | `INFO` | `log_info "msg"` | Normal progress — something completed or is in progress |
+   | `WARN` | `log_warn "msg"` | Something unexpected but non-fatal — script continues |
+   | `ERROR` | `log_error "msg"` | A failure — the ERR trap will call this automatically for any unhandled non-zero exit |
+
+   `log_error` also emits a plain `ERROR: message` line (without timestamp) so the GUI output scanner can extract the error detail for the failure banner.
 
 4. **Make it idempotent** — the script may be run more than once. Check before acting:
 
@@ -164,13 +183,25 @@ These apply whether you started the app with `npm run dev` or via the VS Code de
 
 | You want to see... | Look here |
 |--------------------|-----------|
-| Logs from `ipc-handlers.js`, `main.js`, `script-runner.js` | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** (always) and the VS Code **Debug Console** tab (dev only) |
+| IPC calls, replies, and Electron main process errors | **`gui.log`** (always) and the VS Code **Debug Console** tab (dev only) |
 | Logs from React components (`.tsx` files) | Electron **DevTools** — press `Ctrl+Shift+I` inside the app window, then open the **Console** tab |
-| The `[IPC]` lines that trace data flowing between processes | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** |
-| Output from PowerShell scripts (`host/*.ps1`) | **`%APPDATA%\FedoraBoxAutomation\logs\host.log`** |
-| Renderer crashes caught by the error boundary | **`%APPDATA%\FedoraBoxAutomation\logs\gui.log`** (forwarded via `log-error` IPC) |
+| PowerShell script output, shell script output, script markers | **`host.log`** |
+| Renderer crashes caught by the error boundary | **`gui.log`** (forwarded via `log-error` IPC) |
 
-To open the log folder: paste `%APPDATA%\FedoraBoxAutomation\logs` into the Windows File Explorer address bar. The folder is created automatically the first time the app or any `.ps1` script runs.
+Both files live in `%APPDATA%\FedoraBoxAutomation\logs\`. To open the folder: paste that path into the Windows File Explorer address bar, or use the **App logs** button on the Console page.
+
+#### host.log line tags
+
+Every line in `host.log` carries a `[TAG]` prefix so you can tell at a glance which tier produced it:
+
+| Tag | Source | Example |
+|-----|--------|---------|
+| `[APP]` | Electron (`ipc-handlers.js`) — script lifecycle markers | `[APP] --- START provision-script.ps1 ---` |
+| `[PS ]` | PowerShell stdout — `Write-Host` calls in `host/*.ps1` | `[PS ]   Uploading eclipse.sh... OK` |
+| `[SH ]` | Bash guest script stdout — `log_info`/`log_warn`/`log_error` lines from `common.sh` (detected by their `YYYY-MM-DD HH:MM:SS [LEVEL]` timestamp prefix) | `[SH ] 2026-05-30 16:08:20 [INFO ] eclipse.sh  Downloading Eclipse 2026-03 ...` |
+| `[ERR]` | PowerShell/script stderr | `[ERR] VBoxManage: error: Could not authenticate` |
+
+Note: because VBoxManage buffers guest stdout until the script exits, `[SH ]` lines appear in a batch after the guest script finishes, not in real time.
 
 ---
 
