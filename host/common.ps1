@@ -179,6 +179,7 @@ function Invoke-GuestScript {
     $guestPath = "/tmp/$fileName"
 
     # Upload
+    Write-Host "  Uploading $fileName ..."
     $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $LocalPath, $guestPath,
                     '--username', $script:vmUser, '--password', $script:vmPass)
     $ErrorActionPreference = 'SilentlyContinue'
