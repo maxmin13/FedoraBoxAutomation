@@ -209,6 +209,7 @@ function Invoke-GuestScript {
     }
 
     Write-Host "  Running: $cmd"
+    Write-Host "  Starting $fileName ..."
 
     $runArgs = @(
         'guestcontrol', $script:vmName,
