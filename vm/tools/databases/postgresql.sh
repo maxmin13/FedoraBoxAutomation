@@ -53,7 +53,9 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget -q https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm -O "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
+    PGADMIN_URL="https://ftp.postgresql.org/pub/pgadmin/pgadmin4/yum/pgadmin4-fedora-repo-2-1.noarch.rpm"
+    log_info "Downloading pgAdmin 4 repo RPM from ${PGADMIN_URL} ..."
+    wget -q --tries=3 "${PGADMIN_URL}" -O "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
     rpm -Uvh --force "${WORK_DIR}/pgadmin4-fedora-repo-2-1.noarch.rpm"
     dnf install -y pgadmin4-desktop
 

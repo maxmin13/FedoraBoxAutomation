@@ -33,12 +33,13 @@ if [[ -x '/opt/eclipse-installer/eclipse-inst' ]]
 then
     log_info 'Eclipse Enterprise installer already installed.'
 else
-    log_info "Downloading Eclipse Enterprise installer ${ECLIPSE_RELEASE} ..."
+    ECLIPSE_EE_URL="https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz"
+    log_info "Downloading Eclipse Enterprise installer ${ECLIPSE_RELEASE} from ${ECLIPSE_EE_URL} ..."
 
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget -q "https://download.eclipse.org/oomph/epp/${ECLIPSE_RELEASE}/R/eclipse-inst-jre-linux64.tar.gz" -O "${WORK_DIR}/eclipse_ee.tar.gz"
+    wget -q --tries=3 "${ECLIPSE_EE_URL}" -O "${WORK_DIR}/eclipse_ee.tar.gz"
     gzip -t "${WORK_DIR}/eclipse_ee.tar.gz" 2>/dev/null || {
         log_error "Eclipse Enterprise installer archive is corrupt or the download was incomplete. Check the release name and network connectivity."
         exit 1

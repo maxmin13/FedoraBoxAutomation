@@ -62,7 +62,9 @@ else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    wget -q "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz" -O "${WORK_DIR}/Python-${PYTHON_VERSION}.tar.xz"
+    PYTHON_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz"
+    log_info "Downloading Python ${PYTHON_VERSION} from ${PYTHON_URL} ..."
+    wget -q --tries=3 "${PYTHON_URL}" -O "${WORK_DIR}/Python-${PYTHON_VERSION}.tar.xz"
 
     tar -xf "${WORK_DIR}/Python-${PYTHON_VERSION}.tar.xz" -C "${WORK_DIR}"
 

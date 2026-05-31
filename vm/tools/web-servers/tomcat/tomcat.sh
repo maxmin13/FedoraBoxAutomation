@@ -120,8 +120,9 @@ CACHED_TAR="${CACHE_DIR}/apache-tomcat-${TOMCAT_VERSION}.tar.gz"
 mkdir -p "${CACHE_DIR}"
 
 if [[ ! -f "${CACHED_TAR}" ]]; then
-    log_info "Downloading Tomcat ${TOMCAT_VERSION} ..."
-    wget -q "https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR}/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz" -O "${CACHED_TAR}"
+    TOMCAT_URL="https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR}/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz"
+    log_info "Downloading Tomcat ${TOMCAT_VERSION} from ${TOMCAT_URL} ..."
+    wget -q --tries=3 "${TOMCAT_URL}" -O "${CACHED_TAR}"
     log_info "Download complete. Cached at ${CACHED_TAR}."
 else
     log_info "Using cached archive: ${CACHED_TAR}"

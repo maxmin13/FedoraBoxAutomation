@@ -37,7 +37,9 @@ DRIVER_NM='docker'
 
 if ! minikube version > /dev/null 2>&1
 then
-    wget -q https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -O /usr/local/bin/minikube
+    MINIKUBE_URL="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+    log_info "Downloading minikube from ${MINIKUBE_URL} ..."
+    wget -q --tries=3 "${MINIKUBE_URL}" -O /usr/local/bin/minikube
     chmod 0755 /usr/local/bin/minikube
     log_info 'minikube installed.'
 fi
@@ -61,8 +63,9 @@ then
         log_error 'Could not determine latest kubectl version.'
         exit 1
     fi
-    log_info "Installing kubectl ${KUBECTL_VERSION} ..."
-    wget -q "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -O /usr/bin/kubectl
+    KUBECTL_URL="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    log_info "Installing kubectl ${KUBECTL_VERSION} from ${KUBECTL_URL} ..."
+    wget -q --tries=3 "${KUBECTL_URL}" -O /usr/bin/kubectl
     chmod 0755 /usr/bin/kubectl
     log_info 'kubectl installed.'
 else

@@ -42,8 +42,9 @@ else
 
    log_info "Latest Oracle JDK major version: ${LATEST_MAJOR}"
 
-   wget -q "https://download.oracle.com/java/${LATEST_MAJOR}/latest/jdk-${LATEST_MAJOR}_linux-x64_bin.rpm" \
-     -O "${WORK_DIR}/jdk.rpm"
+   JDK_URL="https://download.oracle.com/java/${LATEST_MAJOR}/latest/jdk-${LATEST_MAJOR}_linux-x64_bin.rpm"
+   log_info "Downloading Oracle JDK ${LATEST_MAJOR} from ${JDK_URL} ..."
+   wget -q --tries=3 "${JDK_URL}" -O "${WORK_DIR}/jdk.rpm"
    dnf install -y "${WORK_DIR}/jdk.rpm"
 
    java -version

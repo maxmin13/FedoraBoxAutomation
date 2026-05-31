@@ -52,7 +52,9 @@ else
 
     mkdir -p "${OPENSSL_DIR}"
 
-    wget -q "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" -O "${WORK_DIR}/openssl.tar.gz"
+    OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
+    log_info "Downloading OpenSSL ${OPENSSL_VERSION} from ${OPENSSL_URL} ..."
+    wget -q --tries=3 "${OPENSSL_URL}" -O "${WORK_DIR}/openssl.tar.gz"
     tar -xf "${WORK_DIR}/openssl.tar.gz" -C "${WORK_DIR}"
     cd "${WORK_DIR}/openssl-${OPENSSL_VERSION}"
 

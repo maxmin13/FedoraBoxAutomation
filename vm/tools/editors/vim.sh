@@ -41,7 +41,8 @@ fi
 
 if [[ ! -f .vim/autoload/pathogen.vim ]]
 then
-    wget -q https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
+    log_info "Downloading pathogen.vim from https://tpo.pe/pathogen.vim ..."
+    wget -q --tries=3 https://tpo.pe/pathogen.vim -O .vim/autoload/pathogen.vim
 fi
 
 if [[ -z "$(grep pathogen .vimrc)" ]]
