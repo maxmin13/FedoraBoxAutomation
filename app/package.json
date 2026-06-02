@@ -7,16 +7,11 @@
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
     "start": "npm run build && cross-env NODE_ENV=production electron .",
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:zip": "node scripts/dist-zip.js",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
-  },
-  "dependencies": {
-    "electron": "^31.0.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "react-markdown": "^9.0.0",
-    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.0",
@@ -29,12 +24,46 @@
     "autoprefixer": "^10.4.0",
     "concurrently": "^8.2.0",
     "cross-env": "^10.1.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^25.0.0",
     "jsdom": "^25.0.0",
     "postcss": "^8.4.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-markdown": "^9.0.0",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
     "vitest": "^2.0.0",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.fedoraboxautomation",
+    "productName": "FedoraBox Automation",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "__mocks__/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "../host", "to": "host" },
+      { "from": "../vm",   "to": "vm"   },
+      { "from": "../docs", "to": "docs" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "FedoraBox Automation"
+    }
   }
 }

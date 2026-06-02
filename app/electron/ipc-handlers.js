@@ -22,12 +22,19 @@ const { runScript } = require('./script-runner')
 const SCRIPTS = require('./scripts')
 const log = require('./logger')
 
-// The docs/ folder sits two levels above app/electron/
-const DOCS_DIR = path.join(__dirname, '..', '..', 'docs')
+// When packaged, extraResources land in process.resourcesPath alongside the ASAR.
+// In dev, the project root is two levels above app/electron/.
+const ROOT = app.isPackaged
+  ? process.resourcesPath
+  : path.join(__dirname, '..', '..')
 
-// VM state store — JSON file inside .vm-data/ at repo root, keyed by VM name.
-// Stores guestcontrol credentials, login user, and setup flags (e.g. gaScriptDone).
-const CREDS_DIR  = path.join(__dirname, '..', '..', '.vm-data')
+const DOCS_DIR = path.join(ROOT, 'docs')
+
+// VM state store — keyed by VM name; stored in userData so it survives reinstalls
+// and is writable when the app is installed in Program Files.
+const CREDS_DIR  = app.isPackaged
+  ? path.join(app.getPath('userData'), '.vm-data')
+  : path.join(ROOT, '.vm-data')
 const CREDS_FILE = path.join(CREDS_DIR, 'vm-state.json')
 
 async function readCredsStore() {
@@ -425,7 +432,7 @@ function registerIpcHandlers(win) {
     const entry = store[vmName]
     if (!entry?.user || !entry?.pass) return { ok: false, noCredentials: true }
     const { user, pass } = entry
-    const scriptSrc = path.join(__dirname, '..', '..', 'vm', 'detect-installed.sh')
+    const scriptSrc = path.join(ROOT, 'vm', 'detect-installed.sh')
     try {
       execSync(
         `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/detect-installed.sh --username "${user}" --password "${pass}"`,

@@ -2,9 +2,15 @@
 // Import this file anywhere you need to reference a script — never hardcode paths.
 
 const path = require('path')
+const { app } = require('electron')
 
-// __dirname is electron-gui/electron/ so host/ is two levels up
-const HOST_DIR = path.join(__dirname, '..', '..', 'host')
+// When packaged, extraResources land in process.resourcesPath alongside the ASAR.
+// In dev, the project root is two levels above app/electron/.
+const ROOT = app.isPackaged
+  ? process.resourcesPath
+  : path.join(__dirname, '..', '..')
+
+const HOST_DIR = path.join(ROOT, 'host')
 
 const SCRIPTS = {
   sanityChecks:        path.join(HOST_DIR, 'virtualbox-sanity-checks.ps1'),
