@@ -246,7 +246,7 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                   const result = await window.electronAPI.pickIso()
                   if (result.filePath) setIsoPath(result.filePath)
                 }}
-                placeholder="Click to browse for the ISO file"
+                placeholder="Click to browse for the Fedora ISO file"
                 className={ic + ' cursor-pointer'}
               />
               {isoPath && (() => {
