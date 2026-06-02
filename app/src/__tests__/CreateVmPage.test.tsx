@@ -124,6 +124,32 @@ describe('step 1 next button', () => {
   })
 })
 
+// ── ISO detection ────────────────────────────────────────────────────────────
+
+describe('ISO Fedora detection', () => {
+  it('shows green confirmation when the selected filename contains "Fedora"', async () => {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
+    await act(async () => {})
+    expect(screen.getByText(/Fedora ISO detected/i)).toBeInTheDocument()
+  })
+
+  it('shows amber warning when the selected filename does not contain "Fedora"', async () => {
+    window.electronAPI.pickIso = vi.fn().mockResolvedValue({ filePath: 'C:\\ISOs\\ubuntu-24.04.iso' })
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
+    await act(async () => {})
+    expect(screen.getByText(/does not contain/i)).toBeInTheDocument()
+  })
+
+  it('shows no detection message before any ISO is selected', async () => {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    await act(async () => {})
+    expect(screen.queryByText(/Fedora ISO detected/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/does not contain/i)).not.toBeInTheDocument()
+  })
+})
+
 // ── Step indicator ───────────────────────────────────────────────────────────
 
 describe('step indicator', () => {

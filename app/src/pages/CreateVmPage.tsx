@@ -249,6 +249,13 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
                 placeholder="Click to browse for the ISO file"
                 className={ic + ' cursor-pointer'}
               />
+              {isoPath && (() => {
+                const filename = isoPath.split(/[\\/]/).pop()!
+                const isFedora = /fedora/i.test(filename)
+                return isFedora
+                  ? <p className="mt-1 text-xs text-green-400">&#10003; Fedora ISO detected</p>
+                  : <p className="mt-1 text-xs text-amber-400">&#9888; Filename does not contain &ldquo;Fedora&rdquo; — make sure this is the right file</p>
+              })()}
             </div>
 
             <div>
