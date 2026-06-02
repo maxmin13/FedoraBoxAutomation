@@ -40,9 +40,9 @@ Step through name, hardware, and ISO selection. A native file picker limits choi
 image::docs/screenshots/share-folder-page.png[Share folder page, width=500]
 Verifies that the VM is running and Guest Additions are active before allowing a mount. Enter the host path and the mount point inside the VM.
 
-.Provision — credentials and entry point (Base Setup / By Category)
+.Provision — entry point (Base Setup / By Category)
 image::docs/screenshots/provision-landing.png[Provision landing, width=500]
-Test Connection verifies root credentials via Guest Control. Choose Base Setup for a full OS configuration or browse tools individually by category.
+Choose Base Setup for a full OS configuration or browse tools individually by category. Credentials are loaded automatically from the saved credential store.
 
 .Provision — Base Setup detail with hostname option
 image::docs/screenshots/provision-base-setup.png[Provision base setup, width=500]
