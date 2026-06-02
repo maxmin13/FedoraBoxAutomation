@@ -299,6 +299,62 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
           <div className="flex-1 min-w-0 space-y-2">
 
             <Section
+              title="Installed tools"
+              action={info.state === 'running' && (
+                <button
+                  onClick={() => setToolsKey((k) => k + 1)}
+                  disabled={toolsStatus === 'loading'}
+                  className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
+                </button>
+              )}
+            >
+              {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
+                <p className="text-zinc-500 text-sm">Checking...</p>
+              ) : toolsStatus === 'stopped' ? (
+                <p className="text-zinc-500 text-sm">VM is stopped — data not available</p>
+              ) : toolsStatus === 'no-credentials' ? (
+                <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
+              ) : toolsStatus === 'error' ? (
+                <p className="text-zinc-500 text-sm">Could not connect to VM</p>
+              ) : Object.keys(installedTools).length > 0 ? (() => {
+                const groups = TOOL_GROUPS
+                  .map((group) => ({
+                    category: group.category,
+                    installed: group.tools.filter((t) => installedTools[t.key]),
+                  }))
+                  .filter((group) => group.installed.length > 0)
+                return (
+                  <div className="flex gap-6">
+                    {[0, 1].map((col) => (
+                      <div key={col} className="flex-1 space-y-1">
+                        {groups.filter((_, i) => i % 2 === col).map((group) => (
+                          <div key={group.category} className="flex gap-1.5 min-w-0">
+                            <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
+                              {group.installed.map((tool) => (
+                                <div key={tool.key} className="flex items-center gap-0.5">
+                                  <span className="text-green-400 text-xs shrink-0">&#10003;</span>
+                                  <span className="text-zinc-300 text-xs">{tool.label}</span>
+                                  {typeof installedTools[tool.key] === 'string' && (
+                                    <span className="text-zinc-500 text-xs">({installedTools[tool.key] as string})</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })() : (
+                <p className="text-zinc-500 text-sm">Nothing installed yet</p>
+              )}
+            </Section>
+
+            <Section
               title="Shared folders"
               action={
                 <button
@@ -356,62 +412,6 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                   </div>
                 )
               })()}
-            </Section>
-
-            <Section
-              title="Installed tools"
-              action={info.state === 'running' && (
-                <button
-                  onClick={() => setToolsKey((k) => k + 1)}
-                  disabled={toolsStatus === 'loading'}
-                  className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
-                </button>
-              )}
-            >
-              {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
-                <p className="text-zinc-500 text-sm">Checking...</p>
-              ) : toolsStatus === 'stopped' ? (
-                <p className="text-zinc-500 text-sm">VM is stopped — data not available</p>
-              ) : toolsStatus === 'no-credentials' ? (
-                <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
-              ) : toolsStatus === 'error' ? (
-                <p className="text-zinc-500 text-sm">Could not connect to VM</p>
-              ) : Object.keys(installedTools).length > 0 ? (() => {
-                const groups = TOOL_GROUPS
-                  .map((group) => ({
-                    category: group.category,
-                    installed: group.tools.filter((t) => installedTools[t.key]),
-                  }))
-                  .filter((group) => group.installed.length > 0)
-                return (
-                  <div className="flex gap-6">
-                    {[0, 1].map((col) => (
-                      <div key={col} className="flex-1 space-y-1">
-                        {groups.filter((_, i) => i % 2 === col).map((group) => (
-                          <div key={group.category} className="flex gap-1.5 min-w-0">
-                            <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
-                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
-                              {group.installed.map((tool) => (
-                                <div key={tool.key} className="flex items-center gap-0.5">
-                                  <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                                  <span className="text-zinc-300 text-xs">{tool.label}</span>
-                                  {typeof installedTools[tool.key] === 'string' && (
-                                    <span className="text-zinc-500 text-xs">({installedTools[tool.key] as string})</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })() : (
-                <p className="text-zinc-500 text-sm">Nothing installed yet</p>
-              )}
             </Section>
 
           </div>
