@@ -74,6 +74,54 @@ npm start     # builds React then launches Electron (production mode)
 
 A desktop window opens. No browser needed — Electron has Chromium built in.
 
+---
+
+## Building the Executable
+
+Two commands produce distributable builds from `app/`:
+
+| Command | Output | When to use |
+|---------|--------|-------------|
+| `npm run dist:zip` | `dist-installer/FedoraBox-Automation-<v>-win-x64.zip` | Any machine — no special privileges needed |
+| `npm run dist` | `dist-installer/FedoraBox-Automation-Setup-<v>.exe` (NSIS installer) | Requires Developer Mode or Administrator |
+
+### `npm run dist:zip` — portable zip (recommended for most releases)
+
+```powershell
+cd app
+npm run dist:zip
+```
+
+What it does:
+1. Runs `vite build` to compile the React renderer into `dist/`
+2. Runs `electron-builder --dir` to package the app into `dist-installer/win-unpacked/` (the full self-contained app)
+3. Zips `win-unpacked/` into `dist-installer/FedoraBox-Automation-<version>-win-x64.zip` using PowerShell
+
+The zip requires no installation — users extract it and run `FedoraBox Automation.exe` directly.
+
+> **Note:** electron-builder downloads a `winCodeSign` archive during step 2 and fails to extract it (it contains macOS symlinks that Windows blocks without Developer Mode). The script ignores this failure because `win-unpacked/` is already created before the error occurs.
+
+### `npm run dist` — NSIS installer
+
+```powershell
+cd app
+npm run dist
+```
+
+Produces a proper Windows installer (`FedoraBox-Automation-Setup-<version>.exe`) with Start Menu shortcuts and uninstall support.
+
+**Prerequisite:** enable Developer Mode once before running this command:
+
+> Windows Settings → System → For developers → Developer Mode → On
+
+Without it, the build fails when electron-builder tries to extract the `winCodeSign` archive (which contains macOS symlinks). Developer Mode grants the symlink creation privilege to non-Administrator processes.
+
+### When to build
+
+- Build before every release tag
+- Do **not** commit `dist-installer/` — it is gitignored
+- Bump `"version"` in `app/package.json` before building so the filename includes the correct version number
+
 ### When to re-run npm install
 
 You must run `npm install` again whenever:

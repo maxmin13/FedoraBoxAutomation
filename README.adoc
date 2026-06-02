@@ -75,7 +75,21 @@ NOTE: VirtualBox and Hyper-V both require exclusive access to the CPU's virtuali
 
 == Quick Start
 
-=== Option A — Electron GUI (recommended)
+=== Option A — Pre-built executable (easiest)
+
+Download `FedoraBox-Automation-<version>-win-x64.zip` from the latest release, extract it anywhere, and run `FedoraBox Automation.exe`.
+
+No installation, no Node.js, no npm.
+
+. Extract the zip to a permanent folder (e.g. `C:\Tools\FedoraBoxAutomation\`)
+. Double-click `FedoraBox Automation.exe`
+. Click *Setup* → *Run Analysis* to check your host
+. Click *Create VM* and follow the 4-step wizard
+. After creating the VM, open *My VMs* and click the VM name to access provisioning and shared folder options
+
+NOTE: Windows may show a "Windows protected your PC" SmartScreen warning the first time because the executable is not code-signed. Click *More info* → *Run anyway* to proceed.
+
+=== Option B — Electron GUI from source
 
 [source,powershell]
 ----
@@ -88,7 +102,7 @@ npm run dev        # opens the desktop app
 . Click *Create VM* and follow the 4-step wizard
 . After creating the VM, open *My VMs* and click the VM name to access provisioning and shared folder options
 
-=== Option B — PowerShell scripts
+=== Option C — PowerShell scripts
 
 [source,powershell]
 ----
