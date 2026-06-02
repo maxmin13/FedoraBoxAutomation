@@ -77,7 +77,7 @@ NOTE: VirtualBox and Hyper-V both require exclusive access to the CPU's virtuali
 
 === Option A — Pre-built executable (easiest)
 
-Download `FedoraBox-Automation-<version>-win-x64.zip` from the latest release, extract it anywhere, and run `FedoraBox Automation.exe`.
+Download link:https://github.com/maxmin13/FedoraBoxAutomation/releases/latest[FedoraBox-Automation-1.0.0-win-x64.zip] from the latest release, extract it anywhere, and run `FedoraBox Automation.exe`.
 
 No installation, no Node.js, no npm.
 
