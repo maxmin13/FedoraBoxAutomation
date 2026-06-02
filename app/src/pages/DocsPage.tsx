@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 
 // All available docs. Add new entries here when a new doc is created.
 const DOC_FILES: { label: string; filename: string }[] = [
-  { label: 'Post-Install Setup', filename: 'POST-INSTALL.md' },
+  { label: 'VM Post-Install Setup', filename: 'POST-INSTALL.md' },
   { label: 'Development Guide', filename: 'DEVELOPMENT.md' },
   { label: 'Testing Guide', filename: 'TESTING.md' },
   { label: 'GUI Design', filename: 'ELECTRON-GUI-DESIGN.md' },

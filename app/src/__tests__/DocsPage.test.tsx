@@ -19,7 +19,7 @@ describe('DocsPage', () => {
     it('shows all four document buttons', async () => {
       render(<DocsPage />)
       await act(async () => {})
-      expect(screen.getByText('Post-Install Setup')).toBeInTheDocument()
+      expect(screen.getByText('VM Post-Install Setup')).toBeInTheDocument()
       expect(screen.getByText('Development Guide')).toBeInTheDocument()
       expect(screen.getByText('Testing Guide')).toBeInTheDocument()
       expect(screen.getByText('GUI Design')).toBeInTheDocument()
