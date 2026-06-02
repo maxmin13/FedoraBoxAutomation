@@ -154,7 +154,7 @@ The desktop app is built with Electron + React and runs at a fixed 1100×750 win
 | Renders the project markdown docs inside the app (dev mode only)
 |===
 
-NOTE: Setup and Create VM stay mounted in the background so analysis results and wizard progress survive navigation.
+NOTE: My VMs, Setup, Create VM, and Console stay mounted in the background so their state survives navigation. Only Docs is unmounted when inactive.
 
 == Script Pipeline
 
@@ -217,7 +217,7 @@ FedoraBoxAutomation/
 │       ├── build-tools/      Maven
 │       ├── web-servers/      Apache, Tomcat
 │       ├── databases/        MariaDB, PostgreSQL, DBeaver
-│       ├── containers/       Docker, minikube, kubectl
+│       ├── containers/       Docker, minikube (+ kubectl), k3s
 │       ├── cloud/            AWS CLI, ECS CLI
 │       └── ides/             Eclipse, VS Code
 │
@@ -239,7 +239,7 @@ FedoraBoxAutomation/
 
 == Running the Tests
 
-Full setup and usage instructions are in link:FedoraBoxAutomation/docs/TESTING.md[docs/TESTING.md].
+Full setup and usage instructions are in link:docs/TESTING.md[docs/TESTING.md].
 
 [cols="2,3,2",options="header"]
 |===
@@ -289,7 +289,7 @@ Set Video RAM to at least 128 MB and install Guest Additions.
 
 == Contributing
 
-See link:FedoraBoxAutomation/CONTRIBUTING.md[CONTRIBUTING.md] for coding standards covering PowerShell scripts, Bash scripts, and guest control patterns.
+See link:CONTRIBUTING.md[CONTRIBUTING.md] for coding standards covering PowerShell scripts, Bash scripts, and guest control patterns.
 
 == License
 
