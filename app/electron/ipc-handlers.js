@@ -24,7 +24,7 @@ const log = require('./logger')
 
 // When packaged, extraResources land in process.resourcesPath alongside the ASAR.
 // In dev, the project root is two levels above app/electron/.
-const ROOT = app.isPackaged
+const ROOT = app?.isPackaged
   ? process.resourcesPath
   : path.join(__dirname, '..', '..')
 
@@ -32,7 +32,7 @@ const DOCS_DIR = path.join(ROOT, 'docs')
 
 // VM state store — keyed by VM name; stored in userData so it survives reinstalls
 // and is writable when the app is installed in Program Files.
-const CREDS_DIR  = app.isPackaged
+const CREDS_DIR  = app?.isPackaged
   ? path.join(app.getPath('userData'), '.vm-data')
   : path.join(ROOT, '.vm-data')
 const CREDS_FILE = path.join(CREDS_DIR, 'vm-state.json')

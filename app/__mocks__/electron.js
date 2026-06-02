@@ -1,4 +1,4 @@
 module.exports = {
   ipcMain: { handle: () => {} },
-  app:     { getPath: () => '' },
+  app:     { getPath: () => '', isPackaged: false },
 }

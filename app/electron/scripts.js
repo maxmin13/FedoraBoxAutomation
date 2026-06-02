@@ -6,7 +6,7 @@ const { app } = require('electron')
 
 // When packaged, extraResources land in process.resourcesPath alongside the ASAR.
 // In dev, the project root is two levels above app/electron/.
-const ROOT = app.isPackaged
+const ROOT = app?.isPackaged
   ? process.resourcesPath
   : path.join(__dirname, '..', '..')
 
