@@ -12,6 +12,12 @@ image:https://img.shields.io/badge/PowerShell-5.1%2B-blue[PowerShell]
 image:https://img.shields.io/badge/Node.js-18%2B-green[Node.js]
 image:https://img.shields.io/badge/license-MIT-green[License]
 
+== Goal
+
+FedoraBox Automation eliminates the manual work of spinning up a Fedora Linux development environment on a Windows 11 Home machine.
+It guides you through every stage — from validating host prerequisites and installing VirtualBox, to creating the VM and provisioning it with a curated set of developer tools (Java, Docker, Python, Tomcat, PostgreSQL, and more) — entirely through a point-and-click GUI backed by PowerShell and Bash automation.
+The end result is a fully configured, ready-to-use Fedora VM without writing a single command.
+
 == Features
 
 * *Environment analysis* — checks RAM, disk, CPU virtualisation, Hyper-V, and VirtualBox version with one click; surfaces fix instructions for every failing check
