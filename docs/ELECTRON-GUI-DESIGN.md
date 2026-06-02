@@ -45,19 +45,29 @@ app/
       CreateVmPage.tsx           <- form to configure and create a new Fedora VM
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
-      VmEditPage.tsx             <- sub-page for a selected VM: provision, share folder, logs
+      VmEditPage.tsx             <- sub-page for a selected VM: detail, provision, share folder, share logs
       ProvisionPage.tsx          <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx        <- shared folder management for a selected VM
+      ShareLogsPage.tsx          <- guest-log sync setup for a selected VM
     components/
       NavBar.tsx                 <- My VMs / Setup / Create VM / Console / Docs navigation
       CheckCard.tsx              <- pass/warn/fail result card
     __tests__/
       CheckCard.test.tsx
+      NavBar.test.tsx
+      VmRunningBadge.test.tsx
+      LogPanel.test.tsx
+      ProgressBar.test.tsx
       SetupPage.test.tsx
       CreateVmPage.test.tsx
+      LandingPage.test.tsx
       LogsPage.test.tsx
+      DocsPage.test.tsx
+      VmEditPage.test.tsx
       ProvisionPage.test.tsx
-      setup.ts                   <- jest-dom matchers setup
+      ShareFolderPage.test.tsx
+      ShareLogsPage.test.tsx
+      setup.ts                   <- loads @testing-library/jest-dom matchers
   __mocks__/
     electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
   package.json                   <- main: "electron/main.js"
@@ -96,6 +106,7 @@ app/
   - `run-provision-script` — runs a single guest Bash script via `provision-script.ps1`; accepts `vmName`, `vmUser`, `vmPass`, `loginUser`, `scriptRelPath`, optional `scriptArgs`; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
   - `run-provision-setup` — runs all base setup scripts (system-prep, network, SELinux, desktop, utilities) via `provision-setup.ps1`; accepts `vmName`, `vmUser`, `vmPass`, `loginUser`, `hostname`; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
   - `run-share-folder` — runs `share-folder.ps1` with the given VM name, host path, mount point, and credentials; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
+  - `query-vm-installed` — runs `detect-installed.sh` inside the guest via guestcontrol and returns a `{ ok, installed }` map of tool keys to versions/booleans; returns `{ ok: false, vmStopped }` or `{ ok: false, noCredentials }` on expected failures
   - `run-share-logs` — runs `share-logs.ps1` to set up the guest-logs shared folder and rsync service; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
   - `pick-folder` — opens a native folder picker; returns `{ folderPath }` or `{ folderPath: null }` if cancelled
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
@@ -125,14 +136,14 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 |---|--------|--------|------------|
 | 1 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
 | 2 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; click a VM name to open its detail page |
-| 3 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Tabs: Provision / Share Folder / Logs; **Provision** shows Test Connection, flat and by-category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials saved per VM |
+| 3 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Detail view shows VM info, installed tools, and shared folders; buttons navigate to sub-pages: **Provision** (Base Setup / By Category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials loaded from store), **Share Folder**, **Share Logs** |
 | 4 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
 | 5 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
 | 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
 
 A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
 
-**State persistence:** `SetupPage` and `CreateVmPage` are kept always-mounted and hidden with `display: none` (via a wrapping `<div>` in `App.tsx`) so their React state — analysis results, wizard step, log lines — survives navigation. Other pages are unmounted when inactive.
+**State persistence:** `LandingPage`, `SetupPage`, `CreateVmPage`, and `LogsPage` are kept always-mounted and hidden with `display: none` (via wrapping `<div>`s in `App.tsx`) so their React state — VM grid, analysis results, wizard step, log content — survives navigation. Only `DocsPage` is unmounted when inactive.
 
 ---
 
@@ -277,10 +288,19 @@ npm test
 | Test file | Component | Key behaviours covered |
 |-----------|-----------|----------------------|
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
+| `NavBar.test.tsx` | `NavBar` | active tab highlighted, nav calls, script-running lock |
+| `VmRunningBadge.test.tsx` | `VmRunningBadge` | running/stopped badge states |
+| `LogPanel.test.tsx` | `LogPanel` | log lines rendered, show/hide toggle |
+| `ProgressBar.test.tsx` | `ProgressBar` | progress bar rendering |
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, left-panel rows rendered, summary counts, "Ready"/"Fix" banners, error message, auto-selection of first failing check, clicking a row loads detail in right panel, "No action needed" for pass checks, panel switching |
+| `LandingPage.test.tsx` | `LandingPage` | VM list rendering, Start/Stop/Delete buttons, navigation to VM detail |
 | `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
-| `LogsPage.test.tsx` | `LogsPage` | gui.log selected by default, log content rendered, empty/error states, switching between logs, Refresh button, Refresh button disabled while loading, "App logs" and "VirtualBox VMs" folder buttons visible, each calls `openLogDir` with the correct key |
-| `ProvisionPage.test.tsx` | `ProvisionPage` | credentials form and Save; Test Connection success/failure and 8 `mapCredsError` branches (VERR_ACCESS_DENIED, VERR_NOT_FOUND, VERR_RESOURCE_BUSY, VERR_DUPLICATE, VERR_AUTHENTICATION_FAILURE, ETIMEDOUT, and fallback); flat and by-category script list; running-state label; success/failure/already-installed/forceConfirm banners; "Install anyway" passes `--force` arg; changeHostname toggle shows/hides hostname input and pre-fills from `getVmHostname` |
+| `LogsPage.test.tsx` | `LogsPage` | default to host.log, content rendered, empty/error states, switching between logs, Refresh button, Refresh disabled while loading, folder buttons, correct `openLogDir` keys |
+| `DocsPage.test.tsx` | `DocsPage` | markdown rendering |
+| `VmEditPage.test.tsx` | `VmEditPage` | VM info sections, installed tools states (stopped, no credentials, results, error), shared folders display |
+| `ProvisionPage.test.tsx` | `ProvisionPage` | Base Setup / By Category / script-args views; running-state label; success/failure/already-installed/forceConfirm banners; "Install anyway" passes `--force` arg; changeHostname toggle shows/hides hostname input and pre-fills from `getVmHostname` |
+| `ShareFolderPage.test.tsx` | `ShareFolderPage` | VM readiness banner, folder inputs, mount script execution |
+| `ShareLogsPage.test.tsx` | `ShareLogsPage` | log sync setup flow |
 
 ---
 

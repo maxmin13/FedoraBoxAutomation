@@ -274,18 +274,25 @@ npm test -- -t "parseVmList"
 A passing run looks like:
 
 ```
- ✓ src/__tests__/CheckCard.test.tsx          (15 tests)
+ ✓ src/__tests__/CheckCard.test.tsx           (15 tests)
+ ✓ src/__tests__/NavBar.test.tsx             (... tests)
+ ✓ src/__tests__/VmRunningBadge.test.tsx     (10 tests)
+ ✓ src/__tests__/LogPanel.test.tsx            (8 tests)
+ ✓ src/__tests__/ProgressBar.test.tsx         (3 tests)
  ✓ src/__tests__/SetupPage.test.tsx          (24 tests)
+ ✓ src/__tests__/LandingPage.test.tsx        (25 tests)
  ✓ src/__tests__/CreateVmPage.test.tsx       (30 tests)
- ✓ src/__tests__/LogsPage.test.tsx           (12 tests)
- ✓ src/__tests__/ProvisionPage.test.tsx      (67 tests)
- ✓ src/__tests__/VmEditPage.test.tsx          (5 tests)
+ ✓ src/__tests__/LogsPage.test.tsx           (13 tests)
+ ✓ src/__tests__/DocsPage.test.tsx          (... tests)
+ ✓ src/__tests__/VmEditPage.test.tsx         (40 tests)
+ ✓ src/__tests__/ProvisionPage.test.tsx      (50 tests)
+ ✓ src/__tests__/ShareFolderPage.test.tsx    (27 tests)
+ ✓ src/__tests__/ShareLogsPage.test.tsx      (21 tests)
  ✓ electron/__tests__/ipc-handlers.test.js  (121 tests)
  ✓ electron/__tests__/script-runner.test.js  (19 tests)
- ... (16 files total)
 
 Test Files  16 passed (16)
-     Tests  407 passed (407)
+     Tests  427 passed (427)
 ```
 
 ### What is tested
@@ -295,9 +302,9 @@ Test Files  16 passed (16)
 | `src/__tests__/CheckCard.test.tsx` | `status badges` — OK/!!/XX badges; `content` — label and detail text; `"How to fix" toggle` — hidden for pass, shown for fail/warn, open/close lifecycle | 15 |
 | `src/__tests__/SetupPage.test.tsx` | `idle state` — prompt and enabled button; `running state` — button disabled/label change; `results state` — left-panel rows rendered, summary counts (pass/warn/fail), pass/fail message, re-run; `live log stream` — emitted lines appear in right panel; `error state` — script failure message; `detail panel` — auto-selects first failing check, clicking a row shows its detail and fix content, "No action needed" for passing checks, switching selection clears previous detail; `InstallVirtualBox action` — button states and success message | 24 |
 | `src/__tests__/CreateVmPage.test.tsx` | `step 1 next button` — disabled when fields empty/partial, enabled when both filled; `step indicator` — all step labels shown, advances on Next, Back returns to step 1, "Review" label on step 3, confirm summary on step 4, fields preserved on back; `name conflict` — warning shown, "Recreate VM" label, no warning for new name; `running state` — "Creating VM..." replaces wizard, correct args passed, live log lines; `success state` — green banner, navigation button, "What to do next"; `failure state` — red banner, script output toggle; `log toggle` — hidden by default, Show/Hide lifecycle, toggle button visible when lines emitted | 30 |
-| `src/__tests__/LogsPage.test.tsx` | default log selection, content rendered, empty/error states, switching logs, Refresh button, Refresh disabled while loading, folder buttons visible, correct `openLogDir` keys | 12 |
-| `src/__tests__/ProvisionPage.test.tsx` | `credentials section` — fields, Test Connection states, error messages (8 `mapCredsError` branches); `script list` — flat list, by-category grouping, category drill-down; `running state` — label while in flight; `done state banners` — green success, red failure with `errorDetail`, blue already-installed, mutual exclusion, action buttons; `forceConfirm` — amber panel, Cancel, "Install anyway" passes `--force`; `changeHostname toggle` — input shown/hidden, pre-filled from `getVmHostname`; `AI Tools — Claude Code` — category visible in grid, script-args form, banners, correct scriptRelPath | 67 |
-| `src/__tests__/VmEditPage.test.tsx` | `Installed tools section` — "VM is stopped" when powered off; "Save credentials" hint when running with no creds; tool labels rendered from `queryVmInstalled`; "Nothing installed yet" when all false; error when guestcontrol fails | 5 |
+| `src/__tests__/LogsPage.test.tsx` | default to host.log, content rendered, empty/error states, switching logs, Refresh button, Refresh disabled while loading, folder buttons visible, correct `openLogDir` keys | 13 |
+| `src/__tests__/ProvisionPage.test.tsx` | `mode view` — Base Setup and By Category cards; `script list` — by-category grouping, category drill-down, script-args form; `running state` — label while in flight; `done state banners` — green success, red failure with `errorDetail`, blue already-installed, mutual exclusion, action buttons; `forceConfirm` — amber panel, Cancel, "Install anyway" passes `--force`; `changeHostname toggle` — input shown/hidden, pre-filled from `getVmHostname`; `AI Tools — Claude Code` — category visible in grid, correct scriptRelPath | 50 |
+| `src/__tests__/VmEditPage.test.tsx` | VM info sections, installed tools states (stopped, no credentials, results, error), shared folders display, navigation to Provision/Share Folder/Share Logs sub-pages | 40 |
 | `electron/__tests__/ipc-handlers.test.js` | All IPC handlers: `parseVmList`, `parseChecksOutput`, `get-downloads-path`, `open-log-dir`, `read-doc`, `load-vm-credentials`, `save-vm-credentials`, `query-vm-installed` (VM stopped, no creds, success, guestcontrol failure), `check-vm-ready`, `list-vms`, `start-vm`, `stop-vm`, `delete-vm`, `get-vm-guest-logs-path`, `get-vm-info`, `run-share-folder`, `run-share-logs`, `run-provision-script`, `run-provision-setup`, `is-dev`, `get-vm-hostname`, `check-vm-credentials`, `run-sanity-checks`, `create-vm`, `install-virtualbox`, `log-error` | 121 |
 | `electron/__tests__/script-runner.test.js` | `splitChunk` — LF, CRLF, empty lines, whitespace-only lines, source tag, blank chunk, Buffer input; `hasActiveScript`; `killActiveScript`; `runScript` | 19 |
 

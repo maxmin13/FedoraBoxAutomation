@@ -18,21 +18,31 @@ app/
     scripts.js        <- central registry of .ps1 paths
   src/                <- React renderer (runs in Chromium)
     __tests__/        <- Vitest + React Testing Library tests (jsdom environment)
-      setup.ts        <- loads @testing-library/jest-dom matchers
+      setup.ts           <- loads @testing-library/jest-dom matchers
       CheckCard.test.tsx
+      NavBar.test.tsx
+      VmRunningBadge.test.tsx
+      LogPanel.test.tsx
+      ProgressBar.test.tsx
       SetupPage.test.tsx
+      LandingPage.test.tsx
       CreateVmPage.test.tsx
       LogsPage.test.tsx
+      DocsPage.test.tsx
+      VmEditPage.test.tsx
       ProvisionPage.test.tsx
+      ShareFolderPage.test.tsx
+      ShareLogsPage.test.tsx
     pages/            <- one component per page
       LandingPage.tsx    <- lists all registered VMs with start/stop controls
       SetupPage.tsx      <- environment analysis and fix actions
       CreateVmPage.tsx   <- form to configure and create a new Fedora VM
       LogsPage.tsx       <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx       <- renders markdown docs from docs/ inside the app
-      VmEditPage.tsx     <- sub-page for a selected VM: provision, share folder, logs
+      VmEditPage.tsx     <- sub-page for a selected VM: detail, provision, share folder, share logs
       ProvisionPage.tsx  <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx <- shared folder management for a selected VM
+      ShareLogsPage.tsx  <- guest-log sync setup for a selected VM
     components/       <- reusable UI components
   package.json
   vite.config.ts

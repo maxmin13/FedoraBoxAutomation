@@ -122,7 +122,7 @@ The desktop app is built with Electron + React and runs at a fixed 1100×750 win
 | Lists all registered VirtualBox VMs with Start / Stop / Delete controls; click a VM name to open its detail page
 
 | *VM detail — Provision*
-| Test Connection verifies guestcontrol credentials; choose Base Setup (system-prep, hostname, SELinux, desktop, utilities) or install individual tools by category; success / failure / already-installed / force-install banners after each run
+| Choose Base Setup (system-prep, hostname, SELinux, desktop, utilities) or install individual tools by category; credentials loaded automatically from the saved store; success / failure / already-installed / force-install banners after each run
 
 | *VM detail — Share Folder*
 | Mount a host directory inside the VM; VM readiness banner checks running state and Guest Additions
@@ -244,7 +244,7 @@ Full setup and usage instructions are in link:FedoraBoxAutomation/docs/TESTING.m
 | Windows or Linux (Node.js)
 |===
 
-Current totals: *407 Vitest tests* across 16 files.
+Current totals: *427 Vitest tests* across 16 files.
 
 == Troubleshooting
 
