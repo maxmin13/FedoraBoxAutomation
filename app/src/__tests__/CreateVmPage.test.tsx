@@ -10,9 +10,11 @@ const ISO_PATH     = 'C:\\Users\\test\\Downloads\\fedora.iso'
 const ISO_FILENAME = 'fedora.iso'
 
 let onScriptRunning: ReturnType<typeof vi.fn>
+let onNavigate: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   onScriptRunning = vi.fn()
+  onNavigate = vi.fn()
   window.electronAPI = {
     listVms:            vi.fn().mockResolvedValue({ ok: true, vms: [] }),
     createVm:           vi.fn().mockResolvedValue({ ok: true }),
@@ -27,9 +29,10 @@ beforeEach(() => {
 // ── Wizard navigation helpers ────────────────────────────────────────────────
 
 // Renders the page and flushes all initial async calls (listVms).
-async function renderAndFlush() {
-  render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+async function renderAndFlush(navKey = 0) {
+  const utils = render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={navKey} />)
   await act(async () => {})
+  return utils
 }
 
 // Fills step 1. The ISO input is read-only and opens a file picker on click,
@@ -61,7 +64,7 @@ async function submitForm(vmName = 'MyVM') {
 
 describe('step 2 next button', () => {
   async function goToStep2() {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
   }
@@ -95,14 +98,14 @@ describe('step 2 next button', () => {
 
 describe('step 1 next button', () => {
   it('is disabled when both VM name and ISO path are empty', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('is disabled when VM name is filled but ISO path is empty', async () => {
     window.electronAPI.pickIso = vi.fn().mockResolvedValue({ filePath: null })
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'MyVM' },
@@ -111,14 +114,14 @@ describe('step 1 next button', () => {
   })
 
   it('is disabled when ISO path is filled but VM name is empty', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
     await act(async () => {})
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   it('is enabled when both VM name and ISO path are filled', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1()
     expect(screen.getByRole('button', { name: 'Next' })).not.toBeDisabled()
   })
@@ -128,7 +131,7 @@ describe('step 1 next button', () => {
 
 describe('ISO Fedora detection', () => {
   it('shows green confirmation when the selected filename contains "Fedora"', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
     await act(async () => {})
     expect(screen.getByText(/Fedora ISO detected/i)).toBeInTheDocument()
@@ -136,14 +139,14 @@ describe('ISO Fedora detection', () => {
 
   it('shows amber warning when the selected filename does not contain "Fedora"', async () => {
     window.electronAPI.pickIso = vi.fn().mockResolvedValue({ filePath: 'C:\\ISOs\\ubuntu-24.04.iso' })
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     fireEvent.click(screen.getByPlaceholderText(/Click to browse/i))
     await act(async () => {})
     expect(screen.getByText(/does not contain/i)).toBeInTheDocument()
   })
 
   it('shows no detection message before any ISO is selected', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     expect(screen.queryByText(/Fedora ISO detected/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/does not contain/i)).not.toBeInTheDocument()
@@ -154,7 +157,7 @@ describe('ISO Fedora detection', () => {
 
 describe('step indicator', () => {
   it('shows all four step labels', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     expect(screen.getByText('Name')).toBeInTheDocument()
     expect(screen.getByText('Hardware')).toBeInTheDocument()
@@ -163,7 +166,7 @@ describe('step indicator', () => {
   })
 
   it('advances to step 2 after clicking Next on a valid step 1', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.queryByPlaceholderText(/e\.g\. FedoraBox/i)).not.toBeInTheDocument()
@@ -171,7 +174,7 @@ describe('step indicator', () => {
   })
 
   it('can navigate back from step 2 to step 1', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
@@ -179,7 +182,7 @@ describe('step indicator', () => {
   })
 
   it('shows "Review" as the next-button label on step 3', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1()
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 3
@@ -197,7 +200,7 @@ describe('step indicator', () => {
   })
 
   it('preserves field values when navigating back from step 2', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1('TestVM')
     fireEvent.click(screen.getByRole('button', { name: 'Next' })) // -> step 2
     fireEvent.click(screen.getByRole('button', { name: 'Back' })) // -> step 1
@@ -213,7 +216,7 @@ describe('name conflict', () => {
   })
 
   it('shows a warning on step 1 when the VM name matches an existing VM', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'FedoraBox' },
@@ -224,7 +227,7 @@ describe('name conflict', () => {
   })
 
   it('shows no warning for a name that does not conflict', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await act(async () => {})
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. FedoraBox/i), {
       target: { value: 'NewVM' },
@@ -234,7 +237,7 @@ describe('name conflict', () => {
   })
 
   it('shows "Recreate VM" button on confirm page when name conflicts', async () => {
-    render(<CreateVmPage onScriptRunning={onScriptRunning} />)
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
     await fillStep1('FedoraBox')
     await waitFor(() => expect(screen.getByText(/already exists/i)).toBeInTheDocument())
     navigateToConfirm()
@@ -298,6 +301,77 @@ describe('success state', () => {
   it('shows the "What to do next" section after clicking the navigation button', () => {
     fireEvent.click(screen.getByRole('button', { name: /next.*what to do/i }))
     expect(screen.getByText('What to do next')).toBeInTheDocument()
+  })
+})
+
+// ── Next-steps — Docs redirect ───────────────────────────────────────────────
+
+describe('next-steps Docs redirect', () => {
+  beforeEach(async () => {
+    await submitForm()
+    await waitFor(() => expect(screen.getByText('VM created successfully.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /next.*what to do/i }))
+  })
+
+  it('shows the "VM Post-Install Setup" heading', () => {
+    expect(screen.getByText('VM Post-Install Setup')).toBeInTheDocument()
+  })
+
+  it('shows the "Open Docs" button', () => {
+    expect(screen.getByRole('button', { name: /open docs/i })).toBeInTheDocument()
+  })
+
+  it('calls onNavigate with "docs" when "Open Docs" is clicked', () => {
+    fireEvent.click(screen.getByRole('button', { name: /open docs/i }))
+    expect(onNavigate).toHaveBeenCalledWith('docs')
+  })
+})
+
+// ── navKey reset ─────────────────────────────────────────────────────────────
+
+describe('navKey reset', () => {
+  it('resets to wizard step 1 when navKey changes while in next-steps state', async () => {
+    const { rerender } = render(
+      <CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={1} />
+    )
+    await act(async () => {})
+    await fillStep1()
+    navigateToConfirm()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /create vm/i }))
+    })
+    await waitFor(() => expect(screen.getByText('VM created successfully.')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /next.*what to do/i }))
+    expect(screen.getByText('What to do next')).toBeInTheDocument()
+
+    rerender(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={2} />)
+    await act(async () => {})
+
+    expect(screen.getByPlaceholderText(/e\.g\. FedoraBox/i)).toBeInTheDocument()
+  })
+
+  it('resets to wizard step 1 when navKey changes while on the success banner', async () => {
+    const { rerender } = render(
+      <CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={1} />
+    )
+    await act(async () => {})
+    await fillStep1()
+    navigateToConfirm()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /create vm/i }))
+    })
+    await waitFor(() => expect(screen.getByText('VM created successfully.')).toBeInTheDocument())
+
+    rerender(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={2} />)
+    await act(async () => {})
+
+    expect(screen.getByPlaceholderText(/e\.g\. FedoraBox/i)).toBeInTheDocument()
+  })
+
+  it('shows wizard step 1 on initial mount (navKey = 0 does not reset)', async () => {
+    render(<CreateVmPage onScriptRunning={onScriptRunning} onNavigate={onNavigate} navKey={0} />)
+    await act(async () => {})
+    expect(screen.getByPlaceholderText(/e\.g\. FedoraBox/i)).toBeInTheDocument()
   })
 })
 
