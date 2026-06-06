@@ -797,7 +797,10 @@ describe('start-vm handler', () => {
 describe('delete-vm handler', () => {
   let deleteVmHandler
   let mockExecSync
-  let mockReadFile, mockMkdir, mockWriteFile
+  let mockReadFile, mockMkdir, mockWriteFile, mockRm
+
+  // CfgFile line returned by the showvminfo call that precedes unregistervm
+  const SHOWVMINFO = 'CfgFile="C:/VMs/FedoraBox/FedoraBox.vbox"\n'
 
   beforeAll(() => {
     const cpId = require.resolve('child_process')
@@ -809,6 +812,7 @@ describe('delete-vm handler', () => {
     mockReadFile  = vi.spyOn(fs.promises, 'readFile')
     mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
     mockWriteFile = vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
+    mockRm        = vi.spyOn(fs.promises, 'rm').mockResolvedValue(undefined)
     deleteVmHandler = loadHandlers()('delete-vm')
   })
 
@@ -817,6 +821,7 @@ describe('delete-vm handler', () => {
     mockReadFile.mockRestore()
     mockMkdir.mockRestore()
     mockWriteFile.mockRestore()
+    mockRm.mockRestore()
     cleanupHandlers()
   })
 
@@ -824,10 +829,11 @@ describe('delete-vm handler', () => {
     mockExecSync.mockReset()
     mockReadFile.mockReset()
     mockWriteFile.mockClear()
+    mockRm.mockClear()
   })
 
   it('calls VBoxManage unregistervm --delete', async () => {
-    mockExecSync.mockReturnValueOnce('')
+    mockExecSync.mockReturnValueOnce(SHOWVMINFO).mockReturnValueOnce('')
     mockReadFile.mockResolvedValueOnce('{}')
     await deleteVmHandler({}, 'FedoraBox')
     expect(mockExecSync).toHaveBeenCalledWith(
@@ -837,14 +843,21 @@ describe('delete-vm handler', () => {
   })
 
   it('returns ok: true on success', async () => {
-    mockExecSync.mockReturnValueOnce('')
+    mockExecSync.mockReturnValueOnce(SHOWVMINFO).mockReturnValueOnce('')
     mockReadFile.mockResolvedValueOnce('{}')
     const result = await deleteVmHandler({}, 'FedoraBox')
     expect(result).toEqual({ ok: true })
   })
 
+  it('removes the machine folder after unregistering', async () => {
+    mockExecSync.mockReturnValueOnce(SHOWVMINFO).mockReturnValueOnce('')
+    mockReadFile.mockResolvedValueOnce('{}')
+    await deleteVmHandler({}, 'FedoraBox')
+    expect(mockRm).toHaveBeenCalledWith('C:/VMs/FedoraBox', { recursive: true, force: true })
+  })
+
   it('removes saved credentials for the deleted VM', async () => {
-    mockExecSync.mockReturnValueOnce('')
+    mockExecSync.mockReturnValueOnce(SHOWVMINFO).mockReturnValueOnce('')
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'x', loginUser: 'y' } })
     )
@@ -854,7 +867,9 @@ describe('delete-vm handler', () => {
   })
 
   it('returns ok: false when VBoxManage unregistervm throws', async () => {
-    mockExecSync.mockImplementationOnce(() => { throw new Error('VM is locked') })
+    mockExecSync
+      .mockReturnValueOnce(SHOWVMINFO)
+      .mockImplementationOnce(() => { throw new Error('VM is locked') })
     const result = await deleteVmHandler({}, 'FedoraBox')
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/VM is locked/)

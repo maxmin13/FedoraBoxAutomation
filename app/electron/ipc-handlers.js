@@ -264,7 +264,30 @@ function registerIpcHandlers(win) {
   handleIpc('delete-vm', async (_event, name) => {
     try {
       log.info(`[ipc][delete-vm] deleting "${name}"`)
+
+      // Read the machine folder path before the VM is unregistered so we can
+      // clean up the directory afterwards. VBoxManage --delete removes .vbox and
+      // registered disk images but leaves the folder itself on disk.
+      let machineFolder = null
+      try {
+        const info = execSync(`VBoxManage showvminfo "${name}" --machinereadable`, { encoding: 'utf8' })
+        const m = info.match(/^CfgFile="(.+)"/m)
+        if (m) machineFolder = path.dirname(m[1])
+      } catch (_) { /* best-effort */ }
+
       execSync(`VBoxManage unregistervm "${name}" --delete`, { encoding: 'utf8' })
+
+      // Remove the machine folder (empty dir, leftover logs, or any disk images
+      // that --delete could not remove because they were locked or outside the
+      // media registry).
+      if (machineFolder) {
+        try {
+          await fs.promises.rm(machineFolder, { recursive: true, force: true })
+          log.info(`[ipc][delete-vm] removed machine folder "${machineFolder}"`)
+        } catch (rmErr) {
+          log.warn(`[ipc][delete-vm] could not remove machine folder:`, rmErr.message)
+        }
+      }
 
       const store = await readCredsStore()
       if (name in store) {
