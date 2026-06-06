@@ -16,6 +16,7 @@ export type Page = 'landing' | 'setup' | 'create-vm' | 'docs' | 'logs'
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
   const [landingKey, setLandingKey] = useState(0)
+  const [createVmNavKey, setCreateVmNavKey] = useState(0)
   const [isDev, setIsDev] = useState(false)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
@@ -51,6 +52,7 @@ export default function App() {
   }, [])
 
   function handleNavigate(page: Page) {
+    if (page === 'create-vm') setCreateVmNavKey((k) => k + 1)
     if (page === 'landing') {
       if (preserveLanding) {
         // First return after script — show result, consume the flag
@@ -79,7 +81,7 @@ export default function App() {
             <SetupPage onScriptRunning={handleScriptRunning} />
           </div>
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <CreateVmPage onScriptRunning={handleScriptRunning} />
+            <CreateVmPage onScriptRunning={handleScriptRunning} onNavigate={handleNavigate} navKey={createVmNavKey} />
           </div>
           {currentPage === 'docs' && (
             <div className="h-full overflow-hidden">

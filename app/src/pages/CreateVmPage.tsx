@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { CreateVmParams } from '../electron.d'
+import type { Page } from '../App'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
 
@@ -11,7 +12,7 @@ type Step = 1 | 2 | 3 | 4
 const DISK_TYPES = ['VDI', 'VMDK', 'VHD']
 const NIC_TYPES  = ['nat', 'bridged', 'host-only', 'none']
 
-export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (running: boolean) => void }) {
+export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { onScriptRunning: (running: boolean) => void; onNavigate: (page: Page) => void; navKey: number }) {
   // Form fields
   const [vmName,   setVmName]   = useState('')
   const [vmFolder, setVmFolder] = useState('')
@@ -48,6 +49,13 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
       if (result.ok) setExistingNames(result.vms.map((v) => v.name))
     })
   }, [])
+
+  useEffect(() => {
+    if (navKey > 0 && pageState !== 'running') {
+      setPageState('idle')
+      setStep(1)
+    }
+  }, [navKey])
 
   const trimmedName  = vmName.trim()
   const nameConflict = trimmedName !== '' && existingNames.includes(trimmedName)
@@ -170,22 +178,25 @@ export default function CreateVmPage({ onScriptRunning }: { onScriptRunning: (ru
             <div>
               <h2 className="text-xl font-semibold text-zinc-100">What to do next</h2>
               <p className="text-zinc-400 text-sm mt-0.5">
-                Follow these steps inside the VM to finish setting up Fedora.
+                Your VM is ready. Follow the post-install guide to finish setting up Fedora.
               </p>
             </div>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
-              <NextStep number={1} title="Complete the Fedora installer">
-                <p className="text-zinc-400 text-sm">
-                  Before rebooting, eject the Live ISO:{' '}
-                  <span className="text-zinc-300">
-                    Devices &rarr; Optical Drives &rarr; Remove disk from virtual drive.
-                  </span>
-                </p>
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 flex items-start gap-4">
+              <span className="text-2xl mt-0.5">&#128214;</span>
+              <div className="flex-1">
+                <p className="text-zinc-100 font-medium">VM Post-Install Setup</p>
                 <p className="text-zinc-400 text-sm mt-1">
-                  Then reboot. On first boot the GNOME wizard will ask you to create your user
-                  account.
+                  The Docs menu has a step-by-step guide covering everything from completing the
+                  Fedora installer to setting a root password and installing Guest Additions.
                 </p>
-              </NextStep>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('docs')}
+                className="shrink-0 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white text-sm rounded font-medium transition-colors"
+              >
+                Open Docs &rarr;
+              </button>
             </div>
           </div>
         )}
@@ -554,22 +565,3 @@ function ConfirmRow({ label, value }: { label: string; value: string }) {
 }
 
 
-interface NextStepProps {
-  number:   number
-  title:    string
-  children: React.ReactNode
-}
-
-function NextStep({ number, title, children }: NextStepProps) {
-  return (
-    <div className="flex gap-3">
-      <span className="shrink-0 w-6 h-6 rounded-full bg-zinc-700 text-zinc-300 text-xs font-bold flex items-center justify-center mt-0.5">
-        {number}
-      </span>
-      <div className="flex-1">
-        <p className="text-zinc-200 text-sm font-medium mb-1">{title}</p>
-        {children}
-      </div>
-    </div>
-  )
-}
