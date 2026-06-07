@@ -40,11 +40,12 @@ app/
     electron.d.ts                <- TypeScript types for window.electronAPI
     App.tsx                      <- top-level router and nav bar
     pages/
-      LandingPage.tsx            <- lists all registered VMs
+      LandingPage.tsx            <- lists all registered VMs; routes Detail/Provision through VmLoginPage gate
       SetupPage.tsx              <- environment analysis and fix actions
       CreateVmPage.tsx           <- form to configure and create a new Fedora VM
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
+      VmLoginPage.tsx            <- credential gate: shown inline before entering VM detail or provision
       VmEditPage.tsx             <- sub-page for a selected VM: detail, provision, share folder, share logs
       ProvisionPage.tsx          <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx        <- shared folder management for a selected VM
@@ -67,6 +68,7 @@ app/
       ProvisionPage.test.tsx
       ShareFolderPage.test.tsx
       ShareLogsPage.test.tsx
+      VmLoginPage.test.tsx       <- (if added)
       setup.ts                   <- loads @testing-library/jest-dom matchers
   __mocks__/
     electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
@@ -98,9 +100,11 @@ app/
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
   - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are installed; returns `{ ok, running, guestAdditions, version? }`
   - `check-vm-credentials` — tests guestcontrol credentials by running a no-op echo inside the guest; also detects live-ISO boot by checking for `/run/initramfs/live`; returns `{ ok, isLive? }` or `{ ok: false, error }` — excluded from IPC logging (contains passwords)
-  - `load-vm-credentials` — reads credentials for a named VM from `.vm-data/vm-state.json`; returns `{ ok, user, pass, loginUser }` or `{ ok: false }` if no entry exists
-  - `save-vm-credentials` — writes credentials for a named VM to `.vm-data/vm-state.json`; merges with existing entries; returns `{ ok }`
-  - `get-vm-hostname` — runs `/bin/hostname` inside the guest via guestcontrol; returns `{ ok, hostname }`; excluded from IPC logging — excluded from IPC logging (contains passwords)
+  - `check-vm-user` — verifies that a given desktop username exists inside the guest by running `id <user>` via guestcontrol; returns `{ ok: true }` or `{ ok: false, error }` — excluded from IPC logging (contains passwords)
+  - `load-vm-credentials` — reads credentials for a named VM from `.credentials/credentials.json`; returns `{ ok, user, pass, loginUser }` (with optional `warning` when fields are missing) or `{ ok: false, reason }` if no entry exists
+  - `load-all-vm-credentials` — returns every entry in `.credentials/credentials.json` as a map keyed by VM name; used to populate dropdowns without individual `load-vm-credentials` calls
+  - `save-vm-credentials` — writes credentials for a named VM to `.credentials/credentials.json`; merges with existing entries; returns `{ ok }`
+  - `get-vm-hostname` — runs `/bin/hostname` inside the guest via guestcontrol; returns `{ ok, hostname }` — excluded from IPC logging (contains passwords)
   - `get-vm-info` — returns all displayable VM parameters: `osType`, `state`, `ramMB`, `cpus`, `vramMB`, `nic`, `mac`, `diskCapacityMB`, `diskType`, `sharedFolders`, `gaVersion`, `logSyncPath`; reads disk capacity via `showmediuminfo` and GA version via `guestproperty`
   - `get-vm-guest-logs-path` — resolves `<VM folder>\guest-logs` from the `CfgFile` line of `showvminfo --machinereadable`; returns `{ ok, path }`
   - `run-provision-script` — runs a single guest Bash script via `provision-script.ps1`; accepts `vmName`, `vmUser`, `vmPass`, `loginUser`, `scriptRelPath`, optional `scriptArgs`; streams output; returns `{ ok }` or `{ ok: false, errorDetail }`
@@ -135,11 +139,12 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 | # | Screen | Script | Key inputs |
 |---|--------|--------|------------|
 | 1 | **Setup** | `host/virtualbox-sanity-checks.ps1` | Run Analysis button — master/detail split: left panel lists all checks as compact rows, right panel shows detail + fix instructions for the selected check; first failing check is auto-selected on completion; analysis results persist when navigating away and back |
-| 2 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; click a VM name to open its detail page |
-| 3 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Detail view shows VM info, installed tools, and shared folders; buttons navigate to sub-pages: **Provision** (Base Setup / By Category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials loaded from store), **Share Folder**, **Share Logs** |
-| 4 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
-| 5 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
-| 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
+| 2 | **My VMs** | none | Lists all registered VMs; Start/Stop/Delete buttons per VM; Detail and Provision buttons open the VM login gate first |
+| 3 | **VM login gate** | none | Shown inline by `LandingPage` before entering VM detail or Provision; collects root username/password and desktop username; validates credentials via guestcontrol before proceeding; credentials saved to store on success |
+| 4 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Detail view shows VM info (state, RAM, CPUs, disk, NIC), installed tools (queried live from the guest), and shared folders; buttons navigate to sub-pages: **Provision** (Base Setup / By Category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials loaded from store; loginUser passed automatically), **Share Folder**, **Share Logs** |
+| 5 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
+| 6 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
+| 7 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
 
 A top navigation bar shows which page is active.
 
@@ -269,7 +274,7 @@ vitest.workspace.ts
 
 | Test file | Module under test | Key behaviours covered |
 |-----------|------------------|----------------------|
-| `ipc-handlers.test.js` | `ipc-handlers.js` | `parseVmList` — single/multiple VMs, spaces in names, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-element array, bare-object guard, missing array error, stderr in error message; `get-downloads-path` handler returns OS downloads path; `open-log-dir` handler — success, correct paths for `'app'` and `'vbox'`, error string from `shell.openPath`, unknown key |
+| `ipc-handlers.test.js` | `ipc-handlers.js` | `parseVmList` — single/multiple VMs, spaces in names, empty output, malformed lines; `parseChecksOutput` — clean JSON, noise lines before/after, single-element array, bare-object guard, missing array error, stderr in error message; `get-downloads-path` handler returns OS downloads path; `open-log-dir` handler — success, correct paths for `'app'` and `'vbox'`, error string from `shell.openPath`, unknown key; `load-vm-credentials` — returns credentials, reason on unknown VM, warning field when fields missing |
 | `script-runner.test.js` | `script-runner.js` | `splitChunk` — LF and CRLF splitting, empty/whitespace filtering, trailing newline, stderr tagging, Buffer input; `hasActiveScript` — false when idle; `killActiveScript` — no-op when no script running |
 
 ---
@@ -289,18 +294,18 @@ npm test
 |-----------|-----------|----------------------|
 | `CheckCard.test.tsx` | `CheckCard` | badge text (OK/!!/XX), label and detail, "How to fix" toggle open/close/label |
 | `NavBar.test.tsx` | `NavBar` | active tab highlighted, nav calls, script-running lock |
-| `VmRunningBadge.test.tsx` | `VmRunningBadge` | running/stopped badge states |
-| `LogPanel.test.tsx` | `LogPanel` | log lines rendered, show/hide toggle |
+| `VmRunningBadge.test.tsx` | `VmRunningBadge` | Running/Stopped/Starting.../Stopping... badge states |
+| `LogPanel.test.tsx` | `LogPanel` | log lines rendered, stdout/stderr colour distinction, show/hide toggle |
 | `ProgressBar.test.tsx` | `ProgressBar` | progress bar rendering |
 | `SetupPage.test.tsx` | `SetupPage` | idle prompt, button disabled while running, left-panel rows rendered, summary counts, "Ready"/"Fix" banners, error message, auto-selection of first failing check, clicking a row loads detail in right panel, "No action needed" for pass checks, panel switching |
-| `LandingPage.test.tsx` | `LandingPage` | VM list rendering, Start/Stop/Delete buttons, navigation to VM detail |
+| `LandingPage.test.tsx` | `LandingPage` | VM list rendering, Start/Stop/Delete buttons, Detail/Provision buttons show VmLoginPage gate first, Back from detail returns to grid |
 | `CreateVmPage.test.tsx` | `CreateVmPage` | submit button state, ISO picker fills via click (read-only input), name conflict warning + "Recreate VM" label, confirm page shows filename only, "Creating..." while running, live log lines, success/failure banners, Show/Hide log toggle |
 | `LogsPage.test.tsx` | `LogsPage` | default to host.log, content rendered, empty/error states, switching between logs, Refresh button, Refresh disabled while loading, folder buttons, correct `openLogDir` keys |
 | `DocsPage.test.tsx` | `DocsPage` | markdown rendering |
-| `VmEditPage.test.tsx` | `VmEditPage` | VM info sections, installed tools states (stopped, no credentials, results, error), shared folders display |
-| `ProvisionPage.test.tsx` | `ProvisionPage` | Base Setup / By Category / script-args views; running-state label; success/failure/already-installed/forceConfirm banners; "Install anyway" passes `--force` arg; changeHostname toggle shows/hides hostname input and pre-fills from `getVmHostname` |
-| `ShareFolderPage.test.tsx` | `ShareFolderPage` | VM readiness banner, folder inputs, mount script execution |
-| `ShareLogsPage.test.tsx` | `ShareLogsPage` | log sync setup flow |
+| `VmEditPage.test.tsx` | `VmEditPage` | VM name heading, Running/Stopped badge, VM info sections, installed tools states (stopped, no credentials, results, error), shared folders display, Sync/Share buttons disabled when VM stopped |
+| `ProvisionPage.test.tsx` | `ProvisionPage` | auto-load credentials (loginUser passed as scriptArgs); Base Setup / By Category / script-args views; running-state label; success/failure/already-installed/forceConfirm banners; "Install anyway" passes `--force` arg; "Try again" shown only on failure; changeHostname toggle pre-fills from `getVmHostname` |
+| `ShareFolderPage.test.tsx` | `ShareFolderPage` | host path + mount point fields; saved credentials from store passed to `runShareFolder`; running/success/failure states; "Try again" button; `/var/log` mount point blocked |
+| `ShareLogsPage.test.tsx` | `ShareLogsPage` | host path pre-filled from `getVmGuestLogsPath`; folder picker override; running/success/failure/try-again states |
 
 ---
 
@@ -529,8 +534,9 @@ making the data flow visible without needing a breakpoint:
 ```js
 // Channels excluded from logging.
 // 'read-log' returns full file content — logging it back to gui.log would create a feedback loop.
-// Credential channels are excluded to keep passwords out of gui.log.
-const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname'])
+// Credential channels ('check-vm-credentials', 'get-vm-hostname', 'check-vm-ready') are
+// excluded to keep passwords out of gui.log.
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready'])
 
 // Wraps ipcMain.handle to log every call and reply to gui.log.
 // util.inspect is used instead of JSON.stringify so Windows paths with
