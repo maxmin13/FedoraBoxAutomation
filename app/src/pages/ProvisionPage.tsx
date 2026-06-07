@@ -447,12 +447,14 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
         <div className="mt-auto flex justify-between shrink-0">
           <div className="flex gap-2">
+          {success === false && (
           <button
             onClick={() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript()}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             Try again
           </button>
+          )}
           <button
             onClick={async () => {
               if (!success) {
@@ -557,18 +559,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                 ))}
               </ol>
             </div>
-            <div>
-              <label className="block text-zinc-400 text-xs mb-1">Desktop username</label>
-              <input
-                type="text"
-                value={loginUser}
-                onChange={(e) => setLoginUser(e.target.value)}
-                placeholder="your desktop username"
-                autoComplete="off"
-                className={ic(loginUser)}
-              />
-            </div>
-
             <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -652,20 +642,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
               <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
             </div>
-
-            {(selectedScript.argType === 'user' || selectedScript.argType === 'user+custom' || selectedScript.argType === 'user+custom2') && (
-              <div>
-                <label className="block text-zinc-400 text-xs mb-1">Desktop username</label>
-                <input
-                  type="text"
-                  value={loginUser}
-                  onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="your desktop username"
-                  autoComplete="off"
-                  className={ic(loginUser)}
-                />
-              </div>
-            )}
 
             {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (() => {
               const opts   = selectedScript.argOptions?.[0]

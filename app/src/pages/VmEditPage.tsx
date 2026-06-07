@@ -16,7 +16,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
   {
     category: 'Languages',
     tools: [
-      { key: 'java',   label: 'Java JDK' },
+      { key: 'java',   label: 'Java' },
       { key: 'php',    label: 'PHP' },
       { key: 'python', label: 'Python' },
       { key: 'node',   label: 'Node.js' },
