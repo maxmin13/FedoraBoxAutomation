@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import type { Vm, ScriptLine } from '../electron.d'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
-import { type VmReadyState } from '../components/VmReadyBanner'
-
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
@@ -232,8 +230,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
 
-  const [vmReady, setVmReady] = useState<VmReadyState | null>(null)
-
   const [pageState,    setPageState]    = useState<PageState>('idle')
   const [idleView,     setIdleView]     = useState<IdleView>('mode')
   const [lines,        setLines]        = useState<ScriptLine[]>([])
@@ -262,16 +258,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   useEffect(() => {
     window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
-      const user = saved.ok ? saved.user ?? '' : ''
-      const pass = saved.ok ? saved.pass ?? '' : ''
       if (saved.ok) {
         if (saved.user)       setVmUser(saved.user)
         if (saved.pass)       setVmPass(saved.pass)
         if (saved.loginUser)  setLoginUser(saved.loginUser)
       }
-      return window.electronAPI.checkVmReady(vm.name, user, pass)
-    }).then((result) => {
-      if (result.ok) setVmReady({ running: result.running, guestReady: result.guestReady })
     })
   }, [vm.name])
 
@@ -404,30 +395,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             {runningLabel === 'Guest Additions' && (
               <p className="text-green-300 text-sm mt-1">Reboot the VM to activate, then return here to provision.</p>
             )}
-            {runningLabel === 'Base Setup' && (() => {
-              const steps = lines
-                .map(l => l.text.trim())
-                .filter(t => /:\s+(OK|FAILED|SKIPPED)$/.test(t))
-                .map(t => {
-                  const m = t.match(/^(.+?):\s+(OK|FAILED|SKIPPED)$/)
-                  return m ? { label: m[1].trim(), status: m[2] } : null
-                })
-                .filter(Boolean) as { label: string; status: string }[]
-              return steps.length > 0 ? (
-                <ul className="mt-3 space-y-1">
-                  {steps.map((s, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm">
-                      {s.status === 'OK'      && <span className="text-green-400">&#10003;</span>}
-                      {s.status === 'FAILED'  && <span className="text-red-400">&#10007;</span>}
-                      {s.status === 'SKIPPED' && <span className="text-zinc-500">~</span>}
-                      <span className={s.status === 'OK' ? 'text-green-300' : s.status === 'FAILED' ? 'text-red-300' : 'text-zinc-500'}>
-                        {s.label}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null
-            })()}
           </div>
         )}
 

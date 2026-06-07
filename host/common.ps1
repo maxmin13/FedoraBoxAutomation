@@ -232,10 +232,12 @@ function Invoke-GuestScript {
         '--', '-c', $cmd
     )
 
+    $script:lastGuestOutput = [System.Collections.Generic.List[string]]::new()
     $ErrorActionPreference = 'SilentlyContinue'
     & $script:vbox @runArgs 2>&1 | ForEach-Object {
-        if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.Exception.Message }
-        else { Write-Host ([string]$_) }
+        $line = if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { [string]$_ }
+        $script:lastGuestOutput.Add($line)
+        Write-Host $line
     }
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'

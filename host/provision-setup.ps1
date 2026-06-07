@@ -89,6 +89,10 @@ $steps.Add(@{ Path = Join-Path $setupRoot 'selinux-config.sh'; Label = 'SELinux 
 $steps.Add(@{ Path = Join-Path $setupRoot 'desktop-config.sh'; Label = 'Desktop configuration'; Args = "$LoginUser $bgFileName".Trim() })
 $steps.Add(@{ Path = Join-Path $setupRoot 'utilities.sh';      Label = 'Utilities';             Args = '' })
 
+$stepOutputs = @{}
+
+$failedStep = $null
+
 foreach ($step in $steps) {
     if (-not (Test-Path $step.Path)) {
         Write-Host "  SKIPPED (not found): $($step.Label)" -ForegroundColor Yellow
@@ -96,20 +100,102 @@ foreach ($step in $steps) {
     }
     Write-Header $step.Label
     $exitCode = Invoke-GuestScript -LocalPath $step.Path -ScriptArgs $step.Args -Label $step.Label
+    $stepOutputs[$step.Label] = ($script:lastGuestOutput -join "`n")
     if ($exitCode -ne 0) {
         Write-Host "  $($step.Label): FAILED" -ForegroundColor Red
         Write-Host "  Fix the issue above and run Base Setup again." -ForegroundColor Yellow
-        exit 1
+        $failedStep = $step.Label
+        break
     }
     Write-Host "  $($step.Label): OK" -ForegroundColor Green
 }
 
-$ErrorActionPreference = 'SilentlyContinue'
-& $script:vbox guestcontrol $VmName run --exe /bin/bash `
-    --username $VmUser --password $VmPass --wait-stdout --wait-stderr `
-    -- -c "mkdir -p /etc/fedorabox && touch /etc/fedorabox/.base-setup" 2>&1 | Out-Null
-$ErrorActionPreference = 'Stop'
+if (-not $failedStep) {
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox guestcontrol $VmName run --exe /bin/bash `
+        --username $VmUser --password $VmPass --wait-stdout --wait-stderr `
+        -- -c "mkdir -p /etc/fedorabox && touch /etc/fedorabox/.base-setup" 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+}
+
+function Write-Item {
+    param([string]$Label, [string]$Status)
+    Write-Host ("    " + $Label.PadRight(45) + $Status)
+}
+
+function Get-ItemStatus {
+    param([string]$Out, [string]$AlreadyPattern = '', [string]$SkipPattern = '', [switch]$Failed)
+    if ($Failed)        { return 'error' }
+    if ($SkipPattern    -and $Out -match $SkipPattern)    { return 'skipped' }
+    if ($AlreadyPattern -and $Out -match $AlreadyPattern) { return 'already done' }
+    return 'done'
+}
+
+$sysOut  = [string]$stepOutputs['System preparation']
+$netOut  = [string]$stepOutputs['Network configuration']
+$seOut   = [string]$stepOutputs['SELinux configuration']
+$deskOut = [string]$stepOutputs['Desktop configuration']
+
+$sysFail  = $failedStep -eq 'System preparation'
+$netFail  = $failedStep -eq 'Network configuration'
+$seFail   = $failedStep -eq 'SELinux configuration'
+$deskFail = $failedStep -eq 'Desktop configuration'
+$utilFail = $failedStep -eq 'Utilities'
 
 Write-Host ""
+Write-Host "  --- What was configured ---" -ForegroundColor Cyan
+
+if ($stepOutputs.ContainsKey('System preparation')) {
+    Write-Host ""
+    Write-Host "  System preparation" -ForegroundColor White
+    Write-Item "Removed LibreOffice, Firefox, libvirt, QEMU"  (Get-ItemStatus $sysOut -Failed:$sysFail)
+    Write-Item "RPM Fusion free repository"                   (Get-ItemStatus $sysOut "RPM Fusion free already" -Failed:$sysFail)
+    Write-Item "RPM Fusion nonfree repository"                (Get-ItemStatus $sysOut "RPM Fusion nonfree already" -Failed:$sysFail)
+    Write-Item "Full system update"                           (Get-ItemStatus $sysOut -Failed:$sysFail)
+    Write-Item "Installed kernel headers and build tools"     (Get-ItemStatus $sysOut -Failed:$sysFail)
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Hostname) -and $stepOutputs.ContainsKey('Network configuration')) {
+    Write-Host ""
+    Write-Host "  Network configuration" -ForegroundColor White
+    Write-Item "Hostname: $Hostname"  (Get-ItemStatus $netOut "Hostname already set" -Failed:$netFail)
+}
+
+if ($stepOutputs.ContainsKey('SELinux configuration')) {
+    Write-Host ""
+    Write-Host "  SELinux configuration" -ForegroundColor White
+    Write-Item "SELinux audit tools"  (Get-ItemStatus $seOut "audit tools already installed" -Failed:$seFail)
+    Write-Item "auditd started"       (Get-ItemStatus $seOut -Failed:$seFail)
+}
+
+if ($stepOutputs.ContainsKey('Desktop configuration')) {
+    Write-Host ""
+    Write-Host "  Desktop configuration" -ForegroundColor White
+    Write-Item "Disabled Wayland, enabled X11 session"        (Get-ItemStatus $deskOut -Failed:$deskFail)
+    $bgStatus = if ($deskFail) { 'error' } `
+                elseif ([string]::IsNullOrWhiteSpace($bgFileName)) { 'skipped' } `
+                elseif ($deskOut -match 'skipping') { 'skipped' } else { 'done' }
+    Write-Item "Desktop background image"                     $bgStatus
+    Write-Item "Audible bell disabled"                        (Get-ItemStatus $deskOut "Bell already disabled" -Failed:$deskFail)
+    Write-Item "Gedit backup files"                           (Get-ItemStatus $deskOut "already configured" -Failed:$deskFail)
+    Write-Item "Nautilus / and /opt bookmarks"                (Get-ItemStatus $deskOut "already present" -Failed:$deskFail)
+    Write-Item "Git prompt and autocrlf=input"                (Get-ItemStatus $deskOut -Failed:$deskFail)
+    Write-Item "Kernel fs.protected_regular=0"                (Get-ItemStatus $deskOut -Failed:$deskFail)
+    Write-Item "sysctl-reload.service"                        (Get-ItemStatus $deskOut "sysctl-reload.service already exists" -Failed:$deskFail)
+    Write-Item "/opt owned by $LoginUser"                     (Get-ItemStatus $deskOut -Failed:$deskFail)
+    Write-Item "GNOME Keyring disabled"                       (Get-ItemStatus $deskOut -Failed:$deskFail)
+}
+
+if ($stepOutputs.ContainsKey('Utilities')) {
+    Write-Host ""
+    Write-Host "  Utilities" -ForegroundColor White
+    Write-Item "dconf-editor, expect, gedit"                  (Get-ItemStatus '' -Failed:$utilFail)
+}
+
+Write-Host ""
+if ($failedStep) {
+    Write-Host "  Base setup failed at: $failedStep. Fix the issue above and run Base Setup again." -ForegroundColor Red
+    exit 1
+}
 Write-Host "  Base setup complete. Reboot the VM to apply all changes." -ForegroundColor Green
 exit 0
