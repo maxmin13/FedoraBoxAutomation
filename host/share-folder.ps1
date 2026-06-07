@@ -66,6 +66,8 @@ if ([string]::IsNullOrWhiteSpace($VmName)) {
     Write-Host "  VM name: $vmName" -ForegroundColor DarkGray
 }
 
+$hostDirCreated = $false
+
 if ([string]::IsNullOrWhiteSpace($HostPath)) {
     $hostPath = ''
     while ($true) {
@@ -80,6 +82,7 @@ if ([string]::IsNullOrWhiteSpace($HostPath)) {
             Write-Host "  Folder does not exist. Creating it..." -ForegroundColor Yellow
             New-Item -ItemType Directory -Force -Path $hostPath | Out-Null
             Write-Host "  Created: $hostPath" -ForegroundColor Green
+            $hostDirCreated = $true
         }
         break
     }
@@ -90,6 +93,7 @@ if ([string]::IsNullOrWhiteSpace($HostPath)) {
         Write-Host "  Host folder does not exist. Creating it..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Force -Path $hostPath | Out-Null
         Write-Host "  Created: $hostPath" -ForegroundColor Green
+        $hostDirCreated = $true
     }
     Write-Host "  Host path : $hostPath" -ForegroundColor DarkGray
 }
@@ -181,6 +185,8 @@ if ($runningVms -contains $vmName) {
     Start-Sleep -Seconds 3
 }
 
+$shareRegistered = $false
+
 try {
     $existing = & $script:vbox showvminfo $vmName --machinereadable 2>$null |
         Select-String "SharedFolderNameMachineMapping\d+=""$([regex]::Escape($shareName))"""
@@ -213,7 +219,7 @@ try {
         }
     }
 
-    $addArgs    = @('sharedfolder', 'add', $vmName, '--name', $shareName, '--hostpath', $hostPath, '--automount', "--auto-mount-point=$mountPoint")
+    $addArgs    = @('sharedfolder', 'add', $vmName, '--name', $shareName, '--hostpath', $hostPath, "--auto-mount-point=$mountPoint")
     $addDeadline = (Get-Date).AddSeconds(30)
     $added       = $false
     while ((Get-Date) -lt $addDeadline) {
@@ -241,6 +247,7 @@ try {
         $added = $true
     }
 
+    $shareRegistered = $true
     Write-Host ""
     Write-Host "  Shared folder registered." -ForegroundColor Green
     Write-Host "  Host path  : $hostPath" -ForegroundColor Cyan
@@ -281,7 +288,7 @@ try {
     Invoke-VBox @('startvm', $vmName, '--type', 'gui')
 
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
-    $deadline = (Get-Date).AddSeconds(180)
+    $deadline = (Get-Date).AddSeconds(300)
     $gaReady  = $false
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 5
@@ -289,8 +296,7 @@ try {
         Write-Host "  ...still waiting" -ForegroundColor DarkGray
     }
     if (-not $gaReady) {
-        Write-Host "  ERROR: Guest Additions did not respond. Run manually: sudo usermod -aG vboxsf $loginUser" -ForegroundColor Red
-        exit 1
+        throw "Guest Additions did not respond. Run manually: sudo usermod -aG vboxsf $loginUser"
     }
     Write-Host "  Guest Additions ready." -ForegroundColor Green
 
@@ -305,8 +311,7 @@ try {
     $ErrorActionPreference = 'Stop'
 
     if ($exitCode -ne 0) {
-        Write-Host "  ERROR: Could not add '$loginUser' to vboxsf group. VM setup may be incomplete - make sure Guest Additions are fully installed inside the VM." -ForegroundColor Red
-        exit 1
+        throw "Could not add '$loginUser' to vboxsf group. VM setup may be incomplete - make sure Guest Additions are fully installed inside the VM."
     }
 
     Write-Host "  '$loginUser' added to vboxsf group." -ForegroundColor Green
@@ -316,6 +321,13 @@ try {
     & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "mkdir -p $mountPoint" 2>&1 | Out-Null
     $ErrorActionPreference = 'Stop'
 
+    Write-Host "  Writing fstab entry (owned by '$loginUser')..." -ForegroundColor Cyan
+    $fstabCmd = "uid=`$(id -u $loginUser); gid=`$(id -g $loginUser); sed -i '\|$shareName|d' /etc/fstab; echo `"$shareName $mountPoint vboxsf uid=`$uid,gid=`$gid,_netdev,nofail 0 0`" >> /etc/fstab"
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c $fstabCmd 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+    Write-Host "  fstab entry written." -ForegroundColor Green
+
     Write-Host "  Mounting '$shareName' at '$mountPoint' (owned by '$loginUser')..." -ForegroundColor Cyan
     $mountCmd  = "uid=`$(id -u $loginUser 2>/dev/null); gid=`$(id -g $loginUser 2>/dev/null); mount -t vboxsf -o uid=`$uid,gid=`$gid $shareName $mountPoint"
     $ErrorActionPreference = 'SilentlyContinue'
@@ -324,8 +336,9 @@ try {
     $ErrorActionPreference = 'Stop'
 
     if ($mountCode -eq 0) {
-        Write-Host "  Share mounted at $mountPoint (accessible by '$loginUser')." -ForegroundColor Green
+        Write-Host "  Share mounted at $mountPoint (owned by '$loginUser')." -ForegroundColor Green
         Write-Host "  Reboot the VM to make the vboxsf group change permanent for '$loginUser'." -ForegroundColor Cyan
+        Write-Host "  After reboot the share will remount automatically with the correct ownership." -ForegroundColor Cyan
     } else {
         Write-Host "  WARNING: mount failed (exit $mountCode): $mountOut" -ForegroundColor Yellow
         Write-Host "  Run manually inside the VM: uid=`$(id -u $loginUser); gid=`$(id -g $loginUser); sudo mount -t vboxsf -o uid=`$uid,gid=`$gid $shareName $mountPoint" -ForegroundColor Cyan
@@ -333,6 +346,16 @@ try {
 
 } catch {
     $msg = $_.Exception.Message
+    if ($shareRegistered) {
+        Write-Host "  Removing shared folder registration due to setup failure..." -ForegroundColor Yellow
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox sharedfolder remove $vmName --name $shareName 2>&1 | Out-Null
+        $ErrorActionPreference = 'Stop'
+    }
+    if ($hostDirCreated -and (Test-Path $hostPath -PathType Container)) {
+        Write-Host "  Removing host directory created during this run..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $hostPath -ErrorAction SilentlyContinue
+    }
     if ($msg -match 'object is not ready') {
         Write-Host "  ERROR: VirtualBox did not release the session lock in time after shutdown. Wait a few seconds and try again." -ForegroundColor Red
     } else {

@@ -7,7 +7,6 @@ const VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 beforeEach(() => {
   window.electronAPI = {
     loadVmCredentials: vi.fn().mockResolvedValue({ ok: false }),
-    checkVmReady:      vi.fn().mockResolvedValue({ ok: true, running: true, guestAdditions: true, version: '7.0.14' }),
     runShareFolder:    vi.fn().mockResolvedValue({ ok: true }),
     saveVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
     pickFolder:        vi.fn().mockResolvedValue({ folderPath: 'C:\\Users\\test\\shared' }),
@@ -52,14 +51,8 @@ describe('idle form', () => {
     expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
   })
 
-  it('disables the run button when fields are empty', async () => {
+  it('the run button is always enabled', async () => {
     await renderAndFlush()
-    expect(screen.getByRole('button', { name: 'Set up shared folder' })).toBeDisabled()
-  })
-
-  it('enables the run button when all fields are filled', async () => {
-    await renderAndFlush()
-    await fillAllFields()
     expect(screen.getByRole('button', { name: 'Set up shared folder' })).not.toBeDisabled()
   })
 
@@ -100,44 +93,6 @@ describe('credential pre-fill', () => {
     await act(async () => {})
     expect(screen.getByPlaceholderText('root')).toHaveValue('')
     expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
-  })
-})
-
-// ── VM ready banner ───────────────────────────────────────────────────────────
-
-describe('VM ready banner', () => {
-  it('shows a green "VM running" banner when running with Guest Additions', async () => {
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/VM running/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows an amber "VM is not running" banner when VM is stopped', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({
-      ok: true, running: false, guestAdditions: false,
-    })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/VM is not running/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows a red "Guest Additions not detected" banner when running without GA', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({
-      ok: true, running: true, guestAdditions: false,
-    })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/Guest Additions not detected/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows the Guest Additions version number in the green banner', async () => {
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/7\.0\.14/)).toBeInTheDocument()
-    })
   })
 })
 
@@ -241,16 +196,6 @@ describe('/var/log mount point validation', () => {
     await renderAndFlush()
     fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/var/log' } })
     expect(screen.getByText(/\/var\/log is a system directory/i)).toBeInTheDocument()
-  })
-
-  it('disables the run button when /var/log is the mount point', async () => {
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
-      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
-    })
-    await renderAndFlush()
-    await fillAllFields()
-    fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/var/log' } })
-    expect(screen.getByRole('button', { name: 'Set up shared folder' })).toBeDisabled()
   })
 
   it('also blocks /var/log/ with a trailing slash', async () => {

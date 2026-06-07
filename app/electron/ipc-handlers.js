@@ -59,9 +59,9 @@ async function writeCredsStore(store) {
 }
 
 // Channels excluded from IPC logging.
-// 'is-dev' is polled on every page load; 'read-log' returns the full file
-// content — logging it back to the log file would create a feedback loop.
-const SILENT_CHANNELS = new Set(['is-dev', 'read-log', 'check-vm-credentials', 'get-vm-hostname'])
+// 'read-log' returns full file content — logging it back would create a feedback loop.
+// Credential channels are excluded to keep passwords out of gui.log.
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready'])
 
 function truncate(str, max = 120) {
   return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
@@ -157,9 +157,6 @@ function extractError(lines) {
  * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
  */
 function registerIpcHandlers(win) {
-
-  // ── is-dev ────────────────────────────────────────────────
-  handleIpc('is-dev', async () => process.env.NODE_ENV !== 'production')
 
   // ── get-downloads-path ────────────────────────────────────
   handleIpc('get-downloads-path', async () => ({ path: app.getPath('downloads') }))
@@ -304,34 +301,35 @@ function registerIpcHandlers(win) {
   })
 
   // ── check-vm-ready ───────────────────────────────────────
-  // Returns running state and Guest Additions status for a VM.
-  // Used by ShareFolderPage to show a readiness banner before running share-folder.ps1.
-  handleIpc('check-vm-ready', async (_event, vmName) => {
+  // Returns whether the VM is running and, if credentials are supplied, whether
+  // Guest Additions are responding via guestcontrol. guestReady is null when no
+  // credentials are available to test with.
+  // Excluded from IPC logging (SILENT_CHANNELS) because credentials are passed.
+  handleIpc('check-vm-ready', async (_event, vmName, vmUser, vmPass) => {
     try {
       const info = execSync(
         `VBoxManage showvminfo "${vmName}" --machinereadable`,
         { encoding: 'utf8' }
       )
       const running = /^VMState="running"/m.test(info)
-      if (!running) {
-        return { ok: true, running: false, guestAdditions: false }
-      }
+      if (!running) return { ok: true, running: false, guestReady: false }
+
+      if (!vmUser || !vmPass) return { ok: true, running: true, guestReady: null }
+
+      // Ping guestcontrol — the only reliable way to confirm GA are installed
+      // and running inside the guest.
       try {
-        const gaOutput = execSync(
-          `VBoxManage guestproperty get "${vmName}" /VirtualBox/GuestAdd/Version`,
-          { encoding: 'utf8' }
+        execSync(
+          `VBoxManage guestcontrol "${vmName}" run --exe /bin/echo --username "${vmUser}" --password "${vmPass}" --wait-stdout -- ok`,
+          { encoding: 'utf8', timeout: 10000 }
         )
-        const match = gaOutput.match(/Value:\s*(.+)/i)
-        if (match) {
-          return { ok: true, running: true, guestAdditions: true, version: match[1].trim() }
-        }
+        return { ok: true, running: true, guestReady: true }
       } catch {
-        // guestproperty throws when Guest Additions are not installed
+        return { ok: true, running: true, guestReady: false }
       }
-      return { ok: true, running: true, guestAdditions: false }
     } catch (error) {
       log.error(`[ipc][check-vm-ready] "${vmName}":`, error.message)
-      return { ok: false, running: false, guestAdditions: false, error: error.message }
+      return { ok: false, running: false, guestReady: false, error: error.message }
     }
   })
 
@@ -356,6 +354,7 @@ function registerIpcHandlers(win) {
   // Also detects whether the VM is booting from a live ISO (isLive: true)
   // by checking for /run/initramfs/live, which only exists in live environments.
   handleIpc('check-vm-credentials', async (_event, { vmName, vmUser, vmPass }) => {
+    log.info(`[ipc] recv check-vm-credentials vm="${vmName}" user="${vmUser}"`)
     try {
       // --password is unavoidable: VBoxManage guestcontrol has no stdin/env-var alternative
       execSync(
@@ -372,11 +371,31 @@ function registerIpcHandlers(win) {
       } catch {
         // exit code 1 means directory absent — installed OS
       }
+      log.info(`[ipc] reply check-vm-credentials ok=true isLive=${isLive}`)
       return { ok: true, isLive }
     } catch (error) {
-      log.error(`[ipc][check-vm-credentials] "${vmName}":`, error.message)
       const raw = (error.stderr ?? error.message ?? '').toString().trim()
       const msg = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(l => l)[0] ?? 'Connection failed'
+      log.error(`[ipc] reply check-vm-credentials ok=false error="${msg}"`)
+      return { ok: false, error: msg }
+    }
+  })
+
+  // ── check-vm-user ────────────────────────────────────────
+  // Verifies that a login username exists inside the guest by running `id <user>` as root.
+  handleIpc('check-vm-user', async (_event, { vmName, rootUser, rootPass, vmUser }) => {
+    log.info(`[ipc] recv check-vm-user vm="${vmName}" rootUser="${rootUser}" vmUser="${vmUser}"`)
+    try {
+      execSync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /usr/bin/id --username "${rootUser}" --password "${rootPass}" --wait-stdout -- "${vmUser}"`,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 10000 }
+      )
+      log.info(`[ipc] reply check-vm-user ok=true`)
+      return { ok: true }
+    } catch (error) {
+      const raw = (error.stderr ?? error.message ?? '').toString().trim()
+      const msg = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(l => l)[0] ?? 'User not found'
+      log.error(`[ipc] reply check-vm-user ok=false error="${msg}"`)
       return { ok: false, error: msg }
     }
   })
@@ -425,13 +444,31 @@ function registerIpcHandlers(win) {
   handleIpc('load-vm-credentials', async (_event, vmName) => {
     const store = await readCredsStore()
     const entry = store[vmName]
-    if (!entry) return { ok: false }
+    if (!entry) return { ok: false, reason: `no entry for VM "${vmName}" in vm-state.json` }
+    const missing = ['user', 'pass', 'loginUser'].filter((k) => !entry[k])
     return {
       ok: true,
       user:      entry.user      ?? '',
       pass:      entry.pass      ?? '',
       loginUser: entry.loginUser ?? '',
+      ...(missing.length ? { warning: `missing fields: ${missing.join(', ')}` } : {}),
     }
+  })
+
+  // ── load-all-vm-credentials ───────────────────────────────
+  // Returns every entry in vm-state.json so the renderer can populate VM lists
+  // and pre-fill credential forms without calling load-vm-credentials per VM.
+  handleIpc('load-all-vm-credentials', async () => {
+    const store = await readCredsStore()
+    const entries = {}
+    for (const [vmName, entry] of Object.entries(store)) {
+      entries[vmName] = {
+        user:      entry.user      ?? '',
+        pass:      entry.pass      ?? '',
+        loginUser: entry.loginUser ?? '',
+      }
+    }
+    return { ok: true, entries }
   })
 
   // ── save-vm-credentials ──────────────────────────────────
@@ -603,10 +640,15 @@ function registerIpcHandlers(win) {
         } catch { /* no disk attached or showmediuminfo unavailable */ }
       }
 
-      // Log sync destination: <VM folder>\guest-logs
+      // Log sync destination: <VM folder>\guest-logs — only set when the share
+      // has actually been registered in VirtualBox (i.e. share-logs.ps1 has run).
       let logSyncPath = null
       if (kv['CfgFile']) {
-        logSyncPath = path.join(path.dirname(kv['CfgFile']), 'guest-logs')
+        const candidate = path.join(path.dirname(kv['CfgFile']), 'guest-logs')
+        const hasShare = sharedFolders.some(
+          sf => sf.hostPath.toLowerCase() === candidate.toLowerCase()
+        )
+        if (hasShare) logSyncPath = candidate
       }
 
       // Hide the log-sync share from the user-facing shared-folders list.
@@ -621,20 +663,6 @@ function registerIpcHandlers(win) {
           )
         : sharedFolders
 
-      // Guest Additions version — only queryable when the VM is running
-      let gaVersion = null
-      const running = /^running$/i.test(kv['VMState'] ?? '')
-      if (running) {
-        try {
-          const gaOut = execSync(
-            `VBoxManage guestproperty get "${vmName}" /VirtualBox/GuestAdd/Version`,
-            { encoding: 'utf8' }
-          )
-          const m = gaOut.match(/Value:\s*(.+)/i)
-          if (m) gaVersion = m[1].trim()
-        } catch { /* Guest Additions not installed */ }
-      }
-
       return {
         ok: true,
         info: {
@@ -648,7 +676,6 @@ function registerIpcHandlers(win) {
           diskCapacityMB,
           diskType,
           sharedFolders: userSharedFolders,
-          gaVersion,
           logSyncPath,
         },
       }

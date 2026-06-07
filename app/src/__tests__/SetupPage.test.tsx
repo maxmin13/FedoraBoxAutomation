@@ -20,7 +20,6 @@ beforeEach(() => {
     readDoc:           vi.fn().mockResolvedValue({ ok: true, content: '' }),
     onScriptLine:      vi.fn().mockReturnValue(() => {}),
     onScriptDone:      vi.fn().mockReturnValue(() => {}),
-    isDev:             vi.fn().mockResolvedValue(false),
   } as unknown as typeof window.electronAPI
 })
 

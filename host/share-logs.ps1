@@ -71,10 +71,15 @@ if ([string]::IsNullOrWhiteSpace($HostPath)) {
 
 Write-Host "  Host path: $HostPath" -ForegroundColor DarkGray
 
+$hostDirCreated = $false
 if (-not (Test-Path $HostPath)) {
     New-Item -ItemType Directory -Path $HostPath -Force | Out-Null
     Write-Host "  Created: $HostPath" -ForegroundColor DarkGray
+    $hostDirCreated = $true
 }
+
+# Share name that share-folder.ps1 will register (leaf of HostPath, spaces -> underscore).
+$shareName = (Split-Path $HostPath -Leaf) -replace '\s+', '_'
 
 # ---------------------------------------------------------------------------
 Write-Header "Step 1 - Mount Shared Folder"
@@ -89,25 +94,32 @@ if ($VmPass)         { $shareFolderArgs['VmPass']         = $VmPass    }
 if ($LoginUser)      { $shareFolderArgs['LoginUser']      = $LoginUser  }
 if ($NonInteractive) { $shareFolderArgs['NonInteractive'] = $true       }
 & "$PSScriptRoot\share-folder.ps1" @shareFolderArgs
-if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: share-folder.ps1 failed." -ForegroundColor Red; exit 1 }
+if ($LASTEXITCODE -ne 0) {
+    if ($hostDirCreated -and (Test-Path $HostPath -PathType Container)) {
+        Write-Host "  Removing host directory created during this run..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $HostPath -ErrorAction SilentlyContinue
+    }
+    Write-Host "  ERROR: Could not set up the shared folder. See the output above for details." -ForegroundColor Red
+    exit 1
+}
 
 # ---------------------------------------------------------------------------
 Write-Header "Step 2 - Install Log Sync Timer"
 
-if ([string]::IsNullOrWhiteSpace($VmUser) -or [string]::IsNullOrWhiteSpace($VmPass)) {
-    $creds = Get-VmCredentials -VmName $VmName
-    if (-not $creds) {
-        Write-Host "  ERROR: No credentials supplied or saved for '$VmName'." -ForegroundColor Red
-        exit 1
-    }
-    $vmUser = $creds.User
-    $vmPass = $creds.Pass
-} else {
-    $vmUser = $VmUser
-    $vmPass = $VmPass
-}
+$tmpFile = $null
 
-$setupScript = @'
+try {
+    if ([string]::IsNullOrWhiteSpace($VmUser) -or [string]::IsNullOrWhiteSpace($VmPass)) {
+        $creds = Get-VmCredentials -VmName $VmName
+        if (-not $creds) { throw "No credentials supplied or saved for '$VmName'." }
+        $vmUser = $creds.User
+        $vmPass = $creds.Pass
+    } else {
+        $vmUser = $VmUser
+        $vmPass = $VmPass
+    }
+
+    $setupScript = @'
 #!/bin/bash
 set -e
 dnf install -y rsync
@@ -163,29 +175,41 @@ rm -f /tmp/log-sync-setup.sh
 echo "log-sync.timer installed and started."
 '@
 
-$tmpFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "log-sync-setup.sh")
-[System.IO.File]::WriteAllText($tmpFile, ($setupScript -replace "`r`n", "`n"), [System.Text.UTF8Encoding]::new($false))
+    $tmpFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "log-sync-setup.sh")
+    [System.IO.File]::WriteAllText($tmpFile, ($setupScript -replace "`r`n", "`n"), [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "  Uploading setup script..." -ForegroundColor Cyan
-$ErrorActionPreference = 'SilentlyContinue'
-& $script:vbox guestcontrol $VmName copyto $tmpFile "/tmp/log-sync-setup.sh" --username $vmUser --password $vmPass 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR: Failed to upload setup script to VM." -ForegroundColor Red; exit 1 }
-$ErrorActionPreference = 'Stop'
+    Write-Host "  Uploading setup script..." -ForegroundColor Cyan
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox guestcontrol $VmName copyto $tmpFile "/tmp/log-sync-setup.sh" --username $vmUser --password $vmPass 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to upload setup script to VM." }
+    $ErrorActionPreference = 'Stop'
 
-Write-Host "  Running setup script..." -ForegroundColor Cyan
-$ErrorActionPreference = 'SilentlyContinue'
-$result   = & $script:vbox guestcontrol $VmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- /tmp/log-sync-setup.sh 2>&1
-$exitCode = $LASTEXITCODE
-$ErrorActionPreference = 'Stop'
+    Write-Host "  Running setup script..." -ForegroundColor Cyan
+    $ErrorActionPreference = 'SilentlyContinue'
+    $result   = & $script:vbox guestcontrol $VmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- /tmp/log-sync-setup.sh 2>&1
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
 
-if ($exitCode -ne 0) {
-    Write-Host "  ERROR: Setup script failed (exit $exitCode): $result" -ForegroundColor Red
+    if ($exitCode -ne 0) { throw "Setup script failed (exit $exitCode): $result" }
+
+    Remove-Item $tmpFile -ErrorAction SilentlyContinue
+
+    Write-Host ""
+    Write-Host "  log-sync.timer active." -ForegroundColor Green
+    Write-Host "  /var/log -> /mnt/log synced every 30 seconds." -ForegroundColor Cyan
+    Write-Host "  View logs on host at: $HostPath" -ForegroundColor Cyan
+
+} catch {
+    $msg = $_.Exception.Message
+    Write-Host "  Removing shared folder registration due to timer setup failure..." -ForegroundColor Yellow
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $script:vbox sharedfolder remove $VmName --name $shareName 2>&1 | Out-Null
+    $ErrorActionPreference = 'Stop'
+    if ($hostDirCreated -and (Test-Path $HostPath -PathType Container)) {
+        Write-Host "  Removing host directory created during this run..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $HostPath -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $tmpFile) { Remove-Item $tmpFile -ErrorAction SilentlyContinue }
+    Write-Host "  ERROR: $msg" -ForegroundColor Red
     exit 1
 }
-
-Remove-Item $tmpFile -ErrorAction SilentlyContinue
-
-Write-Host ""
-Write-Host "  log-sync.timer active." -ForegroundColor Green
-Write-Host "  /var/log -> /mnt/log synced every 30 seconds." -ForegroundColor Cyan
-Write-Host "  View logs on host at: $HostPath" -ForegroundColor Cyan

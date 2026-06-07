@@ -12,7 +12,7 @@ beforeEach(() => {
     stopVm:            vi.fn().mockResolvedValue({ ok: true }),
     deleteVm:          vi.fn().mockResolvedValue({ ok: true }),
     loadVmCredentials: vi.fn().mockResolvedValue({ ok: false }),
-    checkVmReady:      vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false }),
+    checkVmReady:      vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false }),
     getVmInfo:         vi.fn().mockResolvedValue({ ok: false, error: 'not needed' }),
     onScriptLine:      vi.fn().mockReturnValue(() => {}),
     onScriptDone:      vi.fn().mockReturnValue(() => {}),

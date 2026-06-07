@@ -37,9 +37,18 @@ if (-not $script:vbox) {
 }
 
 if ([string]::IsNullOrWhiteSpace($VmName))    { $VmName    = (Read-Host "VM name").Trim() }
-if ([string]::IsNullOrWhiteSpace($VmUser))    { $VmUser    = (Read-Host "VM root username").Trim() }
-if ([string]::IsNullOrWhiteSpace($VmPass))    { $VmPass    = (Read-Host "VM root password") }
-if ([string]::IsNullOrWhiteSpace($LoginUser)) { $LoginUser = (Read-Host "Desktop username").Trim() }
+if ([string]::IsNullOrWhiteSpace($VmUser)) {
+    if ($NonInteractive) { Write-Host "ERROR: VM root username is required."; exit 1 }
+    $VmUser = (Read-Host "VM root username").Trim()
+}
+if ([string]::IsNullOrWhiteSpace($VmPass)) {
+    if ($NonInteractive) { Write-Host "ERROR: VM root password is required."; exit 1 }
+    $VmPass = (Read-Host "VM root password")
+}
+if ([string]::IsNullOrWhiteSpace($LoginUser)) {
+    if ($NonInteractive) { Write-Host "ERROR: Desktop username is required."; exit 1 }
+    $LoginUser = (Read-Host "Desktop username").Trim()
+}
 if ([string]::IsNullOrWhiteSpace($Hostname) -and -not $NonInteractive) {
     $Hostname = (Read-Host "VM hostname (leave blank to skip)").Trim()
 }
@@ -87,8 +96,19 @@ foreach ($step in $steps) {
     }
     Write-Header $step.Label
     $exitCode = Invoke-GuestScript -LocalPath $step.Path -ScriptArgs $step.Args -Label $step.Label
-    if ($exitCode -ne 0) { exit 1 }
+    if ($exitCode -ne 0) {
+        Write-Host "  $($step.Label): FAILED" -ForegroundColor Red
+        Write-Host "  Fix the issue above and run Base Setup again." -ForegroundColor Yellow
+        exit 1
+    }
+    Write-Host "  $($step.Label): OK" -ForegroundColor Green
 }
+
+$ErrorActionPreference = 'SilentlyContinue'
+& $script:vbox guestcontrol $VmName run --exe /bin/bash `
+    --username $VmUser --password $VmPass --wait-stdout --wait-stderr `
+    -- -c "mkdir -p /etc/fedorabox && touch /etc/fedorabox/.base-setup" 2>&1 | Out-Null
+$ErrorActionPreference = 'Stop'
 
 Write-Host ""
 Write-Host "  Base setup complete. Reboot the VM to apply all changes." -ForegroundColor Green

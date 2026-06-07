@@ -241,7 +241,7 @@ These apply whether you started the app with `npm run dev` or via the VS Code de
 
 | You want to see... | Look here |
 |--------------------|-----------|
-| IPC calls, replies, and Electron main process errors | **`gui.log`** (always) and the VS Code **Debug Console** tab (dev only) |
+| IPC calls, replies, and Electron main process errors | **`gui.log`** |
 | Logs from React components (`.tsx` files) | Electron **DevTools** — press `Ctrl+Shift+I` inside the app window, then open the **Console** tab |
 | PowerShell script output, shell script output, script markers | **`host.log`** |
 | Renderer crashes caught by the error boundary | **`gui.log`** (forwarded via `log-error` IPC) |

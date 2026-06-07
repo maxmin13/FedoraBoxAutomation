@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
 import VmEditPage from './VmEditPage'
+import VmLoginPage from './VmLoginPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface LandingPageProps {
@@ -26,6 +27,10 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   // VM currently open in the detail view (null = show grid)
   const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
   const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
+
+  // VM waiting at the login gate before entering detail/provision
+  const [loginVm,     setLoginVm]     = useState<Vm | null>(null)
+  const [loginVmView, setLoginVmView] = useState<'detail' | 'provision'>('detail')
 
   // Incremented each time we want VmEditPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
@@ -60,6 +65,22 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
     }
 
     setLoading(false)
+  }
+
+  if (loginVm && !selectedVm) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage
+          initialVmName={loginVm.name}
+          onBack={() => setLoginVm(null)}
+          onNext={() => {
+            setSelectedVmView(loginVmView)
+            setSelectedVm(loginVm)
+            setLoginVm(null)
+          }}
+        />
+      </div>
+    )
   }
 
   if (selectedVm) {
@@ -134,8 +155,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
               key={vm.uuid}
               vm={vm}
               onRefresh={loadVms}
-              onEdit={() => { setSelectedVmView('detail'); setSelectedVm(vm) }}
-              onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
+              onEdit={() => { setLoginVmView('detail'); setLoginVm(vm) }}
+              onProvision={() => { setLoginVmView('provision'); setLoginVm(vm) }}
             />
           ))}
         </div>

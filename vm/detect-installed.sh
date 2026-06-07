@@ -25,7 +25,7 @@ python_ok() {
 }
 
 base_setup_ok() {
-  getenforce 2>/dev/null | grep -qi disabled && echo true || echo false
+  path_ok /etc/fedorabox/.base-setup
 }
 
 cat <<JSON

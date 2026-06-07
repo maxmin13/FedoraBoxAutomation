@@ -20,10 +20,6 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 
-// isDev is true when running via `npm run dev` (Vite dev server).
-// We check NODE_ENV first so `npm start` (build + electron .) works too.
-const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
-
 /**
  * Creates the main browser window and loads the renderer.
  */
@@ -49,7 +45,7 @@ function createWindow() {
     },
   })
 
-  if (isDev) {
+  if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
     // In development, Vite serves the renderer on localhost
     win.loadURL('http://localhost:5173')
   } else {
@@ -104,7 +100,7 @@ app.on('second-instance', () => {
 // 'ready' fires when Electron has finished initialising.
 // You must not create windows before this event.
 app.whenReady().then(() => {
-  log.info(`[main] app ready — mode: ${isDev ? 'development' : 'production'}`)
+  log.info('[main] app ready')
   const win = createWindow()
 
   // Register all ipcMain.handle() calls so the renderer can talk to main

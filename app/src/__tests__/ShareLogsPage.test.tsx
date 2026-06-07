@@ -9,7 +9,6 @@ beforeEach(() => {
   window.electronAPI = {
     getVmGuestLogsPath: vi.fn().mockResolvedValue({ ok: true, path: HOST_PATH }),
     loadVmCredentials:  vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' }),
-    checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: true, guestAdditions: true, version: '7.0.14' }),
     runShareLogs:       vi.fn().mockResolvedValue({ ok: true }),
     saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     pickFolder:         vi.fn().mockResolvedValue({ folderPath: HOST_PATH }),
@@ -53,26 +52,18 @@ describe('idle form', () => {
     expect(window.electronAPI.getVmGuestLogsPath).toHaveBeenCalledWith('FedoraBox')
   })
 
-  it('enables the run button when a path is set and credentials exist', async () => {
+  it('the run button is always enabled', async () => {
     await renderAndFlush()
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled()
     })
   })
 
-  it('disables the run button when credentials are missing', async () => {
+  it('the run button is enabled even when credentials are missing', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
     await renderAndFlush()
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeDisabled()
-    })
-  })
-
-  it('shows a hint to fill in fields when no credentials are saved', async () => {
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/fill in all fields/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled()
     })
   })
 
@@ -92,47 +83,13 @@ describe('idle form', () => {
   })
 })
 
-// ── VM ready banner ───────────────────────────────────────────────────────────
-
-describe('VM ready banner', () => {
-  it('shows a green banner when VM is running with Guest Additions', async () => {
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/VM running/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows the Guest Additions version in the green banner', async () => {
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/7\.0\.14/)).toBeInTheDocument()
-    })
-  })
-
-  it('shows an amber banner when the VM is not running', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/VM is not running/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows a red banner when running without Guest Additions', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: true, guestAdditions: false })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/Guest Additions not detected/i)).toBeInTheDocument()
-    })
-  })
-})
-
 // ── Running state ─────────────────────────────────────────────────────────────
 
 describe('running state', () => {
   it('shows the progress indicator while the script is running', async () => {
     window.electronAPI.runShareLogs = vi.fn().mockReturnValue(new Promise(() => {}))
     await renderAndFlush()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
     await waitFor(() => {
       expect(screen.getByText('Setting up log sync...')).toBeInTheDocument()
@@ -142,7 +99,7 @@ describe('running state', () => {
   it('hides the idle form while running', async () => {
     window.electronAPI.runShareLogs = vi.fn().mockReturnValue(new Promise(() => {}))
     await renderAndFlush()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Set up log sync' })).not.toBeInTheDocument()
@@ -156,7 +113,7 @@ describe('success state', () => {
   async function runToSuccess() {
     wireRun(0)
     await renderAndFlush()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
     await waitFor(() => {
       expect(screen.getByText('Log sync active.')).toBeInTheDocument()
@@ -185,7 +142,7 @@ describe('failure state', () => {
   async function runToFailure() {
     wireRun(1, 'VBoxManage: guest control error')
     await renderAndFlush()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).not.toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
     await waitFor(() => {
       expect(screen.getByText('Setup failed.')).toBeInTheDocument()

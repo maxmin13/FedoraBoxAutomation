@@ -24,9 +24,6 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
   const [error,     setError]     = useState<string | null>(null)
   const [showLog,   setShowLog]   = useState(false)
 
-  type VmReadyState = { running: boolean; guestAdditions: boolean; version?: string }
-  const [vmReady, setVmReady] = useState<VmReadyState | null>(null)
-
   useEffect(() => {
     onScriptRunning(pageState === 'running')
   }, [pageState, onScriptRunning])
@@ -37,11 +34,6 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
         if (saved.user)      setVmUser(saved.user)
         if (saved.pass)      setVmPass(saved.pass)
         if (saved.loginUser) setLoginUser(saved.loginUser)
-      }
-    })
-    window.electronAPI.checkVmReady(vm.name).then((result) => {
-      if (result.ok) {
-        setVmReady({ running: result.running, guestAdditions: result.guestAdditions, version: result.version })
       }
     })
   }, [vm.name])
@@ -96,7 +88,6 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
 
   const invalidMountPoint = !!mountPoint && !/^\/[^\\ ]*$/.test(mountPoint.trim())
   const reservedMountPoint = mountPoint.trimEnd().replace(/\/+$/, '') === '/var/log'
-  const canRun = pageState === 'idle' && !!hostPath && !!mountPoint && !invalidMountPoint && !reservedMountPoint && !!vmUser && !!vmPass && !!loginUser
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -131,7 +122,7 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
 
         <LogPanel
           lines={lines}
-          showLog={showLog}
+          showLog={pageState === 'running' || showLog}
           onToggle={() => setShowLog((v) => !v)}
         />
 
@@ -179,8 +170,6 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
           Mount a host directory inside the VM via VirtualBox shared folders.
         </p>
 
-        <VmReadyBanner vmReady={vmReady} />
-
         <div className="space-y-3 mb-4">
           <div>
             <label className="block text-zinc-400 text-xs mb-1">Host path</label>
@@ -212,91 +201,17 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
               <p className="text-red-400 text-xs mt-1">/var/log is a system directory and cannot be used as a mount point.</p>
             )}
           </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">VM root username</label>
-            <input
-              type="text"
-              value={vmUser}
-              onChange={(e) => setVmUser(e.target.value)}
-              placeholder="root"
-              className={inputClass(vmUser)}
-            />
-          </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">VM root password</label>
-            <input
-              type="password"
-              value={vmPass}
-              onChange={(e) => setVmPass(e.target.value)}
-              placeholder="••••••••"
-              className={inputClass(vmPass)}
-            />
-          </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">Desktop username (added to vboxsf)</label>
-            <input
-              type="text"
-              value={loginUser}
-              onChange={(e) => setLoginUser(e.target.value)}
-              placeholder="your desktop username"
-              className={inputClass(loginUser)}
-            />
-          </div>
         </div>
 
         <button
           onClick={handleRun}
-          disabled={!canRun}
-          className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
         >
           Set up shared folder
         </button>
-
-        {!canRun && !(invalidMountPoint || reservedMountPoint) && (
-          <p className="text-zinc-500 text-xs mt-2">Fill in all fields above to continue.</p>
-        )}
       </div>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-interface VmReadyBannerProps {
-  vmReady: { running: boolean; guestAdditions: boolean; version?: string } | null
-}
-
-function VmReadyBanner({ vmReady }: VmReadyBannerProps) {
-  if (!vmReady) return null
-
-  if (!vmReady.running) {
-    return (
-      <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-amber-950 border border-amber-700 rounded text-xs text-amber-300">
-        <span className="mt-0.5">&#9888;</span>
-        <span>
-          VM is not running — Guest Additions status cannot be verified.
-          Start the VM first to confirm they are installed.
-        </span>
-      </div>
-    )
-  }
-
-  if (!vmReady.guestAdditions) {
-    return (
-      <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-red-950 border border-red-700 rounded text-xs text-red-300">
-        <span className="mt-0.5">&#10007;</span>
-        <span>
-          Guest Additions not detected. Install them inside the VM before setting up a shared folder.
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-green-950 border border-green-800 rounded text-xs text-green-300">
-      <span>&#10003;</span>
-      <span>VM running · Guest Additions {vmReady.version}</span>
-    </div>
-  )
-}
 

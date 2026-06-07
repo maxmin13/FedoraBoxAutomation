@@ -1,6 +1,5 @@
 // Shared file logger for the Electron main process.
-// Writes to %APPDATA%\FedoraBoxAutomation\logs\gui.log in all environments.
-// In development it also mirrors output to the console.
+// Writes to %APPDATA%\FedoraBoxAutomation\logs\gui.log.
 
 const fs   = require('fs')
 const path = require('path')
@@ -27,8 +26,6 @@ try {
   fs.mkdirSync(LOG_DIR, { recursive: true })
 } catch {}
 
-const isDev = process.env.NODE_ENV !== 'production'
-
 function format(level, args) {
   const ts   = new Date().toISOString().replace('T', ' ').slice(0, 23)
   const text = args
@@ -43,13 +40,6 @@ function write(level, args) {
     rotate(LOG_FILE, MAX_GUI)
     fs.appendFileSync(LOG_FILE, line, 'utf8')
   } catch {}
-
-  if (isDev) {
-    const plain = line.trim()
-    if (level === 'error') console.error(plain)
-    else if (level === 'warn')  console.warn(plain)
-    else                        console.log(plain)
-  }
 }
 
 function writeHost(tag, text) {

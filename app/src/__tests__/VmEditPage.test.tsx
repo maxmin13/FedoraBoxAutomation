@@ -16,11 +16,10 @@ const BASE_INFO = {
   diskCapacityMB: 51200,
   diskType:       'dynamic',
   sharedFolders:  [],
-  gaVersion:      null,
   logSyncPath:    null,
 }
 
-const RUNNING_INFO = { ...BASE_INFO, state: 'running', gaVersion: '7.0.14' }
+const RUNNING_INFO = { ...BASE_INFO, state: 'running' }
 
 const ALL_FALSE = Object.fromEntries([
   'baseSetup','java','php','python','node','maven','httpd','tomcat',
@@ -172,29 +171,6 @@ describe('VmEditPage — Network section', () => {
   })
 })
 
-// ── Guest Additions section ───────────────────────────────────────────────────
-
-describe('VmEditPage — Guest Additions section', () => {
-  it('shows the GA version when VM is running and GA is installed', async () => {
-    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
-    await renderAndWait()
-    expect(screen.getByText('7.0.14')).toBeInTheDocument()
-  })
-
-  it('shows "Not installed" when VM is running but GA version is null', async () => {
-    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
-      ok: true, info: { ...RUNNING_INFO, gaVersion: null },
-    })
-    await renderAndWait()
-    expect(screen.getByText('Not installed')).toBeInTheDocument()
-  })
-
-  it('shows "Start VM to check" when VM is stopped', async () => {
-    await renderAndWait()
-    expect(screen.getByText('Start VM to check')).toBeInTheDocument()
-  })
-})
-
 // ── Log sync section ──────────────────────────────────────────────────────────
 
 describe('VmEditPage — Log sync section', () => {
@@ -211,17 +187,17 @@ describe('VmEditPage — Log sync section', () => {
     expect(screen.getByText('C:\\VMs\\FedoraBox\\guest-logs')).toBeInTheDocument()
   })
 
-  it('shows a Sync button when logSyncPath is null', async () => {
+  it('always shows a Sync button', async () => {
     await renderAndWait()
     expect(screen.getByRole('button', { name: 'Sync' })).toBeInTheDocument()
   })
 
-  it('hides the Sync button when logSyncPath is already configured', async () => {
+  it('shows a Sync button even when logSyncPath is already configured', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
       ok: true, info: { ...BASE_INFO, logSyncPath: 'C:\\VMs\\FedoraBox\\guest-logs' },
     })
     await renderAndWait()
-    expect(screen.queryByRole('button', { name: 'Sync' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeInTheDocument()
   })
 })
 
@@ -307,7 +283,7 @@ describe('VmEditPage — navigation', () => {
   function addSubPageMocks() {
     Object.assign(window.electronAPI, {
       loadVmCredentials:  vi.fn().mockResolvedValue({ ok: false }),
-      checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: false, guestAdditions: false }),
+      checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false }),
       getVmGuestLogsPath: vi.fn().mockResolvedValue({ ok: true, path: 'C:\\VMs\\FedoraBox\\guest-logs' }),
       onScriptLine:       vi.fn().mockReturnValue(() => {}),
       onScriptDone:       vi.fn().mockReturnValue(() => {}),
@@ -315,6 +291,7 @@ describe('VmEditPage — navigation', () => {
   }
 
   it('navigates to ShareFolderPage when the Share button is clicked', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     addSubPageMocks()
     await renderAndWait()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Share' })) })
@@ -324,12 +301,53 @@ describe('VmEditPage — navigation', () => {
   })
 
   it('navigates to ShareLogsPage when the Sync button is clicked', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     addSubPageMocks()
     await renderAndWait()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sync' })) })
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Log sync — FedoraBox' })).toBeInTheDocument()
     )
+  })
+})
+
+// ── VM not-running banner and disabled buttons ────────────────────────────────
+
+describe('VmEditPage — VM not running', () => {
+  it('shows the amber "VM is not running" banner when VM is stopped', async () => {
+    await renderAndWait()
+    expect(screen.getByText('VM is not running. Start the VM first.')).toBeInTheDocument()
+  })
+
+  it('does not show the not-running banner when VM is running', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
+    await renderAndWait()
+    expect(screen.queryByText('VM is not running. Start the VM first.')).not.toBeInTheDocument()
+  })
+
+  it('disables the Sync button when VM is stopped', async () => {
+    await renderAndWait()
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeDisabled()
+  })
+
+  it('disables the Share button when VM is stopped', async () => {
+    await renderAndWait()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled()
+  })
+
+  it('enables the Sync button when VM is running', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
+    await renderAndWait()
+    expect(screen.getByRole('button', { name: 'Sync' })).not.toBeDisabled()
+  })
+
+  it('enables the Share button when VM is running', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
+    await renderAndWait()
+    expect(screen.getByRole('button', { name: 'Share' })).not.toBeDisabled()
   })
 })
 

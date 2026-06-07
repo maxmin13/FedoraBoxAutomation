@@ -9,25 +9,21 @@ import DocsPage from './pages/DocsPage'
 import CreateVmPage from './pages/CreateVmPage'
 import LogsPage from './pages/LogsPage'
 import ErrorBoundary from './ErrorBoundary'
+import VmLoginPage from './pages/VmLoginPage'
 
 // All valid page names in the app
-export type Page = 'landing' | 'setup' | 'create-vm' | 'docs' | 'logs'
+export type Page = 'landing' | 'setup' | 'create-vm' | 'docs' | 'logs' | 'vm-login'
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
   const [landingKey, setLandingKey] = useState(0)
   const [createVmNavKey, setCreateVmNavKey] = useState(0)
-  const [isDev, setIsDev] = useState(false)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
   // Set to true when a script that ran from 'landing' finishes while the user
   // is on another page.  The next navigation to 'landing' will skip the key
   // increment so the provision result stays visible; the one after that resets.
   const [preserveLanding, setPreserveLanding] = useState(false)
-
-  useEffect(() => {
-    window.electronAPI.isDev().then(setIsDev)
-  }, [])
 
   const currentPageRef = useRef(currentPage)
   useEffect(() => { currentPageRef.current = currentPage }, [currentPage])
@@ -68,7 +64,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen">
       {/* Navigation bar — always visible at the top */}
-      <NavBar currentPage={currentPage} onNavigate={handleNavigate} isDev={isDev} scriptRunning={scriptRunning} scriptPage={scriptPage} />
+      <NavBar currentPage={currentPage} onNavigate={handleNavigate} scriptRunning={scriptRunning} scriptPage={scriptPage} />
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-y-auto p-6">
@@ -91,6 +87,11 @@ export default function App() {
           <div style={{ display: currentPage === 'logs' ? undefined : 'none' }} className="h-full overflow-hidden">
             <LogsPage isActive={currentPage === 'logs'} />
           </div>
+          {currentPage === 'vm-login' && (
+            <div className="h-full overflow-hidden">
+              <VmLoginPage onNavigate={handleNavigate} />
+            </div>
+          )}
         </ErrorBoundary>
       </main>
     </div>

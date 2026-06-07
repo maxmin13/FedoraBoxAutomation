@@ -60,18 +60,14 @@ elif [[ ! -f "/usr/share/backgrounds/${BACKGROUND_IMG}" ]]
 then
    log_warn "Background image not found at /usr/share/backgrounds/${BACKGROUND_IMG}, skipping."
 else
-   img_uri="$(gsettings_get org.gnome.desktop.background picture-uri)"
-   img_nm="$(basename "${img_uri}" \')"
-
-   log_info "Current background image: ${img_nm}"
-
-   if [[ "${img_nm}" == "${BACKGROUND_IMG}" ]]
-   then
-      log_info 'Background image already set.'
-   else
-      gsettings_set org.gnome.desktop.background picture-uri "file:///usr/share/backgrounds/${BACKGROUND_IMG}"
-      log_info 'Background image changed.'
-   fi
+   mkdir -p /etc/dconf/db/local.d
+   cat > /etc/dconf/db/local.d/01-background <<EOF
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/${BACKGROUND_IMG}'
+picture-uri-dark='file:///usr/share/backgrounds/${BACKGROUND_IMG}'
+EOF
+   dconf update
+   log_info "Background image set to ${BACKGROUND_IMG}."
 fi
 
 ####

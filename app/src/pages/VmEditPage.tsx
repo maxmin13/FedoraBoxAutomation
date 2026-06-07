@@ -219,10 +219,6 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     ? `${Math.round(info.diskCapacityMB / 1024)} GB (${info.diskType ?? 'dynamic'})`
     : '—'
 
-  const gaValue = info
-    ? info.gaVersion ?? (info.state === 'running' ? 'Not installed' : 'Start VM to check')
-    : ''
-
   return (
     <div className="w-full">
 
@@ -271,20 +267,17 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               <Row label="MAC"       value={info.mac ? formatMac(info.mac) : '—'} />
             </Section>
 
-            <Section title="Guest Additions">
-              <Row label="Version" value={gaValue} />
-            </Section>
-
             <Section
               title="Log sync"
-              action={!info.logSyncPath && (
+              action={
                 <button
                   onClick={() => setView('share-logs')}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                  disabled={info.state !== 'running'}
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Sync
                 </button>
-              )}
+              }
             >
               <Row
                 label="Destination"
@@ -303,7 +296,8 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               action={
                 <button
                   onClick={() => setView('share-folder')}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                  disabled={info.state !== 'running'}
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Share
                 </button>
@@ -492,7 +486,7 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
       {mono && (
         <button
           onClick={handleCopy}
-          className="ml-auto shrink-0 hidden group-hover:flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white text-xs"
+          className="ml-auto shrink-0 flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white text-xs invisible group-hover:visible"
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>

@@ -82,7 +82,6 @@ export interface VmInfo {
   nic: string
   mac: string
   sharedFolders: SharedFolder[]
-  gaVersion: string | null
   logSyncPath: string | null
 }
 
@@ -96,8 +95,9 @@ declare global {
     electronAPI: {
       listVms: () => Promise<{ ok: boolean; vms: Vm[]; error?: string }>
       getVmInfo: (vmName: string) => Promise<{ ok: true; info: VmInfo } | { ok: false; error?: string }>
-      checkVmReady: (vmName: string) => Promise<{ ok: boolean; running: boolean; guestAdditions: boolean; version?: string; error?: string }>
+      checkVmReady: (vmName: string, vmUser?: string, vmPass?: string) => Promise<{ ok: boolean; running: boolean; guestReady: boolean | null; error?: string }>
       checkVmCredentials: (vmName: string, vmUser: string, vmPass: string) => Promise<{ ok: boolean; isLive?: boolean; error?: string }>
+      checkVmUser: (vmName: string, rootUser: string, rootPass: string, vmUser: string) => Promise<{ ok: boolean; error?: string }>
       getVmHostname: (vmName: string, vmUser: string, vmPass: string) => Promise<{ ok: boolean; hostname?: string; error?: string }>
       runShareFolder: (params: ShareFolderParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       getVmGuestLogsPath: (vmName: string) => Promise<{ ok: boolean; path?: string; error?: string }>
@@ -105,6 +105,7 @@ declare global {
       runProvisionScript: (params: ProvisionScriptParams) => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       runProvisionSetup:  (params: ProvisionFullParams)   => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
+      loadAllVmCredentials: () => Promise<{ ok: true; entries: Record<string, { user: string; pass: string; loginUser: string }> }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
       queryVmInstalled: (vmName: string) => Promise<
         | { ok: true; installed: Record<string, boolean | string> }
@@ -121,7 +122,6 @@ declare global {
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>
       readLog: (name: 'gui.log' | 'host.log') => Promise<{ ok: boolean; content?: string; error?: string }>
       openLogDir: (which: 'app' | 'vbox') => Promise<{ ok: boolean; error?: string }>
-      isDev: () => Promise<boolean>
       getDownloadsPath: () => Promise<{ path: string }>
       pickFolder: () => Promise<{ folderPath: string | null }>
       pickIso: () => Promise<{ filePath: string | null }>

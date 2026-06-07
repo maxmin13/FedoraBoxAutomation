@@ -40,8 +40,14 @@ if (-not $script:vbox) {
 }
 
 if ([string]::IsNullOrWhiteSpace($VmName))       { $VmName        = (Read-Host "VM name").Trim() }
-if ([string]::IsNullOrWhiteSpace($VmUser))        { $VmUser        = (Read-Host "VM root username").Trim() }
-if ([string]::IsNullOrWhiteSpace($VmPass))        { $VmPass        = (Read-Host "VM root password") }
+if ([string]::IsNullOrWhiteSpace($VmUser)) {
+    if ($NonInteractive) { Write-Host "ERROR: VM root username is required."; exit 1 }
+    $VmUser = (Read-Host "VM root username").Trim()
+}
+if ([string]::IsNullOrWhiteSpace($VmPass)) {
+    if ($NonInteractive) { Write-Host "ERROR: VM root password is required."; exit 1 }
+    $VmPass = (Read-Host "VM root password")
+}
 if ([string]::IsNullOrWhiteSpace($ScriptRelPath)) { $ScriptRelPath = (Read-Host "Script relative path (e.g. setup/guest-additions.sh)").Trim() }
 
 $script:vmName = $VmName

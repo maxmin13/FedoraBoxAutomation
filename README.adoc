@@ -159,7 +159,7 @@ The desktop app is built with Electron + React and runs at a fixed 1100×750 win
 | Views the last 500 lines of `gui.log` (IPC calls) and `host.log` (PowerShell transcript); auto-scrolls to newest entry; folder shortcuts open log directories in Explorer
 
 | *Docs*
-| Renders the project markdown docs inside the app (dev mode only)
+| Renders the project markdown docs inside the app
 |===
 
 NOTE: My VMs, Setup, Create VM, and Console stay mounted in the background so their state survives navigation. Only Docs is unmounted when inactive.

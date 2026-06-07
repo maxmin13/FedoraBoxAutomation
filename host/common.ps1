@@ -135,7 +135,10 @@ function Get-VBoxErrMsg {
         return 'VM is not running - start it before running guest scripts'
     }
     if ($text -match 'execution service is not ready|not installed or not ready') {
-        return 'Guest Additions are not ready - start the VM, wait 30 seconds, then try again'
+        return 'Guest Additions may not be installed or not yet started'
+    }
+    if ($text -match 'VERR_TIMEOUT|timed out') {
+        return 'Guest Additions may not be installed or not yet started'
     }
     if ($text -match 'VERR_DUPLICATE') {
         return 'A previous guest session is still active - wait a few seconds and try again'
@@ -178,14 +181,23 @@ function Invoke-GuestScript {
     $fileName  = [System.IO.Path]::GetFileName($LocalPath)
     $guestPath = "/tmp/$fileName"
 
-    # Upload
+    # Upload (retry up to 3 times - previous guest session may not have released yet)
     Write-Host "  Uploading $fileName ..."
     $uploadArgs = @('guestcontrol', $script:vmName, 'copyto', $LocalPath, $guestPath,
                     '--username', $script:vmUser, '--password', $script:vmPass)
-    $ErrorActionPreference = 'SilentlyContinue'
-    $r          = & $script:vbox @uploadArgs 2>&1
-    $uploadCode = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop'
+    $uploadCode = 1
+    $r          = $null
+    foreach ($attempt in 1..3) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $r          = & $script:vbox @uploadArgs 2>&1
+        $uploadCode = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($uploadCode -eq 0) { break }
+        if ($attempt -lt 3) {
+            Write-Host "  Uploading $fileName failed (attempt $attempt/3), retrying in 3s..."
+            Start-Sleep -Seconds 3
+        }
+    }
     if ($uploadCode -ne 0) {
         Write-Host "  Uploading $fileName FAILED"
         Write-Host "ERROR: $(Get-VBoxErrMsg $r)"

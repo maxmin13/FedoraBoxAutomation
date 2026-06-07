@@ -34,8 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createVm: (params) => ipcRenderer.invoke('create-vm', params),
 
   // ── Shared folder ─────────────────────────────────────────
-  // Checks whether a VM is running and has Guest Additions installed
-  checkVmReady: (vmName) => ipcRenderer.invoke('check-vm-ready', vmName),
+  // Checks whether a VM is running; if credentials are supplied, also pings guestcontrol
+  checkVmReady: (vmName, vmUser, vmPass) => ipcRenderer.invoke('check-vm-ready', vmName, vmUser, vmPass),
 
   // Runs share-folder.ps1 and streams output to the renderer
   runShareFolder: (params) => ipcRenderer.invoke('run-share-folder', params),
@@ -49,12 +49,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reads saved credentials for a VM
   loadVmCredentials: (vmName) => ipcRenderer.invoke('load-vm-credentials', vmName),
 
+  // Reads all saved VM credentials from vm-state.json in one call
+  loadAllVmCredentials: () => ipcRenderer.invoke('load-all-vm-credentials'),
+
   saveVmCredentials: (vmName, user, pass, loginUser) =>
     ipcRenderer.invoke('save-vm-credentials', { vmName, user, pass, loginUser }),
 
   // Tests whether guestcontrol credentials are valid for a running VM with Guest Additions
   checkVmCredentials: (vmName, vmUser, vmPass) =>
     ipcRenderer.invoke('check-vm-credentials', { vmName, vmUser, vmPass }),
+
+  // Verifies that a login username exists inside the guest (runs `id <vmUser>` as root)
+  checkVmUser: (vmName, rootUser, rootPass, vmUser) =>
+    ipcRenderer.invoke('check-vm-user', { vmName, rootUser, rootPass, vmUser }),
 
   // Reads the current hostname from inside the guest via guestcontrol
   getVmHostname: (vmName, vmUser, vmPass) =>
@@ -99,10 +106,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Error logging ─────────────────────────────────────────
   // Forwards uncaught renderer errors (from the React error boundary) to the main process log
   logError: (message, stack) => ipcRenderer.invoke('log-error', message, stack),
-
-  // ── Environment ───────────────────────────────────────────
-  // True when running via `npm run dev`, false in a packaged build
-  isDev: () => ipcRenderer.invoke('is-dev'),
 
   // Returns the OS downloads folder path (e.g. C:\Users\you\Downloads)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),

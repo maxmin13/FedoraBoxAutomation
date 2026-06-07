@@ -523,29 +523,35 @@ describe('check-vm-ready handler', () => {
     cleanupHandlers()
   })
 
-  it('returns running: false when VM is stopped', async () => {
+  it('returns running: false and guestReady: false when VM is stopped', async () => {
     mockExecSync.mockReturnValueOnce('VMState="poweroff"\n')
     const result = await checkVmReadyHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, running: false, guestAdditions: false })
+    expect(result).toEqual({ ok: true, running: false, guestReady: false })
   })
 
-  it('returns running: true and guestAdditions: true when GA version is present', async () => {
-    mockExecSync
-      .mockReturnValueOnce('VMState="running"\n')           // showvminfo
-      .mockReturnValueOnce('Value: 7.0.14\n')              // guestproperty
+  it('returns guestReady: null when VM is running but no credentials supplied', async () => {
+    mockExecSync.mockReturnValueOnce('VMState="running"\n')
     const result = await checkVmReadyHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, running: true, guestAdditions: true, version: '7.0.14' })
+    expect(result).toEqual({ ok: true, running: true, guestReady: null })
   })
 
-  it('returns running: true and guestAdditions: false when GA property is absent', async () => {
+  it('returns guestReady: true when guestcontrol ping succeeds', async () => {
+    mockExecSync
+      .mockReturnValueOnce('VMState="running"\n')  // showvminfo
+      .mockReturnValueOnce('ok\n')                  // guestcontrol echo
+    const result = await checkVmReadyHandler({}, 'FedoraBox', 'root', 'secret')
+    expect(result).toEqual({ ok: true, running: true, guestReady: true })
+  })
+
+  it('returns guestReady: false when guestcontrol ping fails', async () => {
     mockExecSync
       .mockReturnValueOnce('VMState="running"\n')
-      .mockImplementationOnce(() => { throw new Error('No value set') })
-    const result = await checkVmReadyHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, running: true, guestAdditions: false })
+      .mockImplementationOnce(() => { throw new Error('guestcontrol failed') })
+    const result = await checkVmReadyHandler({}, 'FedoraBox', 'root', 'secret')
+    expect(result).toEqual({ ok: true, running: true, guestReady: false })
   })
 
-  it('returns ok: false when VBoxManage throws', async () => {
+  it('returns ok: false when showvminfo throws', async () => {
     mockExecSync.mockImplementationOnce(() => { throw new Error('VBoxManage not found') })
     const result = await checkVmReadyHandler({}, 'FedoraBox')
     expect(result.ok).toBe(false)
@@ -1084,14 +1090,13 @@ describe('get-vm-info handler', () => {
     expect(result.info.mac).toBe('080027AABBCC')
   })
 
-  it('derives logSyncPath from the CfgFile directory', async () => {
+  it('returns logSyncPath as null when the guest-logs share is not registered', async () => {
     mockExecSync
       .mockReturnValueOnce(MR_STOPPED)
       .mockReturnValueOnce('')
       .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
     const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.info.logSyncPath).toMatch(/FedoraBox/)
-    expect(result.info.logSyncPath).toMatch(/guest-logs/)
+    expect(result.info.logSyncPath).toBeNull()
   })
 
   it('returns diskCapacityMB and diskType from showmediuminfo', async () => {
@@ -1125,27 +1130,6 @@ describe('get-vm-info handler', () => {
       hostPath:   'C:\\Work\\shared',
       mountPoint: '/mnt/shared',
     })
-  })
-
-  it('returns gaVersion from guestproperty when VM is running', async () => {
-    mockExecSync
-      .mockReturnValueOnce(MR_RUNNING)
-      .mockReturnValueOnce('')
-      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
-      .mockReturnValueOnce('Value: 7.0.14\n')  // guestproperty
-    const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.info.gaVersion).toBe('7.0.14')
-  })
-
-  it('returns gaVersion: null when VM is stopped (skips guestproperty call)', async () => {
-    mockExecSync
-      .mockReturnValueOnce(MR_STOPPED)
-      .mockReturnValueOnce('')
-      .mockReturnValueOnce(MEDIUM_INFO_DYNAMIC)
-    const result = await getVmInfoHandler({}, 'FedoraBox')
-    expect(result.info.gaVersion).toBeNull()
-    const cmdsCalled = mockExecSync.mock.calls.map(([cmd]) => cmd)
-    expect(cmdsCalled.some(c => c.includes('guestproperty'))).toBe(false)
   })
 
   it('filters the log-sync share (guest-logs) out of sharedFolders', async () => {
@@ -1503,38 +1487,6 @@ describe('run-provision-setup handler', () => {
     const idx = psArgs.indexOf('-Hostname')
     expect(idx).toBeGreaterThan(-1)
     expect(psArgs[idx + 1]).toBe('myhost')
-  })
-})
-
-// ── is-dev handler ────────────────────────────────────────────────────────────
-
-describe('is-dev handler', () => {
-  let isDevHandler
-
-  beforeAll(() => {
-    isDevHandler = loadHandlers()('is-dev')
-  })
-
-  afterAll(() => cleanupHandlers())
-
-  it('returns true when NODE_ENV is not "production"', async () => {
-    const original = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
-    try {
-      expect(await isDevHandler({})).toBe(true)
-    } finally {
-      process.env.NODE_ENV = original
-    }
-  })
-
-  it('returns false when NODE_ENV is "production"', async () => {
-    const original = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
-    try {
-      expect(await isDevHandler({})).toBe(false)
-    } finally {
-      process.env.NODE_ENV = original
-    }
   })
 })
 

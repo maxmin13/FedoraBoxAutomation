@@ -139,9 +139,9 @@ In dev mode (`npm run dev`), Vite serves the renderer at `http://localhost:5173`
 | 3 | **VM detail** | `host/provision-script.ps1`, `host/provision-setup.ps1` | Detail view shows VM info, installed tools, and shared folders; buttons navigate to sub-pages: **Provision** (Base Setup / By Category script list, run controls, success/failure/already-installed/forceConfirm banners; credentials loaded from store), **Share Folder**, **Share Logs** |
 | 4 | **Create VM** | `host/create-vm.ps1` | 4-step wizard (Identity → Hardware → Options → Confirm); ISO field opens a native file picker (shows filename only); streams live output; wizard state persists when navigating away and back |
 | 5 | **Console** | none | Sidebar to switch between `gui.log` and `host.log`; shows last 500 lines; auto-scrolls to newest entry; Refresh button; "Open folder" buttons to open the app log folder and the VirtualBox VMs folder in Explorer |
-| 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown (dev mode only) |
+| 6 | **Docs** | none | Sidebar of markdown files rendered with react-markdown |
 
-A top navigation bar shows which page is active. The Docs tab is hidden in production builds.
+A top navigation bar shows which page is active.
 
 **State persistence:** `LandingPage`, `SetupPage`, `CreateVmPage`, and `LogsPage` are kept always-mounted and hidden with `display: none` (via wrapping `<div>`s in `App.tsx`) so their React state — VM grid, analysis results, wizard step, log content — survives navigation. Only `DocsPage` is unmounted when inactive.
 
@@ -521,17 +521,16 @@ const SCRIPTS = {
 module.exports = SCRIPTS
 ```
 
-### Log every IPC message (always, not just dev)
+### Log every IPC message unconditionally
 
 A `handleIpc` wrapper logs every IPC call and reply to `gui.log` unconditionally,
-and also mirrors to the VS Code Debug Console in dev mode. This makes the data
-flow visible without needing a breakpoint:
+making the data flow visible without needing a breakpoint:
 
 ```js
 // Channels excluded from logging.
-// 'is-dev' is polled on every page load; 'read-log' returns full file content —
-// logging it back to gui.log would create a feedback loop.
-const SILENT_CHANNELS = new Set(['is-dev', 'read-log'])
+// 'read-log' returns full file content — logging it back to gui.log would create a feedback loop.
+// Credential channels are excluded to keep passwords out of gui.log.
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname'])
 
 // Wraps ipcMain.handle to log every call and reply to gui.log.
 // util.inspect is used instead of JSON.stringify so Windows paths with
@@ -557,7 +556,7 @@ Two log files are written to `%APPDATA%\FedoraBoxAutomation\logs\`:
 | `gui.log` | `logger.js` | Every IPC call (`[ipc] recv` / `[ipc] reply`) and main-process errors |
 | `host.log` | `logger.js` | Tagged output from all three script tiers (see below) |
 
-In dev mode `gui.log` entries also appear in the VS Code Debug Console. `logger.js` handles both destinations.
+`logger.js` writes all entries to `gui.log`.
 
 #### host.log line tags
 
@@ -569,22 +568,6 @@ In dev mode `gui.log` entries also appear in the VS Code Debug Console. `logger.
 | `[ERR]` | PowerShell / script stderr |
 
 Because VBoxManage buffers guest stdout until the script exits, `[SH ]` lines appear in a batch after each guest script finishes rather than in real time.
-
-### Separate dev and prod behaviour with an isDev flag
-
-Things that help during development (logs, DevTools) should never appear
-in a packaged release. One flag at the top of main.js controls everything:
-
-```js
-// isDev is true in `npm run dev` and false in `npm start` (NODE_ENV=production).
-// All development-only behaviour is gated behind this flag.
-const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged
-
-if (isDev) {
-  // Opens the browser DevTools panel so you can inspect the React renderer
-  win.webContents.openDevTools()
-}
-```
 
 ### Split into small focused files
 

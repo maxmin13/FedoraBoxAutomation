@@ -22,12 +22,9 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
   const [error,      setError]      = useState<string | null>(null)
   const [showLog,    setShowLog]    = useState(false)
 
-  type VmReadyState = { running: boolean; guestAdditions: boolean; version?: string }
-  const [vmReady, setVmReady] = useState<VmReadyState | null>(null)
-
   useEffect(() => {
     onScriptRunning(pageState === 'running')
-  }, [pageState])
+  }, [pageState, onScriptRunning])
 
   useEffect(() => {
     window.electronAPI.getVmGuestLogsPath(vm.name).then((result) => {
@@ -38,11 +35,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
         if (saved.user)      setVmUser(saved.user)
         if (saved.pass)      setVmPass(saved.pass)
         if (saved.loginUser) setLoginUser(saved.loginUser)
-      }
-    })
-    window.electronAPI.checkVmReady(vm.name).then((result) => {
-      if (result.ok) {
-        setVmReady({ running: result.running, guestAdditions: result.guestAdditions, version: result.version })
       }
     })
   }, [vm.name])
@@ -88,7 +80,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     'focus:outline-none focus:border-blue-500 ' +
     (value ? 'border-zinc-400' : 'border-zinc-600')
 
-  const canRun = pageState === 'idle' && !!hostPath && !!vmUser && !!vmPass && !!loginUser
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -173,8 +164,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           every 30 seconds via a VirtualBox shared folder and rsync.
         </p>
 
-        <VmReadyBanner vmReady={vmReady} />
-
         <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded text-xs text-zinc-400">
           <span className="mt-0.5">&#9432;</span>
           <span>
@@ -232,56 +221,12 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
 
         <button
           onClick={handleRun}
-          disabled={!canRun}
-          className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
         >
           Set up log sync
         </button>
-
-        {!canRun && (
-          <p className="text-zinc-500 text-xs mt-2">Fill in all fields above to continue.</p>
-        )}
       </div>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-interface VmReadyBannerProps {
-  vmReady: { running: boolean; guestAdditions: boolean; version?: string } | null
-}
-
-function VmReadyBanner({ vmReady }: VmReadyBannerProps) {
-  if (!vmReady) return null
-
-  if (!vmReady.running) {
-    return (
-      <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-amber-950 border border-amber-700 rounded text-xs text-amber-300">
-        <span className="mt-0.5">&#9888;</span>
-        <span>
-          VM is not running — Guest Additions status cannot be verified.
-          Start the VM first to confirm they are installed.
-        </span>
-      </div>
-    )
-  }
-
-  if (!vmReady.guestAdditions) {
-    return (
-      <div className="flex items-start gap-2 mb-4 px-3 py-2 bg-red-950 border border-red-700 rounded text-xs text-red-300">
-        <span className="mt-0.5">&#10007;</span>
-        <span>
-          Guest Additions not detected. Install them inside the VM before setting up log sync.
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-green-950 border border-green-800 rounded text-xs text-green-300">
-      <span>&#10003;</span>
-      <span>VM running · Guest Additions {vmReady.version}</span>
-    </div>
-  )
-}
