@@ -39,11 +39,11 @@ image::docs/screenshots/my-vms-page.png[My VMs page, width=500]
 Lists every registered VirtualBox VM with its running state and Start / Stop / Delete buttons. The Detail and Provision buttons open a credential gate before entering the VM.
 
 .VM Login — credential gate
-image::docs/screenshots/login-gate.png[VM Login gate, width=500]
+image::docs/screenshots/login-gate-page.png[VM Login gate, width=500]
 Collects root username, root password, and desktop username. Validates credentials via Guest Control before proceeding; credentials are saved to the store on success.
 
 .Create VM — 4-step wizard
-image::docs/screenshots/create-vm-wizard.png[Create VM wizard, width=500]
+image::docs/screenshots/create-vm-wizard-page.png[Create VM wizard, width=500]
 Step through name, hardware, and ISO selection. A native file picker limits choices to `.iso` files and shows only the filename once selected.
 
 .Shared folder — mount configuration
@@ -51,23 +51,23 @@ image::docs/screenshots/share-folder-page.png[Share folder page, width=500]
 Enter the host path and the mount point inside the VM. Credentials are loaded automatically from the saved store.
 
 .Log sync — export VM logs to the host
-image::docs/screenshots/share-logs.png[Share logs page, width=500]
+image::docs/screenshots/share-logs-page.png[Share logs page, width=500]
 Syncs `/var/log` from the VM to a host folder every 30 seconds via a VirtualBox shared folder and rsync. The destination path is pre-filled from the VM folder location.
 
 .Provision — entry point (Base Setup / By Category)
-image::docs/screenshots/provision-landing.png[Provision landing, width=500]
+image::docs/screenshots/provision-landing-page.png[Provision landing, width=500]
 Choose Base Setup for a full OS configuration or browse tools individually by category. Credentials are loaded automatically from the saved credential store.
 
 .Provision — Base Setup detail with hostname option
-image::docs/screenshots/provision-base-setup.png[Provision base setup, width=500]
+image::docs/screenshots/provision-base-setup-page.png[Provision base setup, width=500]
 Runs system-prep, networking, SELinux, desktop, and utilities in sequence. An optional hostname field renames the VM before the run starts.
 
 .Provision — By Category grid (14 categories)
-image::docs/screenshots/provision-by-category.png[Provision by category, width=500]
+image::docs/screenshots/provision-by-category-page.png[Provision by category, width=500]
 Tool categories shown as cards. Click any card to see the individual scripts available for that category.
 
 .Provision — category drill-down (Databases example)
-image::docs/screenshots/provision-detail.png[Provision detail, width=500]
+image::docs/screenshots/provision-detail-page.png[Provision detail, width=500]
 Each tool in the category has its own Run button. Script output streams line by line into the panel with success, failure, and already-installed banners.
 
 == Requirements
