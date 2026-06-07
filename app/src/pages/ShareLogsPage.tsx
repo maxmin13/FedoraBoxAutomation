@@ -187,36 +187,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
               }}
             />
           </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">VM root username</label>
-            <input
-              type="text"
-              value={vmUser}
-              onChange={(e) => setVmUser(e.target.value)}
-              placeholder="root"
-              className={inputClass(vmUser)}
-            />
-          </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">VM root password</label>
-            <input
-              type="password"
-              value={vmPass}
-              onChange={(e) => setVmPass(e.target.value)}
-              placeholder="••••••••"
-              className={inputClass(vmPass)}
-            />
-          </div>
-          <div>
-            <label className="block text-zinc-400 text-xs mb-1">Desktop username (added to vboxsf)</label>
-            <input
-              type="text"
-              value={loginUser}
-              onChange={(e) => setLoginUser(e.target.value)}
-              placeholder="your desktop username"
-              className={inputClass(loginUser)}
-            />
-          </div>
         </div>
 
         <button

@@ -59,6 +59,21 @@ describe('idle form', () => {
     })
   })
 
+  it('passes saved credentials to runShareLogs', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'mypass', loginUser: 'alice',
+    })
+    wireRun(0)
+    await renderAndFlush()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runShareLogs).toHaveBeenCalledWith(
+        expect.objectContaining({ vmUser: 'root', vmPass: 'mypass', loginUser: 'alice' })
+      )
+    )
+  })
+
   it('the run button is enabled even when credentials are missing', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
     await renderAndFlush()
