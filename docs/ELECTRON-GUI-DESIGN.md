@@ -68,7 +68,6 @@ app/
       ProvisionPage.test.tsx
       ShareFolderPage.test.tsx
       ShareLogsPage.test.tsx
-      VmLoginPage.test.tsx       <- (if added)
       setup.ts                   <- loads @testing-library/jest-dom matchers
   __mocks__/
     electron.js                  <- stub used by React tests (ipcMain.handle, app.getPath)
@@ -80,7 +79,7 @@ app/
   tsconfig.json
 ```
 
-- **Main process** (`main.js`): Node.js running inside Electron. Uses `child_process.spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', script])` to run each `.ps1`. Streams `stdout`/`stderr` line-by-line over IPC to the renderer.
+- **Main process** (`main.js`): Node.js running inside Electron. Window creation and close-warning logic lives here; script execution is delegated to `script-runner.js`, which uses `child_process.spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', script])` and streams `stdout`/`stderr` line-by-line over IPC to the renderer.
 - **Renderer**: React + TypeScript, bundled by Vite. Each pipeline step is a page component managed by React state.
 - **Security boundary** (`preload.js`): Runs in a privileged context before the renderer loads. Uses Electron's `contextBridge` to expose a safe, explicit `window.electronAPI` object to React. The renderer can only call the methods listed in `preload.js` — it has no direct access to Node.js or Electron APIs.
 - **IPC channels** (request/response via `ipcMain.handle` / `ipcRenderer.invoke`):
@@ -98,9 +97,9 @@ app/
   - `read-log` — reads the last 500 lines of `gui.log` or `host.log` from `%APPDATA%\FedoraBoxAutomation\logs\`; returns `{ ok, content }`; excluded from IPC logging to prevent a feedback loop
   - `open-log-dir` — opens a log folder in the native file explorer; `'app'` opens `%APPDATA%\FedoraBoxAutomation\logs\`; `'vbox'` opens `%USERPROFILE%\VirtualBox VMs`; uses `shell.openPath()`
   - `log-error` — receives a renderer crash message + stack from `ErrorBoundary` and writes it to `gui.log`
-  - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are installed; returns `{ ok, running, guestAdditions, version? }`
+  - `check-vm-ready` — checks whether a named VM is running and whether Guest Additions are responsive; returns `{ ok, running, guestReady }`
   - `check-vm-credentials` — tests guestcontrol credentials by running a no-op echo inside the guest; also detects live-ISO boot by checking for `/run/initramfs/live`; returns `{ ok, isLive? }` or `{ ok: false, error }` — excluded from IPC logging (contains passwords)
-  - `check-vm-user` — verifies that a given desktop username exists inside the guest by running `id <user>` via guestcontrol; returns `{ ok: true }` or `{ ok: false, error }` — excluded from IPC logging (contains passwords)
+  - `check-vm-user` — verifies that a given desktop username exists inside the guest by running `id <user>` via guestcontrol; returns `{ ok: true }` or `{ ok: false, error }`; uses custom manual `log.info` calls that omit the password rather than relying on the standard `handleIpc` wrapper logging
   - `load-vm-credentials` — reads credentials for a named VM from `.credentials/credentials.json`; returns `{ ok, user, pass, loginUser }` (with optional `warning` when fields are missing) or `{ ok: false, reason }` if no entry exists
   - `load-all-vm-credentials` — returns every entry in `.credentials/credentials.json` as a map keyed by VM name; used to populate dropdowns without individual `load-vm-credentials` calls
   - `save-vm-credentials` — writes credentials for a named VM to `.credentials/credentials.json`; merges with existing entries; returns `{ ok }`
@@ -337,14 +336,14 @@ easy to read and learn, no separate CSS files to maintain.
 | State | Background | Border | Text |
 |-------|-----------|--------|------|
 | Pass | `green-900` | `green-500` | `green-300` |
-| Warn | `yellow-900` | `yellow-500` | `yellow-300` |
+| Warn | `yellow-900` | `yellow-700` | `yellow-300` |
 | Fail | `red-900` | `red-500` | `red-300` |
 | Neutral | `zinc-800` | `zinc-600` | `zinc-100` |
 | App background | `zinc-900` | — | — |
 
 ### Layout
 
-- Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Console, Docs); Docs is hidden in production; active tab highlighted
+- Fixed top navigation bar with 5 tabs (My VMs, Setup, Create VM, Console, Docs); active tab highlighted
 - Main content area: SetupPage and CreateVmPage fill the viewport with `h-full` and manage their own internal layout (no outer scroll); other pages scroll through the main area as needed
 - SetupPage uses a left/right split — left panel is a fixed-width check list, right panel fills remaining width with detail + fix content; both panels use `overflow-hidden` so no scrollbars appear at the fixed 1100×750 window size
 
