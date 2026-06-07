@@ -7,7 +7,6 @@ const VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 beforeEach(() => {
   window.electronAPI = {
     loadVmCredentials:  vi.fn().mockResolvedValue({ ok: false }),
-    checkVmReady:       vi.fn().mockResolvedValue({ ok: true, running: true, guestReady: true }),
     saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     runProvisionScript: vi.fn().mockResolvedValue({ ok: true }),
     runProvisionSetup:  vi.fn().mockResolvedValue({ ok: true }),
@@ -125,53 +124,24 @@ describe('auto-load credentials', () => {
     expect(screen.getByRole('button', { name: /By Category/ })).toBeInTheDocument()
   })
 
-  it('loginUser from saved credentials pre-fills the Desktop username input', async () => {
+  it('loginUser from saved credentials is passed as scriptArgs to provision scripts', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
       ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
     })
+    wireRun(0)
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: /By Category/ }))
     await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Languages'))
     await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
     fireEvent.click(screen.getByText('Java JDK'))
-    await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
-  })
-})
-
-// ── VM ready banner ───────────────────────────────────────────────────────────
-
-describe('VM ready banner', () => {
-  it('shows a green "VM is ready" banner when guestcontrol ping succeeds', async () => {
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText('VM is ready')).toBeInTheDocument()
-    })
-  })
-
-  it('shows a green "VM is running" banner when no credentials are available to ping', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: true, guestReady: null })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText('VM is running')).toBeInTheDocument()
-    })
-  })
-
-  it('shows an amber "may not be ready" banner when guestcontrol ping fails', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: true, guestReady: false })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/may not be ready/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows an amber "VM is not running" banner when VM is stopped', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false })
-    await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByText(/VM is not running/i)).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Java JDK' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runProvisionScript).toHaveBeenCalledWith(
+        expect.objectContaining({ scriptArgs: 'fedora' })
+      )
+    )
   })
 })
 
@@ -182,13 +152,6 @@ describe('mode buttons', () => {
     await renderAndFlush()
     expect(screen.getByRole('button', { name: /Base Setup/ })).not.toBeDisabled()
     expect(screen.getByRole('button', { name: /By Category/ })).not.toBeDisabled()
-  })
-
-  it('disables both mode buttons when the VM is not running', async () => {
-    window.electronAPI.checkVmReady = vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false })
-    await renderAndFlush()
-    expect(screen.getByRole('button', { name: /Base Setup/ })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /By Category/ })).toBeDisabled()
   })
 
   it('clicking "Base Setup" navigates to the Base Setup form', async () => {
@@ -211,42 +174,33 @@ describe('mode buttons', () => {
 // ── Run Base Setup ────────────────────────────────────────────────────────────
 
 describe('Run Base Setup', () => {
-  it('"Run Base Setup" button is always enabled regardless of loginUser', async () => {
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
+  it('"Run Base Setup" button is always enabled', async () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: /Base Setup/ }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run Base Setup' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Run Base Setup' })).not.toBeDisabled()
   })
 
-  it('shows a "Desktop username" input in the Base Setup form', async () => {
-    await navigateToBaseSetup()
-    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
-  })
-
-  it('pre-fills Desktop username from saved credentials in the Base Setup form', async () => {
-    await navigateToBaseSetup()
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
+  it('loginUser from credentials is passed to runProvisionSetup', async () => {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
     })
-  })
-
-  it('Desktop username input is empty when no credentials are saved', async () => {
+    wireSetupRun(0)
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: /Base Setup/ }))
-    await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Base Setup' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Run Base Setup' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runProvisionSetup).toHaveBeenCalledWith(
+        expect.objectContaining({ loginUser: 'fedora' })
+      )
+    )
   })
 })
 
 // ── script-args form ──────────────────────────────────────────────────────────
 
 describe('script-args form', () => {
-  it('shows "Desktop username" input for a user-type script', async () => {
-    await navigateToJavaReady()
-    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
-  })
-
   it('"Run Java JDK" button is always enabled', async () => {
     await navigateToJavaReady()
     expect(screen.getByRole('button', { name: 'Run Java JDK' })).not.toBeDisabled()
@@ -304,29 +258,6 @@ describe('"Run another" behaviour', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
   }
-
-  it('after a failed run, clicking "Run another" clears the Desktop username when no credentials are saved', async () => {
-    await runToDone(1)
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
-    await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Java JDK'))
-    await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
-  })
-
-  it('after a successful run, "Run another" keeps the loginUser value', async () => {
-    await runToDone(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Run another' }))
-    await waitFor(() => expect(screen.getByText('Languages')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Languages'))
-    await waitFor(() => expect(screen.getByText('Java JDK')).toBeInTheDocument())
-    fireEvent.click(screen.getByText('Java JDK'))
-    await waitFor(() => expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument())
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('fedora')
-  })
 
   it('clicking "Run another" then Back returns to the mode view', async () => {
     await runToDone(0)
@@ -447,6 +378,22 @@ describe('done state banners', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Run another' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /My VMs/i })).toBeInTheDocument()
+  })
+
+  it('shows "Try again" button only after a failed run', async () => {
+    await navigateToJavaReady()
+    wireRun(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK failed.')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
+
+  it('does not show "Try again" button after a successful run', async () => {
+    await navigateToJavaReady()
+    wireRun(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Run Java JDK' }))
+    await waitFor(() => expect(screen.getByText('Java JDK completed successfully.')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument()
   })
 })
 
@@ -574,11 +521,6 @@ describe('AI Tools category — Claude Code', () => {
     await waitFor(() => expect(screen.getByText('AI Tools')).toBeInTheDocument())
     fireEvent.click(screen.getByText('AI Tools'))
     await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument())
-  })
-
-  it('clicking "Claude Code" shows the script-args form with a "Desktop username" input', async () => {
-    await navigateToClaudeCode()
-    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
   })
 
   it('"Run Claude Code" button is always enabled', async () => {

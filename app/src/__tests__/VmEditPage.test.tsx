@@ -314,16 +314,16 @@ describe('VmEditPage — navigation', () => {
 // ── VM not-running banner and disabled buttons ────────────────────────────────
 
 describe('VmEditPage — VM not running', () => {
-  it('shows the amber "VM is not running" banner when VM is stopped', async () => {
-    await renderAndWait()
-    expect(screen.getByText('VM is not running. Start the VM first.')).toBeInTheDocument()
+  it('shows the "Stopped" badge when vm.running is false', async () => {
+    const stoppedVm = { name: 'FedoraBox', uuid: 'uuid-1', running: false }
+    render(<VmEditPage vm={stoppedVm} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await waitFor(() => expect(screen.queryByText('Loading VM info...')).not.toBeInTheDocument())
+    expect(screen.getByText('Stopped')).toBeInTheDocument()
   })
 
-  it('does not show the not-running banner when VM is running', async () => {
-    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
-    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
+  it('shows the "Running" badge when vm.running is true', async () => {
     await renderAndWait()
-    expect(screen.queryByText('VM is not running. Start the VM first.')).not.toBeInTheDocument()
+    expect(screen.getByText('Running')).toBeInTheDocument()
   })
 
   it('disables the Sync button when VM is stopped', async () => {
@@ -377,7 +377,7 @@ describe('VmEditPage — Installed tools section', () => {
     })
     render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Base Setup')).toBeInTheDocument())
-    expect(screen.getByText('Java JDK')).toBeInTheDocument()
+    expect(screen.getByText('Java')).toBeInTheDocument()
     expect(screen.getByText('(21.0.3)')).toBeInTheDocument()
     expect(screen.getByText('Docker CE')).toBeInTheDocument()
     expect(screen.queryByText('PHP')).not.toBeInTheDocument()

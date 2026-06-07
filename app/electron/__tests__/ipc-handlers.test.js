@@ -334,13 +334,13 @@ describe('load-vm-credentials handler', () => {
   it('returns ok: false for an unknown VM', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
     const result = await loadCredsHandler({}, 'NonExistent')
-    expect(result).toEqual({ ok: false })
+    expect(result.ok).toBe(false)
   })
 
   it('returns ok: false when the credentials file does not exist', async () => {
     mockReadFile.mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: false })
+    expect(result.ok).toBe(false)
   })
 
   it('strips the UTF-8 BOM that PowerShell 5.1 writes', async () => {
@@ -351,10 +351,11 @@ describe('load-vm-credentials handler', () => {
     expect(result.user).toBe('root')
   })
 
-  it('returns empty strings for missing optional credential fields', async () => {
+  it('returns empty strings for missing optional credential fields and includes a warning', async () => {
     mockReadFile.mockResolvedValueOnce(JSON.stringify({ FedoraBox: {} }))
     const result = await loadCredsHandler({}, 'FedoraBox')
-    expect(result).toEqual({ ok: true, user: '', pass: '', loginUser: '' })
+    expect(result).toMatchObject({ ok: true, user: '', pass: '', loginUser: '' })
+    expect(result.warning).toMatch(/missing fields/)
   })
 })
 

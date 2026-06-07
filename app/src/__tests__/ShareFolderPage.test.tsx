@@ -20,13 +20,10 @@ async function renderAndFlush() {
   await act(async () => {})
 }
 
-async function fillAllFields() {
+async function fillForm() {
   fireEvent.click(screen.getByPlaceholderText(/C:\\Users\\you\\shared/i))
   await act(async () => {})
   fireEvent.change(screen.getByPlaceholderText('/mnt/shared'), { target: { value: '/mnt/shared' } })
-  fireEvent.change(screen.getByPlaceholderText('root'),         { target: { value: 'root' } })
-  fireEvent.change(screen.getByPlaceholderText('••••••••'),     { target: { value: 'password' } })
-  fireEvent.change(screen.getByPlaceholderText('your desktop username'), { target: { value: 'fedora' } })
 }
 
 // Simulate a full run by wiring onScriptDone to fire immediately with the given exitCode.
@@ -42,13 +39,10 @@ function wireRun(exitCode: number, errorDetail?: string) {
 // ── Idle form ────────────────────────────────────────────────────────────────
 
 describe('idle form', () => {
-  it('renders all five input fields', async () => {
+  it('renders host path and mount point fields', async () => {
     await renderAndFlush()
     expect(screen.getByPlaceholderText(/C:\\Users\\you\\shared/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText('/mnt/shared')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('root')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('your desktop username')).toBeInTheDocument()
   })
 
   it('the run button is always enabled', async () => {
@@ -77,22 +71,19 @@ describe('credential pre-fill', () => {
     expect(window.electronAPI.loadVmCredentials).toHaveBeenCalledWith('FedoraBox')
   })
 
-  it('pre-fills fields when saved credentials exist', async () => {
+  it('passes saved credentials to runShareFolder', async () => {
     window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
       ok: true, user: 'root', pass: 'mypass', loginUser: 'alice',
     })
+    wireRun(0)
     await renderAndFlush()
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('root')).toHaveValue('root')
-    })
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('alice')
-  })
-
-  it('leaves fields empty when no saved credentials exist', async () => {
-    await renderAndFlush()
-    await act(async () => {})
-    expect(screen.getByPlaceholderText('root')).toHaveValue('')
-    expect(screen.getByPlaceholderText('your desktop username')).toHaveValue('')
+    await fillForm()
+    fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await waitFor(() =>
+      expect(window.electronAPI.runShareFolder).toHaveBeenCalledWith(
+        expect.objectContaining({ vmUser: 'root', vmPass: 'mypass', loginUser: 'alice' })
+      )
+    )
   })
 })
 
@@ -102,7 +93,7 @@ describe('running state', () => {
   it('shows the progress indicator while the script is running', async () => {
     window.electronAPI.runShareFolder = vi.fn().mockReturnValue(new Promise(() => {}))
     await renderAndFlush()
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await waitFor(() => {
       expect(screen.getByText('Setting up shared folder...')).toBeInTheDocument()
@@ -112,7 +103,7 @@ describe('running state', () => {
   it('hides the idle form while running', async () => {
     window.electronAPI.runShareFolder = vi.fn().mockReturnValue(new Promise(() => {}))
     await renderAndFlush()
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Set up shared folder' })).not.toBeInTheDocument()
@@ -124,9 +115,12 @@ describe('running state', () => {
 
 describe('success state', () => {
   async function runToSuccess() {
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
+      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
+    })
     wireRun(0)
     await renderAndFlush()
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await waitFor(() => {
       expect(screen.getByText('Shared folder set up successfully.')).toBeInTheDocument()
@@ -145,7 +139,7 @@ describe('success state', () => {
 
   it('saves credentials when the share succeeds', async () => {
     await runToSuccess()
-    expect(window.electronAPI.saveVmCredentials).toHaveBeenCalledWith('FedoraBox', 'root', 'password', 'fedora')
+    expect(window.electronAPI.saveVmCredentials).toHaveBeenCalledWith('FedoraBox', 'root', 'secret', 'fedora')
   })
 })
 
@@ -155,7 +149,7 @@ describe('failure state', () => {
   async function runToFailure() {
     wireRun(1, 'VBoxManage: guest control error')
     await renderAndFlush()
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await waitFor(() => {
       expect(screen.getByText('Setup failed.')).toBeInTheDocument()
@@ -213,7 +207,7 @@ describe('onScriptRunning callback', () => {
     window.electronAPI.runShareFolder = vi.fn().mockReturnValue(new Promise(() => {}))
     render(<ShareFolderPage vm={VM} onBack={vi.fn()} onScriptRunning={onScriptRunning} />)
     await act(async () => {})
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
     expect(onScriptRunning).toHaveBeenCalledWith(true)
@@ -224,7 +218,7 @@ describe('onScriptRunning callback', () => {
     wireRun(0)
     render(<ShareFolderPage vm={VM} onBack={vi.fn()} onScriptRunning={onScriptRunning} />)
     await act(async () => {})
-    await fillAllFields()
+    await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await waitFor(() => {
       expect(onScriptRunning).toHaveBeenCalledWith(false)
