@@ -61,6 +61,7 @@ cat <<JSON
   "vim":              $(cmd_ok vim),
   "chrome":           $(rpm_ok google-chrome-stable),
   "ansible":          $(ansible_ok),
-  "claudeCode":       $(cmd_ok claude)
+  "claudeCode":       $(cmd_ok claude),
+  "flameshot":        $(cmd_ok flameshot)
 }
 JSON

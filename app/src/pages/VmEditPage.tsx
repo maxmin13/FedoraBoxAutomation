@@ -40,7 +40,6 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     tools: [
       { key: 'mariadb',    label: 'MariaDB' },
       { key: 'postgresql', label: 'PostgreSQL' },
-      { key: 'dbeaver',    label: 'DBeaver CE' },
     ],
   },
   {
@@ -72,12 +71,6 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     ],
   },
   {
-    category: 'Network',
-    tools: [
-      { key: 'wireshark', label: 'Wireshark' },
-    ],
-  },
-  {
     category: 'VCS',
     tools: [
       { key: 'git', label: 'Git' },
@@ -90,9 +83,12 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     ],
   },
   {
-    category: 'Browsers',
+    category: 'Desktop',
     tools: [
-      { key: 'chrome', label: 'Google Chrome' },
+      { key: 'flameshot', label: 'Flameshot' },
+      { key: 'dbeaver',   label: 'DBeaver CE' },
+      { key: 'chrome',    label: 'Google Chrome' },
+      { key: 'wireshark', label: 'Wireshark' },
     ],
   },
   {

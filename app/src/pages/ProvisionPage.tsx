@@ -21,6 +21,7 @@ interface ScriptDef {
   name: string
   label: string
   relPath: string
+  scriptPath?: string           // overrides tools/<dir>/<relPath> when the script lives elsewhere
   description: string
   argType: ArgType
   argPrompts?: string[]
@@ -86,7 +87,6 @@ const CATEGORIES: CategoryDef[] = [
     scripts: [
       { name: 'mariadb.sh',    label: 'MariaDB',     relPath: 'mariadb.sh',    description: 'MariaDB - MySQL-compatible relational database',     argType: 'none' },
       { name: 'postgresql.sh', label: 'PostgreSQL',  relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled', argType: 'none' },
-      { name: 'dbeaver.sh',    label: 'DBeaver CE',  relPath: 'dbeaver.sh',    description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL',    argType: 'none' },
     ],
   },
   {
@@ -151,12 +151,6 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    name: 'Network', dir: 'network',
-    scripts: [
-      { name: 'wireshark.sh', label: 'Wireshark', relPath: 'wireshark.sh', description: 'Wireshark - network packet analyser', argType: 'user' },
-    ],
-  },
-  {
     name: 'Version Control', dir: 'version-control',
     scripts: [
       { name: 'git.sh', label: 'Git', relPath: 'git.sh', description: 'Git version control', argType: 'none' },
@@ -169,9 +163,12 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    name: 'Browsers', dir: 'browsers',
+    name: 'Desktop', dir: 'desktop',
     scripts: [
-      { name: 'chrome.sh', label: 'Google Chrome', relPath: 'chrome.sh', description: 'Google Chrome stable', argType: 'none' },
+      { name: 'flameshot.sh', label: 'Flameshot',     relPath: 'flameshot.sh',  description: 'Flameshot screenshot tool - binds Print Screen to flameshot gui', argType: 'user' },
+      { name: 'dbeaver.sh',  label: 'DBeaver CE',    relPath: 'dbeaver.sh',   scriptPath: 'tools/databases/dbeaver.sh',   description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL',  argType: 'none' },
+      { name: 'chrome.sh',   label: 'Google Chrome', relPath: 'chrome.sh',    scriptPath: 'tools/browsers/chrome.sh',     description: 'Google Chrome stable',                             argType: 'none' },
+      { name: 'wireshark.sh',label: 'Wireshark',     relPath: 'wireshark.sh', scriptPath: 'tools/network/wireshark.sh',   description: 'Wireshark - network packet analyser',              argType: 'user' },
     ],
   },
   {
@@ -346,7 +343,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         vmUser,
         vmPass,
         loginUser,
-        scriptRelPath: `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
+        scriptRelPath: selectedScript.scriptPath ?? `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
         scriptArgs,
       })
     )
