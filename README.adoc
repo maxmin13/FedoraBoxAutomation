@@ -60,7 +60,7 @@ Choose Base Setup for a full OS configuration or browse tools individually by ca
 
 .Provision — Base Setup detail with hostname option
 image::docs/screenshots/provision-base-setup-page.png[Provision base setup, width=500]
-Runs system-prep, networking, SELinux, desktop, and utilities in sequence. An optional hostname field renames the VM before the run starts.
+Runs system-prep, networking, SELinux, desktop, and utilities in sequence. An optional hostname field sets the Linux hostname inside the guest before the run starts.
 
 .Provision — By Category grid (14 categories)
 image::docs/screenshots/provision-by-category-page.png[Provision by category, width=500]
