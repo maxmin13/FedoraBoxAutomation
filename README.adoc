@@ -318,6 +318,11 @@ The zip was downloaded from the internet so Windows marks the extracted files as
 Unblock-File -Path "C:\Tools\FedoraBoxAutomation\FedoraBox Automation.exe"
 ----
 Then unpin the app from the taskbar (if already pinned) and re-pin it — the old shortcut inherited the block flag and must be recreated.
+If the error names a `.lnk` file in the taskbar path, unblock the shortcut directly:
+[source,powershell]
+----
+Unblock-File -Path "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Electron.lnk"
+----
 
 == Contributing
 
