@@ -4,33 +4,40 @@
 # Called by the Electron GUI via VBoxManage guestcontrol.
 # Always exits 0. Never sources /tmp/common.sh.
 
-# Ensure /usr/local/bin is in PATH regardless of how guestcontrol invokes this.
-# Needed for tools installed there: minikube, k3s, openssl, claude, aws, ecs-cli.
-export PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:${PATH}"
+# Build PATH to cover all common install locations:
+#   - standard system dirs
+#   - pip install as root  (/root/.local/bin)
+#   - pip install as each regular user (/home/*/.local/bin)
+export PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/.local/bin:/snap/bin:${PATH}"
+for _d in /home/*/.local/bin /opt/*/bin; do
+  [ -d "$_d" ] && PATH="${PATH}:${_d}"
+done
 
-cmd_ok()  { command -v "$1" >/dev/null 2>&1 && echo true || echo false; }
+cmd_ok()  { which "$1" >/dev/null 2>&1 && echo true || echo false; }
 svc_ok()  { systemctl is-active "$1" >/dev/null 2>&1 && echo true || echo false; }
 path_ok() { [ -e "$1" ] && echo true || echo false; }
 glob_ok() { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
 rpm_ok()  { rpm -q "$1" &>/dev/null && echo true || echo false; }
 
 java_version() {
-  command -v java >/dev/null 2>&1 || { echo false; return; }
+  which java >/dev/null 2>&1 || { echo false; return; }
   ver=$(java -version 2>&1 | head -1 | sed 's/.*version "\([^"]*\)".*/\1/')
   echo "\"${ver}\""
+}
+
+ansible_ok() {
+  which ansible >/dev/null 2>&1 && echo true && return
+  find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
+    | grep -q . && echo true || echo false
 }
 
 python_ok() {
   compgen -G "/usr/local/bin/python3.*" >/dev/null 2>&1 && echo true || echo false
 }
 
-base_setup_ok() {
-  path_ok /etc/fedorabox/.base-setup
-}
-
 cat <<JSON
 {
-  "baseSetup":        $(base_setup_ok),
+  "baseSetup":        $(path_ok /etc/fedorabox/.base-setup),
   "java":             $(java_version),
   "php":              $(cmd_ok php),
   "python":           $(python_ok),
@@ -44,8 +51,8 @@ cat <<JSON
   "eclipse":          $(glob_ok '/opt/eclipse*'),
   "visualStudioCode": $(cmd_ok code),
   "docker":           $(cmd_ok docker),
-  "minikube":         $(path_ok /usr/local/bin/minikube),
-  "k3s":              $(path_ok /usr/local/bin/k3s),
+  "minikube":         $(cmd_ok minikube),
+  "k3s":              $(cmd_ok k3s),
   "awsCli":           $(cmd_ok aws),
   "ecsCli":           $(cmd_ok ecs-cli),
   "openssl":          $(path_ok /usr/local/ssl/bin/openssl),
@@ -53,7 +60,7 @@ cat <<JSON
   "git":              $(cmd_ok git),
   "vim":              $(cmd_ok vim),
   "chrome":           $(rpm_ok google-chrome-stable),
-  "ansible":          $(cmd_ok ansible),
+  "ansible":          $(ansible_ok),
   "claudeCode":       $(cmd_ok claude)
 }
 JSON
