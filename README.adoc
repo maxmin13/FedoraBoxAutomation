@@ -103,7 +103,22 @@ No installation, no Node.js, no npm.
 
 NOTE: Windows may show a "Windows protected your PC" SmartScreen warning the first time because the executable is not code-signed. Click *More info* → *Run anyway* to proceed.
 
-NOTE: If Windows blocks the app with "An Application Control policy has blocked this file — Dangerous file extension from the web", right-click `FedoraBox Automation.exe` → *Properties* → tick *Unblock* → *OK*. Then unpin the app from the taskbar (if pinned) and re-pin it. This happens because the zip was downloaded from the internet and Windows marks the extracted files as potentially unsafe.
+[NOTE]
+====
+If Windows blocks the app with "An Application Control policy has blocked this file — Dangerous file extension from the web", the zip download added a Mark of the Web flag. Right-click `FedoraBox Automation.exe` → *Properties* → tick *Unblock* → *OK*, or run in PowerShell:
+
+[source,powershell]
+----
+Unblock-File -Path "C:\Tools\FedoraBoxAutomation\FedoraBox Automation.exe"
+----
+
+Then unpin the app from the taskbar (if already pinned) and re-pin it — the old shortcut inherited the block flag and must be recreated. If the error names a `.lnk` file in the taskbar path, unblock the shortcut directly:
+
+[source,powershell]
+----
+Unblock-File -Path "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Electron.lnk"
+----
+====
 
 === Option B — Electron GUI from source
 
@@ -310,19 +325,6 @@ Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 
 *Low VM resolution* +
 Set Video RAM to at least 128 MB and install Guest Additions.
-
-*"Application Control policy has blocked this file" when launching the exe* +
-The zip was downloaded from the internet so Windows marks the extracted files as potentially unsafe (Mark of the Web). Right-click `FedoraBox Automation.exe` → *Properties* → tick *Unblock* → *OK*, or run in PowerShell:
-[source,powershell]
-----
-Unblock-File -Path "C:\Tools\FedoraBoxAutomation\FedoraBox Automation.exe"
-----
-Then unpin the app from the taskbar (if already pinned) and re-pin it — the old shortcut inherited the block flag and must be recreated.
-If the error names a `.lnk` file in the taskbar path, unblock the shortcut directly:
-[source,powershell]
-----
-Unblock-File -Path "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Electron.lnk"
-----
 
 == Contributing
 
