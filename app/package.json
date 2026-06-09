@@ -1,6 +1,6 @@
 {
   "name": "fedora-box-automation",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Electron GUI for FedoraBoxAutomation",
   "main": "electron/main.js",
   "scripts": {
