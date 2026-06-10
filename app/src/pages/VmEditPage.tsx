@@ -46,7 +46,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     category: 'IDEs',
     tools: [
       { key: 'eclipse',          label: 'Eclipse IDE' },
-      { key: 'visualStudioCode', label: 'Visual Studio Code' },
+      { key: 'visualStudioCode', label: 'VS Code' },
     ],
   },
   {

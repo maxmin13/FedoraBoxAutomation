@@ -110,7 +110,7 @@ const CATEGORIES: CategoryDef[] = [
           { value: '2025-06', label: '2025-06 — 4.32 (Jun 2025)' },
           { value: '2024-12', label: '2024-12 — 4.30 (Dec 2024)' },
         ]] },
-      { name: 'visualstudiocode.sh', label: 'Visual Studio Code',   relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo', argType: 'none' },
+      { name: 'visualstudiocode.sh', label: 'VS Code',   relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo', argType: 'none' },
     ],
   },
   {
