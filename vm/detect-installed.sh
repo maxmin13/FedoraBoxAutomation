@@ -25,6 +25,13 @@ java_version() {
   echo "\"${ver}\""
 }
 
+intellij_version() {
+  local dir
+  dir=$(compgen -G '/opt/idea-IC-*' 2>/dev/null | head -1)
+  [[ -z "${dir}" ]] && { echo false; return; }
+  echo "\"${dir#/opt/idea-IC-}\""
+}
+
 ansible_ok() {
   which ansible >/dev/null 2>&1 && echo true && return
   find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
@@ -49,6 +56,7 @@ cat <<JSON
   "postgresql":       $(svc_ok postgresql),
   "dbeaver":          $(rpm_ok dbeaver-ce),
   "eclipse":          $(glob_ok '/opt/eclipse*'),
+  "intellij":         $(intellij_version),
   "visualStudioCode": $(cmd_ok code),
   "docker":           $(cmd_ok docker),
   "minikube":         $(cmd_ok minikube),

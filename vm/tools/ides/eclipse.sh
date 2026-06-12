@@ -3,18 +3,31 @@
 ##
 ## Description: Downloads and installs Eclipse IDE for Java Developers to /opt/eclipse-<release>
 ##              and registers a per-version GNOME desktop entry. Multiple versions coexist.
-##              Optionally pass a release as the first argument (default: 2026-03).
-## Usage:       sudo ./eclipse.sh [release]
-## Parameters:  $1  <release>  Eclipse release to install (e.g. 2026-03)
+##              Pass 'latest' to auto-resolve the current release from the Eclipse EPP downloads page.
+## Usage:       sudo ./eclipse.sh <release>
+## Parameters:  $1  <release>  Eclipse release to install (e.g. 2026-03) or 'latest'
 ##
 
 source /tmp/common.sh
 
 if [[ -z "${1:-}" ]]; then
-    log_error "Eclipse release argument is required (e.g. 2026-03)"
+    log_error "Eclipse release argument is required (e.g. 2026-03 or 'latest')"
     exit 1
 fi
 ECLIPSE_RELEASE="$1"
+
+if [[ "${ECLIPSE_RELEASE}" == 'latest' ]]; then
+    log_info "Querying Eclipse EPP downloads for the latest release ..."
+    ECLIPSE_RELEASE=$(curl -fsSL "https://download.eclipse.org/technology/epp/downloads/release/" \
+        | grep -Eo '"[0-9]{4}-[0-9]{2}/"' \
+        | grep -Eo '[0-9]{4}-[0-9]{2}' \
+        | sort -r | head -1)
+    if [[ -z "${ECLIPSE_RELEASE}" ]]; then
+        log_error "Could not determine the latest Eclipse release. Check network connectivity."
+        exit 1
+    fi
+    log_info "Latest release: ${ECLIPSE_RELEASE}"
+fi
 ECLIPSE_DIR="/opt/eclipse-${ECLIPSE_RELEASE}"
 ECLIPSE_BIN="/usr/bin/eclipse-${ECLIPSE_RELEASE}"
 ECLIPSE_DESKTOP="/usr/share/applications/eclipse-${ECLIPSE_RELEASE}.desktop"
