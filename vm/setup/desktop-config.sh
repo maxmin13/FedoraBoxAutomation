@@ -28,7 +28,11 @@ dnf install -y dbus-x11
 STEP "Disable Wayland"
 ####
 
-sed -i 's/#WaylandEnable=false/WaylandEnable=false/g' /etc/gdm/custom.conf
+if grep -q 'WaylandEnable' /etc/gdm/custom.conf; then
+  sed -i 's/#\?WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
+else
+  sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm/custom.conf
+fi
 
 log_info 'Wayland disabled.'
 

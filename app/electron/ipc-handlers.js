@@ -255,6 +255,44 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── restart-vm ────────────────────────────────────────────
+  // Gracefully stops the VM (ACPI, with forced poweroff fallback) then starts it again.
+  // Streams progress via script-line/script-done so the renderer can show logs.
+  handleIpc('restart-vm', async (event, name) => {
+    const emit = (text, source = 'stdout') => event.sender.send('script-line', { text, source })
+    try {
+      if (await isVmRunning(name)) {
+        emit(`Stopping ${name}...`)
+        log.info(`[ipc][restart-vm] stopping "${name}"`)
+        await execAsync(`VBoxManage controlvm "${name}" acpipowerbutton`, { encoding: 'utf8' })
+        const deadline = Date.now() + 60_000
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 1000))
+          if (!await isVmRunning(name)) break
+        }
+        if (await isVmRunning(name)) {
+          emit(`ACPI timeout — forcing poweroff...`, 'stderr')
+          log.warn(`[ipc][restart-vm] ACPI timeout — forcing poweroff for "${name}"`)
+          await execAsync(`VBoxManage controlvm "${name}" poweroff`, { encoding: 'utf8' })
+        }
+        emit(`${name} stopped.`)
+        await new Promise(r => setTimeout(r, 2000))
+      }
+      emit(`Starting ${name}...`)
+      log.info(`[ipc][restart-vm] starting "${name}"`)
+      await execAsync(`VBoxManage startvm "${name}" --type gui`, { encoding: 'utf8' })
+      emit(`${name} started.`)
+      log.info(`[ipc][restart-vm] "${name}" restarted`)
+      event.sender.send('script-done', 0)
+      return { ok: true }
+    } catch (error) {
+      emit(error.message, 'stderr')
+      log.error(`[ipc][restart-vm] "${name}":`, error.message)
+      event.sender.send('script-done', 1)
+      return { ok: false, error: error.message }
+    }
+  })
+
   // ── delete-vm ─────────────────────────────────────────────
   // Unregisters the VM and deletes all associated files (VDI, snapshots, etc.).
   // Only safe to call when the VM is stopped. Also removes saved credentials.

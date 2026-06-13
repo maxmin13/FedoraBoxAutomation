@@ -224,6 +224,57 @@ function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: stri
   }
 }
 
+// ── RestartModal ───────────────────────────────────────────────────────────────
+
+interface RestartModalProps {
+  vmName: string
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function RestartModal({ vmName, busy, onConfirm, onCancel }: RestartModalProps) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-zinc-400 text-sm text-center mb-2">Restart this VM?</p>
+        <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-2">{vmName}</p>
+        <p className="text-zinc-500 text-xs text-center mb-8">
+          The VM will be shut down and restarted. Unsaved work inside may be lost.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Restart VM
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 interface ProvisionPageProps {
@@ -245,6 +296,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showLog,      setShowLog]      = useState(false)
   const [runningLabel, setRunningLabel] = useState('')
 
+  const [restarting,        setRestarting]        = useState(false)
+  const [restarted,         setRestarted]         = useState(false)
+  const [showRestartModal,  setShowRestartModal]  = useState(false)
   const [forceConfirm,      setForceConfirm]      = useState(false)
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
   const forceConfirmNeededRef  = useRef(false)
@@ -274,8 +328,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }, [vm.name])
 
   useEffect(() => {
-    onScriptRunning(pageState === 'running')
-  }, [pageState, onScriptRunning])
+    onScriptRunning(pageState === 'running' || restarting)
+  }, [pageState, restarting, onScriptRunning])
 
   function handleNavBack() {
     switch (idleView) {
@@ -288,7 +342,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   async function startRun(
-    runFn: () => Promise<{ ok: boolean; error?: string; errorDetail?: string }>
+    runFn: () => Promise<{ ok: boolean; error?: string; errorDetail?: string }>,
+    trackAlreadyInstalled = true
   ) {
     setPageState('running')
     setLines([])
@@ -303,7 +358,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (/Use 'Install anyway'/i.test(line.text)) {
         forceConfirmNeededRef.current = true
       }
-      if (/\[INFO\s*\].*already installed/i.test(line.text)) {
+      if (trackAlreadyInstalled && /\[INFO\s*\].*already installed/i.test(line.text)) {
         alreadyInstalledRef.current = true
       }
     })
@@ -359,6 +414,25 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     )
   }
 
+  async function handleRestart() {
+    setShowRestartModal(false)
+    setLines([])
+    setShowLog(true)
+    setRestarting(true)
+
+    const unsubLine = window.electronAPI.onScriptLine((line) => {
+      setLines((prev) => [...prev, line])
+    })
+    const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+      setRestarting(false)
+      if (exitCode === 0) setRestarted(true)
+      unsubLine()
+      unsubDone()
+    })
+
+    await window.electronAPI.restartVm(vm.name)
+  }
+
   async function handleRunFull() {
     setRunningLabel('Base Setup')
     await startRun(() =>
@@ -368,7 +442,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         vmPass,
         loginUser,
         hostname: changeHostname ? hostname.trim() : '',
-      })
+      }), false
     )
   }
 
@@ -395,12 +469,32 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   if (pageState === 'done') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
+        {showRestartModal && (
+          <RestartModal
+            vmName={vm.name}
+            busy={restarting}
+            onConfirm={handleRestart}
+            onCancel={() => setShowRestartModal(false)}
+          />
+        )}
 
         {success === true && !alreadyInstalled && (
           <div className="bg-green-900 border border-green-700 rounded-lg p-4 shrink-0">
             <p className="text-green-200 font-medium">{runningLabel} completed successfully.</p>
             {runningLabel === 'Guest Additions' && (
               <p className="text-green-300 text-sm mt-1">Reboot the VM to activate, then return here to provision.</p>
+            )}
+            {runningLabel === 'Base Setup' && (
+              <div className="mt-3">
+                <p className="text-green-300 text-sm mb-2">Reboot the VM to apply desktop changes.</p>
+                <button
+                  onClick={() => setShowRestartModal(true)}
+                  disabled={restarting || restarted}
+                  className="px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+                >
+                  {restarting ? 'Rebooting...' : restarted ? 'VM Restarted' : 'Restart VM'}
+                </button>
+              </div>
             )}
           </div>
         )}

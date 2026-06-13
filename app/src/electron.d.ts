@@ -114,6 +114,7 @@ declare global {
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>
+      restartVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       deleteVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       runSanityChecks: () => Promise<{ ok: boolean; checks: CheckResult[]; error?: string }>
       installVirtualBox: () => Promise<{ ok: boolean }>
