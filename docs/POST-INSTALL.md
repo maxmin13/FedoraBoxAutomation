@@ -34,13 +34,80 @@ This updates all packages including the kernel. The reboot is required to switch
 
 ### 3. Install Guest Additions
 
-After the reboot, the GA kernel modules no longer match the new kernel and must be reinstalled. The GA ISO is already attached as `/dev/sr1`.
+After the reboot, the GA kernel modules (`vboxguest`, `vboxsf`, `vboxvideo`) no longer match the new kernel and must be reinstalled. The GA ISO is already attached as `/dev/sr1`.
 
 ```bash
 sudo dnf install -y kernel-devel-$(uname -r) kernel-headers gcc make perl
 sudo mkdir -p /mnt/ga
 sudo mount /dev/sr1 /mnt/ga
 sudo /mnt/ga/VBoxLinuxAdditions.run
+```
+
+Check the service status:
+
+```bash
+sudo systemctl status vboxadd
+```
+
+The output should show `active (exited)`. If it shows `failed`, verify the kernel and GA versions match:
+
+```bash
+uname -r
+cat /var/lib/VBoxGuestAdditions/config | grep INSTALL_VER
+```
+
+The GA `INSTALL_VER` should match the VirtualBox version on the host. If it does not, the ISO attached may be from an older VirtualBox install — detach it in **Devices → Optical Drives** and attach the correct ISO.
+
+If the versions look correct but the service still fails:
+
+1. Confirm the running kernel matches the installed `kernel-devel`:
+   ```bash
+   rpm -q kernel-devel
+   ```
+   If the versions differ, install the matching one:
+   ```bash
+   sudo dnf install -y kernel-devel-$(uname -r)
+   ```
+2. Re-run the installer:
+   ```bash
+   sudo /mnt/ga/VBoxLinuxAdditions.run
+   ```
+3. Check the service status again — it should now show `active (exited)`.
+
+#### Reverting to an older kernel
+
+If the current kernel is not yet supported by the installed GA version (e.g. GA 7.2.8 does not support kernel 7.0.x), boot into an older kernel instead. List the available kernel files:
+
+```bash
+ls /boot/vmlinuz-*
+```
+
+List all GRUB entries with their index numbers:
+
+```bash
+sudo grubby --info=ALL
+```
+
+Set the older kernel as default by index and reboot:
+
+```bash
+sudo grubby --set-default-index=1
+sudo reboot
+```
+
+After the reboot, the GA ISO mount is lost and must be remounted. Install the matching kernel headers, remount and re-run GA:
+
+```bash
+sudo dnf install -y kernel-devel-$(uname -r)
+sudo mkdir -p /mnt/ga
+sudo mount /dev/sr1 /mnt/ga
+sudo /mnt/ga/VBoxLinuxAdditions.run
+```
+
+Check the service status — it should now show `active (exited)`:
+
+```bash
+sudo systemctl status vboxadd
 ```
 
 ### 4. Set the root password
