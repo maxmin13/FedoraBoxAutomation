@@ -130,12 +130,12 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
 
         {/* Left: check list — only shown once results exist */}
         {checks.length > 0 && (
-          <div className="w-56 shrink-0 flex flex-col gap-1">
+          <div className="w-56 shrink-0 flex flex-col gap-1 overflow-y-auto min-h-0">
             {checks.map((check) => (
               <button
                 key={check.id}
                 onClick={() => setSelectedId(check.id)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors border ${
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors border ${
                   selectedId === check.id
                     ? 'bg-zinc-600 border-zinc-500'
                     : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'

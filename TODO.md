@@ -30,3 +30,7 @@ maybe someone is not visible
 # rebuild zip dist file
 
 # on the tics and triangle icons, add tooltip with explanation
+
+# can you run the connections checks under the hood and display the 
+login page only if they fail? add the login page in fron of every
+action that requires connection with running vm
