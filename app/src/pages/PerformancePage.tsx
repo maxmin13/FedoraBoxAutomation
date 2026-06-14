@@ -214,11 +214,17 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
               </div>
             )}
 
-            {diagError && (
+            {diagError && vmNotRunning(diagLines) && (
+              <p className="text-amber-400 text-sm shrink-0">
+                The VM is not running — start it from My VMs, then Refresh.
+              </p>
+            )}
+
+            {diagError && !vmNotRunning(diagLines) && (
               <p className="text-red-400 text-xs shrink-0">{diagError}</p>
             )}
 
-            {diagState === 'done' && diagLines.length > 0 && (
+            {diagState === 'done' && diagLines.length > 0 && !vmNotRunning(diagLines) && (
               <DiagReport sections={parseDiagReport(diagLines)} />
             )}
           </div>
@@ -230,6 +236,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 }
 
 // ── Error mapping ──────────────────────────────────────────────────────────────
+
+function vmNotRunning(lines: ScriptLine[]): boolean {
+  return lines.some((l) => l.text.includes('not responding') || l.text.includes('VM is not running'))
+}
 
 function friendlyFixError(raw: string): string {
   if (raw.includes('locked for a session') || raw.includes('VBOX_E_INVALID_OBJECT_STATE'))

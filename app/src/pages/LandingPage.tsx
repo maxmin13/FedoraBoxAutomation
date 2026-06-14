@@ -13,9 +13,10 @@ interface LandingPageProps {
   onNavigate: (page: Page) => void
   onScriptRunning: (running: boolean) => void
   isActive: boolean
+  createVmRunning: boolean
 }
 
-export default function LandingPage({ onNavigate, onScriptRunning, isActive }: LandingPageProps) {
+export default function LandingPage({ onNavigate, onScriptRunning, isActive, createVmRunning }: LandingPageProps) {
   // The list of VMs returned by VBoxManage
   const [vms, setVms] = useState<Vm[]>([])
 
@@ -37,12 +38,15 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   // Incremented each time we want VmEditPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
 
-  // Load VMs on mount and whenever this page becomes active again after being hidden
+  // Load VMs on mount and whenever this page becomes active, but not while
+  // create-vm is running — the VM appears in VBoxManage before it's fully set up.
+  // When createVmRunning flips to false the effect re-fires and loads the finished VM.
   useEffect(() => {
     if (!isActive) return
+    if (createVmRunning) return
     loadVms()
     setVmRefreshKey((k) => k + 1)
-  }, [isActive])
+  }, [isActive, createVmRunning])
 
   /**
    * Calls the main process to get the list of registered VMs.
@@ -110,10 +114,10 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
 
         <button
           onClick={loadVms}
-          disabled={loading}
+          disabled={loading || createVmRunning}
           className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Loading...' : 'Refresh'}
+          {loading ? 'Loading...' : createVmRunning ? 'Creating VM...' : 'Refresh'}
         </button>
       </div>
 

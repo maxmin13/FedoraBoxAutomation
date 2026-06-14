@@ -22,5 +22,11 @@ maybe someone is not visible
 
 # leave the running flag only in the my vms page
 
-# analize menus blocks, remove it alltogheter, when the user is creatining a new vm
-if he clicks to my vms is the new vms visible? it shouldn't be until the create script ends
+
+# integrate and fix unit tests
+
+# update docs and analysis
+
+# rebuild zip dist file
+
+# on the tics and triangle icons, add tooltip with explanation

@@ -64,13 +64,13 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen">
       {/* Navigation bar — always visible at the top */}
-      <NavBar currentPage={currentPage} onNavigate={handleNavigate} scriptRunning={scriptRunning} scriptPage={scriptPage} />
+      <NavBar currentPage={currentPage} onNavigate={handleNavigate} />
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-hidden p-6">
         <ErrorBoundary>
           <div style={{ display: currentPage === 'landing' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} />
+            <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} createVmRunning={scriptRunning && scriptPage === 'create-vm'} />
           </div>
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
