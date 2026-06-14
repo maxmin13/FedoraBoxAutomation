@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Vm, ScriptLine } from '../electron.d'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
+import { useAuthGate } from '../hooks/useAuthGate'
+import VmLoginPage from './VmLoginPage'
 
 interface ShareLogsPageProps {
   vm: Vm
@@ -21,6 +23,14 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
   const [success,    setSuccess]    = useState<boolean | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [showLog,    setShowLog]    = useState(false)
+  const [credKey,    setCredKey]    = useState(0)
+
+  const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
+
+  function handleLoginSuccess() {
+    setCredKey(k => k + 1)
+    onLoginSuccess()
+  }
 
   useEffect(() => {
     onScriptRunning(pageState === 'running')
@@ -37,7 +47,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
         if (saved.loginUser) setLoginUser(saved.loginUser)
       }
     })
-  }, [vm.name])
+  }, [vm.name, credKey])
 
   async function handleRun() {
     setPageState('running')
@@ -80,6 +90,15 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     'focus:outline-none focus:border-blue-500 ' +
     (value ? 'border-zinc-400' : 'border-zinc-600')
 
+
+  // ── Login gate ──────────────────────────────────────────────────────────────
+  if (loginRequired) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage initialVmName={vm.name} onBack={onLoginBack} onNext={handleLoginSuccess} />
+      </div>
+    )
+  }
 
   // ── Running / done ──────────────────────────────────────────────────────────
   if (pageState !== 'idle') {
@@ -190,7 +209,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
         </div>
 
         <button
-          onClick={handleRun}
+          onClick={() => withAuth(handleRun)}
           className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
         >
           Set up log sync

@@ -4,9 +4,9 @@
 import { useEffect, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
-import VmEditPage from './VmEditPage'
-import VmLoginPage from './VmLoginPage'
+import VmDetailPage from './VmDetailPage'
 import PerformancePage from './PerformancePage'
+import VmLoginPage from './VmLoginPage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface LandingPageProps {
@@ -30,12 +30,9 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
   const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
   const [perfVm,         setPerfVm]         = useState<Vm | null>(null)
+  const [pendingPerfVm,  setPendingPerfVm]  = useState<Vm | null>(null)
 
-  // VM waiting at the login gate before entering detail/provision
-  const [loginVm,     setLoginVm]     = useState<Vm | null>(null)
-  const [loginVmView, setLoginVmView] = useState<'detail' | 'provision'>('detail')
-
-  // Incremented each time we want VmEditPage to re-fetch its info
+  // Incremented each time we want VmDetailPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
 
   // Load VMs on mount and whenever this page becomes active, but not while
@@ -73,6 +70,32 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     setLoading(false)
   }
 
+  async function handleOpenPerf(vm: Vm) {
+    const creds = await window.electronAPI.loadVmCredentials(vm.name)
+    if (!creds.ok || !creds.user || !creds.pass) {
+      setPendingPerfVm(vm)
+      return
+    }
+    const check = await window.electronAPI.checkVmCredentials(vm.name, creds.user, creds.pass)
+    if (!check.ok) {
+      setPendingPerfVm(vm)
+      return
+    }
+    setPerfVm(vm)
+  }
+
+  if (pendingPerfVm) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage
+          initialVmName={pendingPerfVm.name}
+          onBack={() => setPendingPerfVm(null)}
+          onNext={() => { setPerfVm(pendingPerfVm); setPendingPerfVm(null) }}
+        />
+      </div>
+    )
+  }
+
   if (perfVm) {
     return (
       <div className="h-full overflow-hidden">
@@ -81,26 +104,10 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     )
   }
 
-  if (loginVm && !selectedVm) {
-    return (
-      <div className="h-full overflow-y-auto">
-        <VmLoginPage
-          initialVmName={loginVm.name}
-          onBack={() => setLoginVm(null)}
-          onNext={() => {
-            setSelectedVmView(loginVmView)
-            setSelectedVm(loginVm)
-            setLoginVm(null)
-          }}
-        />
-      </div>
-    )
-  }
-
   if (selectedVm) {
     return (
       <div className="h-full overflow-y-auto">
-        <VmEditPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} isActive={isActive} />
+        <VmDetailPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} isActive={isActive} />
       </div>
     )
   }
@@ -169,9 +176,9 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
               key={vm.uuid}
               vm={vm}
               onRefresh={loadVms}
-              onEdit={() => { setLoginVmView('detail'); setLoginVm(vm) }}
-              onProvision={() => { setLoginVmView('provision'); setLoginVm(vm) }}
-              onPerformance={() => setPerfVm(vm)}
+              onEdit={() => { setSelectedVmView('detail'); setSelectedVm(vm) }}
+              onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
+              onPerformance={() => handleOpenPerf(vm)}
             />
           ))}
         </div>

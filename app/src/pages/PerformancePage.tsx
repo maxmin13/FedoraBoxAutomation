@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Vm, VmInfo, ScriptLine } from '../electron.d'
 import ProgressBar from '../components/ProgressBar'
+import { useAuthGate } from '../hooks/useAuthGate'
+import VmLoginPage from './VmLoginPage'
 
 
 interface PerformancePageProps {
@@ -23,6 +25,14 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [diagState,   setDiagState]   = useState<'idle' | 'running' | 'done'>('idle')
   const [diagLines,   setDiagLines]   = useState<ScriptLine[]>([])
   const [diagError,   setDiagError]   = useState<string | null>(null)
+  const [credKey,     setCredKey]     = useState(0)
+
+  const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
+
+  function handleLoginSuccess() {
+    setCredKey(k => k + 1)
+    onLoginSuccess()
+  }
 
   useEffect(() => {
     setInfo(null)
@@ -45,7 +55,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       setLoginUser(login)
       runDiagnostics(user, pass, login)
     })
-  }, [vm.name])
+  }, [vm.name, credKey])
 
   function handleRefresh() {
     setInfoKey((k) => k + 1)
@@ -105,6 +115,14 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     }
   }
 
+  if (loginRequired) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage initialVmName={vm.name} onBack={onLoginBack} onNext={handleLoginSuccess} />
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
 
@@ -118,7 +136,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
         </button>
         <h1 className="text-xl font-semibold text-zinc-100 truncate">{vm.name}</h1>
         <button
-          onClick={handleRefresh}
+          onClick={() => withAuth(handleRefresh)}
           disabled={diagState === 'running'}
           className="ml-auto px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >

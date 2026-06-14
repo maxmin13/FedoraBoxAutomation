@@ -3,7 +3,8 @@ import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
 import ProvisionPage from './ProvisionPage'
-import VmRunningBadge from '../components/VmRunningBadge'
+import { useAuthGate } from '../hooks/useAuthGate'
+import VmLoginPage from './VmLoginPage'
 
 // Maps detect-installed.sh JSON keys to user-facing labels, grouped by category.
 const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }[] = [
@@ -106,7 +107,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
   },
 ]
 
-interface VmEditPageProps {
+interface VmDetailPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
@@ -138,7 +139,7 @@ function capitalize(s: string) {
 }
 
 
-export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView, isActive = true }: VmEditPageProps) {
+export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, initialView, isActive = true }: VmDetailPageProps) {
   type ToolsStatus = 'idle' | 'loading' | 'ok' | 'stopped' | 'no-credentials' | 'error'
 
   const [view, setView]               = useState<View>(initialView ?? 'detail')
@@ -149,6 +150,8 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
   const [installedTools, setInstalledTools] = useState<Record<string, string | boolean>>({})
   const [missingOpen,    setMissingOpen]    = useState(false)
+
+  const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
   function backToDetail() {
     setView('detail')
@@ -224,6 +227,14 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     )
   }
 
+  if (loginRequired) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage initialVmName={vm.name} onBack={onLoginBack} onNext={onLoginSuccess} />
+      </div>
+    )
+  }
+
   const diskValue = info?.diskCapacityMB != null
     ? `${Math.round(info.diskCapacityMB / 1024)} GB (${info.diskType ?? 'dynamic'})`
     : '—'
@@ -240,7 +251,6 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
           &larr; Back
         </button>
         <h1 className="text-xl font-semibold text-zinc-100 truncate">{vm.name}</h1>
-        <VmRunningBadge running={vm.running} />
       </div>
 
       {loadError && (
@@ -281,8 +291,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               action={
                 <button
                   onClick={() => setView('share-logs')}
-                  disabled={info.state !== 'running'}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Sync
                 </button>
@@ -305,8 +314,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               action={
                 <button
                   onClick={() => setView('share-folder')}
-                  disabled={info.state !== 'running'}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Share
                 </button>
@@ -365,7 +373,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
               title="Installed tools"
               action={info.state === 'running' && (
                 <button
-                  onClick={() => setToolsKey((k) => k + 1)}
+                  onClick={() => withAuth(() => setToolsKey((k) => k + 1))}
                   disabled={toolsStatus === 'loading'}
                   className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >

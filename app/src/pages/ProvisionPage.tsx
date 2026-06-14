@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import type { Vm, ScriptLine } from '../electron.d'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
+import { useAuthGate } from '../hooks/useAuthGate'
+import VmLoginPage from './VmLoginPage'
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
@@ -318,6 +320,14 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [argValues,        setArgValues]        = useState(['', ''])
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
+  const [credKey,          setCredKey]          = useState(0)
+
+  const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
+
+  function handleLoginSuccess() {
+    setCredKey(k => k + 1)
+    onLoginSuccess()
+  }
 
   useEffect(() => {
     if (!changeHostname || !vmUser || !vmPass || hostname) return
@@ -334,7 +344,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         if (saved.loginUser)  setLoginUser(saved.loginUser)
       }
     })
-  }, [vm.name])
+  }, [vm.name, credKey])
 
   useEffect(() => {
     onScriptRunning(pageState === 'running' || restarting)
@@ -461,6 +471,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     (val ? 'border-zinc-400' : 'border-zinc-600')
 
 
+  // ── Login gate ──────────────────────────────────────────────────────────────
+  if (loginRequired) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage initialVmName={vm.name} onBack={onLoginBack} onNext={handleLoginSuccess} />
+      </div>
+    )
+  }
+
   // ── Running ──────────────────────────────────────────────────────────────────
   if (pageState === 'running') {
     return (
@@ -528,7 +547,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
             <div className="flex gap-2">
               <button
-                onClick={() => handleRunScript(true)}
+                onClick={() => withAuth(() => handleRunScript(true))}
                 className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
               >
                 {selectedScript.forceConfirmDef.actionLabel}
@@ -559,7 +578,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           <div className="flex gap-2">
           {success === false && (
           <button
-            onClick={() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript()}
+            onClick={() => withAuth(() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript())}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             Try again
@@ -691,7 +710,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </div>
             )}
             <button
-              onClick={handleRunFull}
+              onClick={() => withAuth(handleRunFull)}
               className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
             >
               Run Base Setup
@@ -825,7 +844,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
 
             <button
-              onClick={() => handleRunScript()}
+              onClick={() => withAuth(() => handleRunScript())}
               className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
             >
               Run {selectedScript.label}

@@ -250,9 +250,9 @@ describe('VM detail navigation', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
   })
 
-  it('opens VmEditPage after completing the login gate from Detail', async () => {
+  it('opens VmDetailPage after completing the login gate from Detail', async () => {
     await clickDetailAndLogin()
-    // VmEditPage shows the VM name as a heading
+    // VmDetailPage shows the VM name as a heading
     expect(screen.getByRole('heading', { name: 'FedoraBox', level: 1 })).toBeInTheDocument()
   })
 

@@ -18,11 +18,6 @@ maybe someone is not visible
 
 # create a new vm, verify all the provision scripts after change most recent version
 
-
-
-# leave the running flag only in the my vms page
-
-
 # integrate and fix unit tests
 
 # update docs and analysis
@@ -31,6 +26,4 @@ maybe someone is not visible
 
 # on the tics and triangle icons, add tooltip with explanation
 
-# can you run the connections checks under the hood and display the 
-login page only if they fail? add the login page in fron of every
-action that requires connection with running vm
+# review readme file snapshots

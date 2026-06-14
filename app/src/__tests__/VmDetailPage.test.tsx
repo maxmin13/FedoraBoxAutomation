@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
-import VmEditPage from '../pages/VmEditPage'
+import VmDetailPage from '../pages/VmDetailPage'
 import type { Vm } from '../electron.d'
 
 const VM: Vm = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
@@ -37,21 +37,21 @@ beforeEach(() => {
 
 /** Render and wait for the loading state to clear (info loaded or error shown). */
 async function renderAndWait() {
-  render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+  render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
   await waitFor(() => expect(screen.queryByText('Loading VM info...')).not.toBeInTheDocument())
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-describe('VmEditPage — header', () => {
+describe('VmDetailPage — header', () => {
   it('shows the VM name as a heading', async () => {
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'FedoraBox' })).toBeInTheDocument())
   })
 
   it('calls onBack when the Back button is clicked', async () => {
     const onBack = vi.fn()
-    render(<VmEditPage vm={VM} onBack={onBack} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={onBack} onScriptRunning={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(onBack).toHaveBeenCalledOnce()
     await act(async () => {})  // flush pending getVmInfo promise
@@ -60,10 +60,10 @@ describe('VmEditPage — header', () => {
 
 // ── Loading and error states ──────────────────────────────────────────────────
 
-describe('VmEditPage — loading and error states', () => {
+describe('VmDetailPage — loading and error states', () => {
   it('shows "Loading VM info..." while getVmInfo is pending', () => {
     window.electronAPI.getVmInfo = vi.fn().mockReturnValue(new Promise(() => {}))
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     expect(screen.getByText('Loading VM info...')).toBeInTheDocument()
   })
 
@@ -82,7 +82,7 @@ describe('VmEditPage — loading and error states', () => {
 
 // ── General section ───────────────────────────────────────────────────────────
 
-describe('VmEditPage — General section', () => {
+describe('VmDetailPage — General section', () => {
   it('shows the OS type', async () => {
     await renderAndWait()
     expect(screen.getByText('Fedora_64')).toBeInTheDocument()
@@ -103,7 +103,7 @@ describe('VmEditPage — General section', () => {
 
 // ── Hardware section ──────────────────────────────────────────────────────────
 
-describe('VmEditPage — Hardware section', () => {
+describe('VmDetailPage — Hardware section', () => {
   it('shows RAM in MB with thousands separator', async () => {
     await renderAndWait()
     expect(screen.getByText('4,096 MB')).toBeInTheDocument()
@@ -143,7 +143,7 @@ describe('VmEditPage — Hardware section', () => {
 
 // ── Network section ───────────────────────────────────────────────────────────
 
-describe('VmEditPage — Network section', () => {
+describe('VmDetailPage — Network section', () => {
   it('formats "nat" as "NAT"', async () => {
     await renderAndWait()
     expect(screen.getByText('NAT')).toBeInTheDocument()
@@ -173,7 +173,7 @@ describe('VmEditPage — Network section', () => {
 
 // ── Log sync section ──────────────────────────────────────────────────────────
 
-describe('VmEditPage — Log sync section', () => {
+describe('VmDetailPage — Log sync section', () => {
   it('shows "Not configured" when logSyncPath is null', async () => {
     await renderAndWait()
     expect(screen.getByText('Not configured')).toBeInTheDocument()
@@ -203,7 +203,7 @@ describe('VmEditPage — Log sync section', () => {
 
 // ── Shared folders section ────────────────────────────────────────────────────
 
-describe('VmEditPage — Shared folders section', () => {
+describe('VmDetailPage — Shared folders section', () => {
   it('shows "None configured" when sharedFolders is empty', async () => {
     await renderAndWait()
     expect(screen.getByText('None configured')).toBeInTheDocument()
@@ -253,11 +253,11 @@ describe('VmEditPage — Shared folders section', () => {
 
 // ── Installed tools — Refresh button ─────────────────────────────────────────
 
-describe('VmEditPage — Installed tools Refresh button', () => {
+describe('VmDetailPage — Installed tools Refresh button', () => {
   it('shows "Checking..." (disabled) while queryVmInstalled is in flight', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockReturnValue(new Promise(() => {}))
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Checking...' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Checking...' })).toBeDisabled()
   })
@@ -265,7 +265,7 @@ describe('VmEditPage — Installed tools Refresh button', () => {
   it('shows "Refresh" (enabled) after queryVmInstalled resolves', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled()
   })
@@ -279,7 +279,7 @@ describe('VmEditPage — Installed tools Refresh button', () => {
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 
-describe('VmEditPage — navigation', () => {
+describe('VmDetailPage — navigation', () => {
   function addSubPageMocks() {
     Object.assign(window.electronAPI, {
       loadVmCredentials:  vi.fn().mockResolvedValue({ ok: false }),
@@ -313,10 +313,10 @@ describe('VmEditPage — navigation', () => {
 
 // ── VM not-running banner and disabled buttons ────────────────────────────────
 
-describe('VmEditPage — VM not running', () => {
+describe('VmDetailPage — VM not running', () => {
   it('shows the "Stopped" badge when vm.running is false', async () => {
     const stoppedVm = { name: 'FedoraBox', uuid: 'uuid-1', running: false }
-    render(<VmEditPage vm={stoppedVm} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={stoppedVm} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.queryByText('Loading VM info...')).not.toBeInTheDocument())
     expect(screen.getByText('Stopped')).toBeInTheDocument()
   })
@@ -353,9 +353,9 @@ describe('VmEditPage — VM not running', () => {
 
 // ── Installed tools section ───────────────────────────────────────────────────
 
-describe('VmEditPage — Installed tools section', () => {
+describe('VmDetailPage — Installed tools section', () => {
   it('shows "VM is stopped" message when the VM is powered off', async () => {
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/INSTALLED TOOLS/i)).toBeInTheDocument())
     expect(screen.getByText(/VM is stopped/i)).toBeInTheDocument()
   })
@@ -363,7 +363,7 @@ describe('VmEditPage — Installed tools section', () => {
   it('shows "Save credentials" hint when VM is running but no credentials are saved', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: false, noCredentials: true })
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByText(/Save credentials in Provision/i)).toBeInTheDocument()
     )
@@ -375,7 +375,7 @@ describe('VmEditPage — Installed tools section', () => {
       ok: true,
       installed: { ...ALL_FALSE, baseSetup: true, java: '21.0.3', docker: true },
     })
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Base Setup')).toBeInTheDocument())
     expect(screen.getByText('Java')).toBeInTheDocument()
     expect(screen.getByText('(21.0.3)')).toBeInTheDocument()
@@ -386,14 +386,14 @@ describe('VmEditPage — Installed tools section', () => {
   it('shows "Nothing installed yet" when the VM is running but all tools return false', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Nothing installed yet')).toBeInTheDocument())
   })
 
   it('shows error message when guestcontrol fails', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_AUTHENTICATION_FAILURE' })
-    render(<VmEditPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByText(/Could not connect to VM/i)).toBeInTheDocument()
     )
