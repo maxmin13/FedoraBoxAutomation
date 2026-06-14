@@ -13,7 +13,9 @@ After the VM is created and Fedora is installed on disk, a few manual steps insi
 
 ### 1. Install Fedora to disk
 
-In the live desktop, launch the **Fedora installer** and complete the installation. When it finishes, click **Exit live desktop** — the VM will reboot.
+In the live desktop, launch the **Fedora installer** and complete the installation. When it finishes, click **Exit live desktop**.
+
+Before the VM reboots, remove the Fedora ISO: in the VirtualBox menu go to **Devices → Optical Drives → Remove disk from virtual drive**. Then let the VM reboot — it will boot from the installed disk.
 
 During first boot, complete the initial setup wizard:
 - Create your login user (e.g. `maxmin`)
