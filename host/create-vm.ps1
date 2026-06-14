@@ -48,6 +48,11 @@ param(
     [string]$diskType             = '',
     [string]$vramMB               = '',
     [string]$nicType              = '',
+    [string]$paravirtProvider     = '',
+    [string]$nicChipset           = '',
+    [string]$storageController    = '',
+    [string]$acceleration3d       = '',
+    [string]$cpuExecCap           = '',
     [string]$attachGuestAdditions = '',
     [string]$startVm              = '',
     [string]$forceRecreate        = '',
@@ -237,6 +242,12 @@ if ([string]::IsNullOrWhiteSpace($nicType)) {
     $nicType = $nicType.ToLower()
 }
 
+if ([string]::IsNullOrWhiteSpace($paravirtProvider))  { $paravirtProvider  = 'kvm' }
+if ([string]::IsNullOrWhiteSpace($nicChipset))         { $nicChipset         = 'virtio' }
+if ([string]::IsNullOrWhiteSpace($storageController))  { $storageController  = 'IntelAhci' }
+$accel3d = if ($acceleration3d -in 'on','yes','true','1') { 'on' } else { 'off' }
+$cpuCapInt = if ([string]::IsNullOrWhiteSpace($cpuExecCap)) { 100 } else { [int]$cpuExecCap }
+
 Write-Host ""
 Write-Host "Creating VM '$vmName'..." -ForegroundColor Green
 
@@ -248,9 +259,12 @@ try {
     Invoke-VBox "createvm", "--name", $vmName, "--ostype", "Fedora_64", "--register", "--basefolder", $vmFolder
     Invoke-VBox "modifyvm", $vmName, "--memory", $ramMB, "--cpus", $cpus, "--vram", $vramMB, "--graphicscontroller", "vmsvga"
     Invoke-VBox "modifyvm", $vmName, "--clipboard", "bidirectional", "--draganddrop", "bidirectional"
-    Invoke-VBox "modifyvm", $vmName, "--rtcuseutc", "on", "--paravirtprovider", "kvm", "--accelerate3d", "off"
+    Invoke-VBox "modifyvm", $vmName, "--rtcuseutc", "on", "--paravirtprovider", $paravirtProvider, "--accelerate3d", $accel3d
+    if ($cpuCapInt -lt 100) {
+        Invoke-VBox "modifyvm", $vmName, "--cpuexecutioncap", $cpuCapInt
+    }
     if ($nicType -ne "none") {
-        Invoke-VBox "modifyvm", $vmName, "--nic1", $nicType
+        Invoke-VBox "modifyvm", $vmName, "--nic1", $nicType, "--nictype1", $nicChipset
     }
 
     $diskPath = Join-Path -Path $vmFolder -ChildPath "$vmName\$vmName.$($diskType.ToLower())"
@@ -265,8 +279,13 @@ try {
     Write-Host "  Creating virtual disk ($diskMB MB, $diskType) ..." -ForegroundColor Cyan
     Invoke-VBox "createmedium", "disk", "--filename", $diskPath, "--size", $diskMB, "--format", $diskType, "--variant", "Standard"
     Write-Host "  Disk created." -ForegroundColor Green
-    Invoke-VBox "storagectl", $vmName, "--name", "SATA Controller", "--add", "sata", "--controller", "IntelAhci"
-    Invoke-VBox "storageattach", $vmName, "--storagectl", "SATA Controller", "--port", 0, "--device", 0, "--type", "hdd", "--medium", $diskPath
+    if ($storageController -eq 'NVMe') {
+        Invoke-VBox "storagectl", $vmName, "--name", "NVMe Controller", "--add", "pcie", "--controller", "NVMe"
+        Invoke-VBox "storageattach", $vmName, "--storagectl", "NVMe Controller", "--port", 0, "--device", 0, "--type", "hdd", "--medium", $diskPath
+    } else {
+        Invoke-VBox "storagectl", $vmName, "--name", "SATA Controller", "--add", "sata", "--controller", "IntelAhci"
+        Invoke-VBox "storageattach", $vmName, "--storagectl", "SATA Controller", "--port", 0, "--device", 0, "--type", "hdd", "--medium", $diskPath
+    }
     Invoke-VBox "storagectl", $vmName, "--name", "IDE Controller", "--add", "ide"
     Invoke-VBox "storageattach", $vmName, "--storagectl", "IDE Controller", "--port", 0, "--device", 0, "--type", "dvddrive", "--medium", $isoPath
     Invoke-VBox "modifyvm", $vmName, "--boot1", "dvd", "--boot2", "disk", "--boot3", "none", "--boot4", "none"

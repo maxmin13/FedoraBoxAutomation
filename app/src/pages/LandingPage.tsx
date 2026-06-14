@@ -6,6 +6,7 @@ import type { Vm } from '../electron.d'
 import type { Page } from '../App'
 import VmEditPage from './VmEditPage'
 import VmLoginPage from './VmLoginPage'
+import PerformancePage from './PerformancePage'
 import VmRunningBadge from '../components/VmRunningBadge'
 
 interface LandingPageProps {
@@ -27,6 +28,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   // VM currently open in the detail view (null = show grid)
   const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
   const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
+  const [perfVm,         setPerfVm]         = useState<Vm | null>(null)
 
   // VM waiting at the login gate before entering detail/provision
   const [loginVm,     setLoginVm]     = useState<Vm | null>(null)
@@ -67,6 +69,14 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
     setLoading(false)
   }
 
+  if (perfVm) {
+    return (
+      <div className="h-full overflow-hidden">
+        <PerformancePage vm={perfVm} onBack={() => { setPerfVm(null); loadVms() }} onScriptRunning={onScriptRunning} />
+      </div>
+    )
+  }
+
   if (loginVm && !selectedVm) {
     return (
       <div className="h-full overflow-y-auto">
@@ -86,7 +96,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
   if (selectedVm) {
     return (
       <div className="h-full overflow-y-auto">
-        <VmEditPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} />
+        <VmEditPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} isActive={isActive} />
       </div>
     )
   }
@@ -125,8 +135,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
         </div>
       )}
 
-      {/* Loading state */}
-      {loading && (
+      {/* Loading state — only shown on first load (no VMs yet) */}
+      {loading && vms.length === 0 && (
         <div className="text-zinc-400 text-sm">Loading VMs...</div>
       )}
 
@@ -147,8 +157,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
         </div>
       )}
 
-      {/* VM grid */}
-      {!loading && vms.length > 0 && (
+      {/* VM grid — stays mounted during refresh so card-level error state is preserved */}
+      {vms.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {vms.map((vm) => (
             <VmCard
@@ -157,6 +167,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive }: L
               onRefresh={loadVms}
               onEdit={() => { setLoginVmView('detail'); setLoginVm(vm) }}
               onProvision={() => { setLoginVmView('provision'); setLoginVm(vm) }}
+              onPerformance={() => setPerfVm(vm)}
             />
           ))}
         </div>
@@ -280,9 +291,10 @@ interface VmCardProps {
   onRefresh: () => void
   onEdit: () => void
   onProvision: () => void
+  onPerformance: () => void
 }
 
-function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
+function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardProps) {
   const [busy,     setBusy]     = useState(false)
   const [starting, setStarting] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -297,7 +309,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
     try {
       const result = await window.electronAPI.startVm(vm.name)
       if (!result.ok) {
-        setError(result.error ?? 'Failed to start VM')
+        setError('Could not start the VM — check the logs for details')
       }
     } finally {
       setBusy(false)
@@ -314,7 +326,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
     try {
       const result = await window.electronAPI.stopVm(vm.name)
       if (!result.ok) {
-        setError(result.error ?? 'Failed to stop VM')
+        setError('Could not stop the VM — check the logs for details')
       }
     } finally {
       setBusy(false)
@@ -371,12 +383,12 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
         {error && <p className="text-red-400 text-xs">{error}</p>}
 
         {/* Action buttons */}
-        <div className="flex gap-2 mt-auto flex-wrap">
+        <div className="flex gap-1.5 mt-auto">
           {vm.running ? (
             <button
               onClick={() => setShowStopModal(true)}
               disabled={busy}
-              className="px-3 py-1 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-1 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Stop
             </button>
@@ -384,7 +396,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
             <button
               onClick={handleStart}
               disabled={busy}
-              className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start
             </button>
@@ -393,7 +405,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
           <button
             onClick={() => setShowDeleteModal(true)}
             disabled={vm.running || busy}
-            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Delete
           </button>
@@ -401,7 +413,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
           <button
             onClick={onProvision}
             disabled={busy}
-            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+            className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Provision
           </button>
@@ -409,9 +421,17 @@ function VmCard({ vm, onRefresh, onEdit, onProvision }: VmCardProps) {
           <button
             onClick={onEdit}
             disabled={busy}
-            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Detail
+          </button>
+
+          <button
+            onClick={onPerformance}
+            disabled={busy}
+            className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Performance
           </button>
         </div>
       </div>

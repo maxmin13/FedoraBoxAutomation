@@ -58,12 +58,37 @@ async function writeCredsStore(store) {
   await fs.promises.writeFile(CREDS_FILE, encoded, 'utf8')
 }
 
+// Tracks in-flight VBoxManage child processes for query-vm-installed, keyed by VM name.
+// Populated by query-vm-installed, drained by cancel-query-vm-installed.
+const activeQueryProcs = new Map()
+
+function killProc(proc) {
+  try {
+    if (process.platform === 'win32') {
+      execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' })
+    } else {
+      proc.kill('SIGTERM')
+    }
+  } catch {}
+}
+
+// Like execAsync but also pushes the ChildProcess into a tracking array so it can be killed.
+function execTracked(cmd, options, procs) {
+  return new Promise((resolve, reject) => {
+    const cp = exec(cmd, options, (err, stdout) => {
+      if (err) reject(err)
+      else resolve(stdout)
+    })
+    procs.push(cp)
+  })
+}
+
 // Channels excluded from IPC logging.
 // 'read-log' returns full file content — logging it back would create a feedback loop.
 // Credential channels are excluded to keep passwords out of gui.log.
 const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready'])
 
-function truncate(str, max = 120) {
+function truncate(str, max = 1000) {
   return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
 }
 
@@ -466,6 +491,11 @@ function registerIpcHandlers(win) {
       '-diskType', params.diskType,
       '-vramMB', String(params.vramMB),
       '-nicType', params.nicType,
+      '-paravirtProvider', params.paravirtProvider,
+      '-nicChipset', params.nicChipset,
+      '-storageController', params.storageController,
+      '-acceleration3d', params.acceleration3d ? 'on' : 'off',
+      '-cpuExecCap', String(params.cpuExecCap),
       '-attachGuestAdditions', params.attachGuestAdditions ? 'yes' : 'no',
       '-startVm', params.startVm ? 'yes' : 'no',
       '-forceRecreate', params.forceRecreate ? 'yes' : 'no',
@@ -531,20 +561,39 @@ function registerIpcHandlers(win) {
     if (!entry?.user || !entry?.pass) return { ok: false, noCredentials: true }
     const { user, pass } = entry
     const scriptSrc = path.join(ROOT, 'vm', 'detect-installed.sh')
+    const procs = []
+    activeQueryProcs.set(vmName, procs)
     try {
-      execSync(
+      log.hostMark(`query-vm-installed "${vmName}" — copyto detect-installed.sh (user=${user})`)
+      await execTracked(
         `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/detect-installed.sh --username "${user}" --password "${pass}"`,
-        { encoding: 'utf8', stdio: 'pipe', timeout: 15000 }
+        { encoding: 'utf8', timeout: 15000 },
+        procs
       )
-      const stdout = execSync(
+      log.hostMark(`query-vm-installed "${vmName}" — running /tmp/detect-installed.sh`)
+      const stdout = await execTracked(
         `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/detect-installed.sh`,
-        { encoding: 'utf8', stdio: 'pipe', timeout: 30000 }
+        { encoding: 'utf8', timeout: 30000 },
+        procs
       )
+      stdout.trim().split('\n').forEach((line) => log.hostLine(line, 'SH'))
       return { ok: true, installed: JSON.parse(stdout.trim()) }
     } catch (error) {
       log.error(`[ipc][query-vm-installed] "${vmName}":`, error.message)
       return { ok: false, error: error.message }
+    } finally {
+      activeQueryProcs.delete(vmName)
     }
+  })
+
+  handleIpc('cancel-query-vm-installed', (_event, { vmName }) => {
+    const procs = activeQueryProcs.get(vmName)
+    if (procs?.length) {
+      procs.forEach(killProc)
+      activeQueryProcs.delete(vmName)
+      log.info(`[ipc][cancel-query-vm-installed] killed ${procs.length} proc(s) for "${vmName}"`)
+    }
+    return { ok: true }
   })
 
   // ── run-provision-script ─────────────────────────────────
@@ -715,10 +764,38 @@ function registerIpcHandlers(win) {
           diskType,
           sharedFolders: userSharedFolders,
           logSyncPath,
+          paravirtProvider:      kv['paravirtprovider']      ?? 'default',
+          acceleration3d:        kv['accelerate3d']          === 'on',
+          nicType:               kv['nictype1']              ?? '',
+          cpuExecCap:            parseInt(kv['cpuexecutioncap'] ?? '100', 10),
+          storageControllerType: kv['storagecontrollertype0'] ?? null,
         },
       }
     } catch (error) {
       log.error(`[ipc][get-vm-info] "${vmName}":`, error.message)
+      return { ok: false, error: error.message }
+    }
+  })
+
+  // ── fix-vm-perf-setting ───────────────────────────────────
+  // Applies a single VBoxManage modifyvm fix for a known suboptimal setting.
+  // The VM must be powered off; VBoxManage will return an error otherwise.
+  handleIpc('fix-vm-perf-setting', async (_event, { vmName, setting }) => {
+    const cmds = {
+      paravirt:       `VBoxManage modifyvm "${vmName}" --paravirtprovider kvm`,
+      nicType:        `VBoxManage modifyvm "${vmName}" --nictype1 virtio`,
+      acceleration3d: `VBoxManage modifyvm "${vmName}" --accelerate3d on`,
+      cpuExecCap:     `VBoxManage modifyvm "${vmName}" --cpuexecutioncap 100`,
+    }
+    const cmd = cmds[setting]
+    if (!cmd) return { ok: false, error: `Unknown setting: ${setting}` }
+    try {
+      log.info(`[ipc][fix-vm-perf-setting] running: ${cmd}`)
+      await execAsync(cmd, { encoding: 'utf8' })
+      log.info(`[ipc][fix-vm-perf-setting] "${vmName}" ${setting} fixed`)
+      return { ok: true }
+    } catch (error) {
+      log.error(`[ipc][fix-vm-perf-setting] "${vmName}" ${setting}:`, error.message)
       return { ok: false, error: error.message }
     }
   })

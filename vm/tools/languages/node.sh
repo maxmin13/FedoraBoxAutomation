@@ -7,15 +7,30 @@
 ##              is required.
 ## Usage:       sudo ./node.sh <login-user> [major-version]
 ## Parameters:  $1  <login-user>    Non-root desktop username (e.g. maxmin)
-##              $2  [major-version] Node.js major version to install
-##                                  (default: 22)
+##              $2  [major-version] Node.js major version to install (default: latest LTS)
+##                                  Pass 'latest' to auto-resolve the current LTS major.
 ##
 
 source /tmp/common.sh
 
 LOGIN_USER="${1:-}"
 require_login_user "${LOGIN_USER}"
-NODE_MAJOR="${2:-22}"
+NODE_MAJOR="${2:-latest}"
+
+if [[ "${NODE_MAJOR}" == 'latest' ]]; then
+    log_info "Querying nodejs.org for the latest LTS major version ..."
+    NODE_MAJOR=$(curl -fsSL "https://nodejs.org/dist/index.json" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+lts = next((v for v in data if v['lts']), None)
+print(lts['version'].split('.')[0].lstrip('v') if lts else '')
+")
+    if [[ -z "${NODE_MAJOR}" ]]; then
+        log_error "Could not determine the latest Node.js LTS major version. Check network connectivity."
+        exit 1
+    fi
+    log_info "Latest LTS major version: ${NODE_MAJOR}"
+fi
 
 ####
 STEP "Node.js ${NODE_MAJOR}.x"

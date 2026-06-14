@@ -12,6 +12,23 @@ type Step = 1 | 2 | 3 | 4
 const DISK_TYPES = ['VDI', 'VMDK', 'VHD']
 const NIC_TYPES  = ['nat', 'bridged', 'host-only', 'none']
 
+const PARAVIRT_OPTIONS = [
+  { value: 'kvm',     label: 'KVM (recommended for Linux)' },
+  { value: 'default', label: 'Default (auto)' },
+  { value: 'minimal', label: 'Minimal' },
+  { value: 'none',    label: 'None' },
+]
+
+const NIC_CHIPSET_OPTIONS = [
+  { value: 'virtio',   label: 'virtio-net (fastest)' },
+  { value: '82540EM',  label: 'Intel e1000 MT' },
+]
+
+const STORAGE_CTRL_OPTIONS = [
+  { value: 'IntelAhci', label: 'SATA / AHCI' },
+  { value: 'NVMe',      label: 'NVMe (fastest)' },
+]
+
 export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { onScriptRunning: (running: boolean) => void; onNavigate: (page: Page) => void; navKey: number }) {
   // Form fields
   const [vmName,   setVmName]   = useState('')
@@ -22,8 +39,13 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const [diskMB,     setDiskMB]     = useState(40000)
   const [diskType,   setDiskType]   = useState('VDI')
   const [vramMB,     setVramMB]     = useState(128)
-  const [nicType,    setNicType]    = useState('nat')
-  const [startAfter, setStartAfter] = useState(false)
+  const [nicType,          setNicType]          = useState('nat')
+  const [paravirtProvider, setParavirtProvider] = useState('kvm')
+  const [nicChipset,       setNicChipset]       = useState('virtio')
+  const [storageCtrl,      setStorageCtrl]      = useState('IntelAhci')
+  const [acceleration3d,   setAcceleration3d]   = useState(true)
+  const [cpuExecCap,       setCpuExecCap]       = useState(100)
+  const [startAfter,       setStartAfter]       = useState(false)
 
   // Wizard + execution state
   const [step,          setStep]          = useState<Step>(1)
@@ -64,8 +86,9 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const ramError  = ramMB  < 1024  ? 'Minimum 1024 MB'            : null
   const cpusError = cpus   < 1     ? 'Minimum 1'                   : cpus > 32   ? 'Maximum 32'   : null
   const diskError = diskMB < 10000 ? 'Minimum 10000 MB (10 GB)'    : null
-  const vramError = vramMB < 16    ? 'Minimum 16 MB'               : vramMB > 256 ? 'Maximum 256 MB' : null
-  const step2Valid = !ramError && !cpusError && !diskError && !vramError
+  const vramError   = vramMB    < 16  ? 'Minimum 16 MB'    : vramMB > 256    ? 'Maximum 256 MB'   : null
+  const cpuCapError = cpuExecCap < 1   ? 'Minimum 1%'      : cpuExecCap > 100 ? 'Maximum 100%'    : null
+  const step2Valid = !ramError && !cpusError && !diskError && !vramError && !cpuCapError
 
   async function handleCreate() {
     setPageState('running')
@@ -87,6 +110,11 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
       diskType,
       vramMB,
       nicType,
+      paravirtProvider,
+      nicChipset,
+      storageController: storageCtrl,
+      acceleration3d,
+      cpuExecCap,
       attachGuestAdditions: true,
       startVm: startAfter,
       forceRecreate: nameConflict,
@@ -290,75 +318,62 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
 
         {/* Step 2 — Hardware */}
         {step === 2 && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">RAM (MB)</label>
-                <input
-                  type="number"
-                  value={ramMB}
-                  onChange={(e) => setRamMB(Number(e.target.value))}
-                  min={1024}
-                  step={512}
-                  className={ic}
-                />
-                {ramError && <p className="text-red-400 text-xs mt-1">{ramError}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">CPUs</label>
-                <input
-                  type="number"
-                  value={cpus}
-                  onChange={(e) => setCpus(Number(e.target.value))}
-                  min={1}
-                  max={32}
-                  className={ic}
-                />
-                {cpusError && <p className="text-red-400 text-xs mt-1">{cpusError}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  Disk Size (MB)
-                </label>
-                <input
-                  type="number"
-                  value={diskMB}
-                  onChange={(e) => setDiskMB(Number(e.target.value))}
-                  min={10000}
-                  step={1000}
-                  className={ic}
-                />
-                {diskError && <p className="text-red-400 text-xs mt-1">{diskError}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-1">
-                  Video RAM (MB)
-                </label>
-                <input
-                  type="number"
-                  value={vramMB}
-                  onChange={(e) => setVramMB(Number(e.target.value))}
-                  min={16}
-                  max={256}
-                  className={ic}
-                />
-                {vramError && <p className="text-red-400 text-xs mt-1">{vramError}</p>}
-              </div>
-            </div>
-
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">Disk Type</label>
-              <select
-                value={diskType}
-                onChange={(e) => setDiskType(e.target.value)}
-                className={ic}
-              >
-                {DISK_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+              <label className="block text-sm font-medium text-zinc-300 mb-1">RAM (MB)</label>
+              <input type="number" value={ramMB} onChange={(e) => setRamMB(Number(e.target.value))} min={1024} step={512} className={ic} />
+              {ramError && <p className="text-red-400 text-xs mt-1">{ramError}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">CPUs</label>
+              <input type="number" value={cpus} onChange={(e) => setCpus(Number(e.target.value))} min={1} max={32} className={ic} />
+              {cpusError && <p className="text-red-400 text-xs mt-1">{cpusError}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Disk Size (MB)</label>
+              <input type="number" value={diskMB} onChange={(e) => setDiskMB(Number(e.target.value))} min={10000} step={1000} className={ic} />
+              {diskError && <p className="text-red-400 text-xs mt-1">{diskError}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Video RAM (MB)</label>
+              <input type="number" value={vramMB} onChange={(e) => setVramMB(Number(e.target.value))} min={16} max={256} className={ic} />
+              {vramError && <p className="text-red-400 text-xs mt-1">{vramError}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Disk Format</label>
+              <select value={diskType} onChange={(e) => setDiskType(e.target.value)} className={ic}>
+                {DISK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Storage Controller<InfoTip text="NVMe is faster under heavy I/O; SATA is more compatible with existing setups" /></label>
+              <select value={storageCtrl} onChange={(e) => setStorageCtrl(e.target.value)} className={ic}>
+                {STORAGE_CTRL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Paravirtualization<InfoTip text="KVM improves CPU and I/O performance for Linux guests" /></label>
+              <select value={paravirtProvider} onChange={(e) => setParavirtProvider(e.target.value)} className={ic}>
+                {PARAVIRT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">NIC Chipset<InfoTip text="A faster network adapter type is available for this VM" /></label>
+              <select value={nicChipset} onChange={(e) => setNicChipset(e.target.value)} className={ic}>
+                {NIC_CHIPSET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">3D Acceleration<InfoTip text="Requires Guest Additions to be installed inside the VM to take effect" /></label>
+              <select value={acceleration3d ? 'on' : 'off'} onChange={(e) => setAcceleration3d(e.target.value === 'on')} className={ic}>
+                <option value="on">Enabled</option>
+                <option value="off">Disabled</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">CPU Execution Cap (%)<InfoTip text="Limits how much host CPU the VM can use — keep at 100% for full performance" /></label>
+              <input type="number" value={cpuExecCap} onChange={(e) => setCpuExecCap(Number(e.target.value))} min={1} max={100} className={ic} />
+              {cpuCapError && <p className="text-red-400 text-xs mt-1">{cpuCapError}</p>}
             </div>
           </div>
         )}
@@ -417,11 +432,16 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
               </ConfirmSection>
               <div className="grid grid-cols-2 divide-x divide-zinc-700">
                 <ConfirmSection title="Hardware">
-                  <ConfirmRow label="RAM"       value={`${ramMB} MB`} />
-                  <ConfirmRow label="CPUs"      value={String(cpus)} />
-                  <ConfirmRow label="Disk Size" value={`${diskMB} MB`} />
-                  <ConfirmRow label="Video RAM" value={`${vramMB} MB`} />
-                  <ConfirmRow label="Disk Type" value={diskType} />
+                  <ConfirmRow label="RAM"         value={`${ramMB} MB`} />
+                  <ConfirmRow label="CPUs"        value={String(cpus)} />
+                  <ConfirmRow label="Disk Size"   value={`${diskMB} MB`} />
+                  <ConfirmRow label="Video RAM"   value={`${vramMB} MB`} />
+                  <ConfirmRow label="Disk Format" value={diskType} />
+                  <ConfirmRow label="Storage"     value={STORAGE_CTRL_OPTIONS.find((o) => o.value === storageCtrl)?.label ?? storageCtrl} />
+                  <ConfirmRow label="Paravirt"    value={PARAVIRT_OPTIONS.find((o) => o.value === paravirtProvider)?.label ?? paravirtProvider} />
+                  <ConfirmRow label="NIC Chipset" value={NIC_CHIPSET_OPTIONS.find((o) => o.value === nicChipset)?.label ?? nicChipset} />
+                  <ConfirmRow label="3D Accel"    value={acceleration3d ? 'Enabled' : 'Disabled'} />
+                  <ConfirmRow label="CPU Cap"     value={`${cpuExecCap}%`} />
                 </ConfirmSection>
                 <ConfirmSection title="Options">
                   <ConfirmRow label="Network"     value={nicType} />
@@ -561,6 +581,45 @@ function ConfirmRow({ label, value }: { label: string; value: string }) {
       <span className="w-32 text-zinc-400 shrink-0">{label}</span>
       <span className="text-zinc-200 break-all">{value}</span>
     </div>
+  )
+}
+
+function InfoTip({ text }: { text: string }) {
+  const [show, setShow]     = useState(false)
+  const [style, setStyle]   = useState<React.CSSProperties>({})
+  const ref                 = useRef<HTMLSpanElement>(null)
+
+  function handleMouseEnter() {
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      setStyle({
+        position: 'fixed',
+        top:  r.top - 6,
+        left: r.left + r.width / 2,
+        transform: 'translate(-50%, -100%)',
+        zIndex: 9999,
+      })
+    }
+    setShow(true)
+  }
+
+  return (
+    <span
+      ref={ref}
+      className="ml-1 text-zinc-500 hover:text-zinc-300 cursor-default text-xs align-middle"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShow(false)}
+    >
+      &#9432;
+      {show && (
+        <span
+          style={style}
+          className="w-56 bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs rounded px-2 py-1.5 whitespace-normal pointer-events-none shadow-lg"
+        >
+          {text}
+        </span>
+      )}
+    </span>
   )
 }
 

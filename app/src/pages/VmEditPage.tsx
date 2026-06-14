@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
@@ -112,6 +112,7 @@ interface VmEditPageProps {
   onScriptRunning: (running: boolean) => void
   refreshKey?: number
   initialView?: View
+  isActive?: boolean
 }
 
 type View = 'detail' | 'share-folder' | 'share-logs' | 'provision'
@@ -137,7 +138,7 @@ function capitalize(s: string) {
 }
 
 
-export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView }: VmEditPageProps) {
+export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, initialView, isActive = true }: VmEditPageProps) {
   type ToolsStatus = 'idle' | 'loading' | 'ok' | 'stopped' | 'no-credentials' | 'error'
 
   const [view, setView]               = useState<View>(initialView ?? 'detail')
@@ -168,7 +169,12 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
   }, [vm.name, refreshKey, infoKey, view])
 
   // Query installed tools whenever VM state or VM name changes.
+  // Cancels the in-flight guestcontrol process when the user navigates away.
   useEffect(() => {
+    if (!isActive) {
+      window.electronAPI.cancelQueryVmInstalled(vm.name)
+      return
+    }
     if (view === 'provision') return
     if (!info) return
     if (info.state !== 'running') {
@@ -177,7 +183,9 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
       return
     }
     setToolsStatus('loading')
+    let stale = false
     window.electronAPI.queryVmInstalled(vm.name).then((result) => {
+      if (stale) return
       if (result.ok) {
         const knownKeys = new Set(TOOL_GROUPS.flatMap((g) => g.tools).map((t) => t.key))
         const filtered: Record<string, string | boolean> = {}
@@ -194,7 +202,11 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
         setToolsStatus('error')
       }
     })
-  }, [info?.state, vm.name, toolsKey, view])
+    return () => {
+      stale = true
+      window.electronAPI.cancelQueryVmInstalled(vm.name)
+    }
+  }, [isActive, info?.state, vm.name, toolsKey, view])
 
   if (view === 'share-folder') {
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
@@ -217,10 +229,10 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
     : '—'
 
   return (
-    <div className="w-full">
+    <div className="h-full flex flex-col overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-3 shrink-0">
         <button
           onClick={onBack}
           className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
@@ -232,20 +244,20 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
       </div>
 
       {loadError && (
-        <div className="bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
+        <div className="shrink-0 bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
           {loadError}
         </div>
       )}
 
       {!info && !loadError && (
-        <p className="text-zinc-500 text-sm">Loading VM info...</p>
+        <p className="shrink-0 text-zinc-500 text-sm">Loading VM info...</p>
       )}
 
       {info && (
-        <div className="flex gap-4">
+        <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
 
           {/* Left column — read-only info */}
-          <div className="flex-1 space-y-2">
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
 
             <Section title="General">
               <Row label="OS type" value={info.osType} />
@@ -286,7 +298,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
           </div>
 
           {/* Right column — action sections */}
-          <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
 
             <Section
               title="Shared folders"
@@ -311,7 +323,7 @@ export default function VmEditPage({ vm, onBack, onScriptRunning, refreshKey, in
                       <span className="text-zinc-500 text-xs">Host folder</span>
                       <span className="text-zinc-500 text-xs">VM folder</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-0">
                       {valid.map((sf) => (
                         <div key={sf.name} className="grid grid-cols-2 gap-3">
                           <CopyCell value={sf.hostPath} />
@@ -425,8 +437,8 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-2">
+      <div className="flex items-center justify-between mb-1.5">
         <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">{title}</h2>
         {action}
       </div>
@@ -476,7 +488,7 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
 
   return (
     <div className="relative flex items-center gap-2 text-sm min-w-0 group">
-      <span className="text-zinc-500 w-24 shrink-0">{label}</span>
+      <span className="text-zinc-500 w-20 shrink-0">{label}</span>
       <span className={mono ? 'text-zinc-300 font-mono text-xs truncate min-w-0' : 'text-zinc-300'}>
         {value}
       </span>

@@ -12,6 +12,11 @@ export interface CreateVmParams {
   diskType: string
   vramMB: number
   nicType: string
+  paravirtProvider: string
+  nicChipset: string
+  storageController: string
+  acceleration3d: boolean
+  cpuExecCap: number
   attachGuestAdditions: boolean
   startVm: boolean
   forceRecreate: boolean
@@ -83,6 +88,11 @@ export interface VmInfo {
   mac: string
   sharedFolders: SharedFolder[]
   logSyncPath: string | null
+  paravirtProvider: string
+  acceleration3d: boolean
+  nicType: string
+  cpuExecCap: number
+  storageControllerType: string | null
 }
 
 export interface ScriptLine {
@@ -107,6 +117,8 @@ declare global {
       loadVmCredentials: (vmName: string) => Promise<{ ok: boolean; user?: string; pass?: string; loginUser?: string }>
       loadAllVmCredentials: () => Promise<{ ok: true; entries: Record<string, { user: string; pass: string; loginUser: string }> }>
       saveVmCredentials: (vmName: string, user: string, pass: string, loginUser: string) => Promise<{ ok: boolean }>
+      fixVmPerfSetting: (vmName: string, setting: 'paravirt' | 'nicType' | 'acceleration3d' | 'cpuExecCap') => Promise<{ ok: boolean; error?: string }>
+      cancelQueryVmInstalled: (vmName: string) => Promise<{ ok: boolean }>
       queryVmInstalled: (vmName: string) => Promise<
         | { ok: true; installed: Record<string, boolean | string> }
         | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }

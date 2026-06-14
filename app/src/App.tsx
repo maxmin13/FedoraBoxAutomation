@@ -67,7 +67,7 @@ export default function App() {
       <NavBar currentPage={currentPage} onNavigate={handleNavigate} scriptRunning={scriptRunning} scriptPage={scriptPage} />
 
       {/* Main content area — scrollable */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-hidden p-6">
         <ErrorBoundary>
           <div style={{ display: currentPage === 'landing' ? undefined : 'none' }} className="h-full overflow-hidden">
             <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} />

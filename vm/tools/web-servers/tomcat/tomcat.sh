@@ -27,8 +27,21 @@ source /tmp/common.sh
 
 LOGIN_USER="${1:-}"
 require_login_user "${LOGIN_USER}"
-TOMCAT_VERSION="${2:-10.1.36}"
+TOMCAT_VERSION="${2:-latest-10}"
 TOMCAT_PORT="${3:-8080}"
+
+if [[ "${TOMCAT_VERSION}" == latest-* ]]; then
+    AUTO_MAJOR="${TOMCAT_VERSION#latest-}"
+    log_info "Querying Apache dist server for the latest Tomcat ${AUTO_MAJOR}.x release ..."
+    TOMCAT_VERSION=$(curl -fsSL "https://downloads.apache.org/tomcat/tomcat-${AUTO_MAJOR}/" \
+        | grep -oP '(?<=href="v)[0-9]+\.[0-9]+\.[0-9]+(?=/)' | sort -V | tail -1)
+    if [[ -z "${TOMCAT_VERSION}" ]]; then
+        log_error "Could not determine the latest Tomcat ${AUTO_MAJOR}.x version. Check network connectivity."
+        exit 1
+    fi
+    log_info "Latest Tomcat ${AUTO_MAJOR}.x version: ${TOMCAT_VERSION}"
+fi
+
 TOMCAT_MAJOR="${TOMCAT_VERSION%%.*}"
 TOMCAT_DIR="/opt/apache-tomcat-${TOMCAT_VERSION}-${TOMCAT_PORT}"
 SERVICE_NAME="tomcat-${TOMCAT_VERSION}-${TOMCAT_PORT}"

@@ -78,6 +78,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Queries the VM for installed tools by running detect-installed.sh via guestcontrol
   queryVmInstalled: (vmName) => ipcRenderer.invoke('query-vm-installed', { vmName }),
+  // Kills any in-flight query-vm-installed process for the given VM
+  cancelQueryVmInstalled: (vmName) => ipcRenderer.invoke('cancel-query-vm-installed', { vmName }),
+
+  // Applies a single VBoxManage performance fix (VM must be stopped)
+  fixVmPerfSetting: (vmName, setting) => ipcRenderer.invoke('fix-vm-perf-setting', { vmName, setting }),
 
   // ── Sanity checks ─────────────────────────────────────────
   // Runs the sanity check script and returns structured JSON results

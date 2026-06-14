@@ -31,7 +31,7 @@ export default function NavBar({ currentPage, onNavigate, scriptRunning = false,
         const isActive = item.page === currentPage
 
         // Active item gets a filled background; inactive items are muted
-        const locked = scriptRunning && item.page !== 'logs' && item.page !== 'docs' && item.page !== scriptPage
+        const locked = scriptRunning && scriptPage !== 'landing' && item.page !== 'logs' && item.page !== 'docs' && item.page !== scriptPage
 
         const buttonClass = isActive
           ? 'px-3 py-1 rounded text-sm font-medium bg-zinc-600 text-white'

@@ -52,8 +52,9 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource — includes npm',
         argType: 'user+custom',
         argPrompts:  ['Node.js version'],
-        argDefaults: ['22'],
+        argDefaults: ['latest'],
         argOptions: [[
+          { value: 'latest', label: 'Latest LTS (auto-detect)' },
           { value: '24', label: '24 — Current stable · ships natively in Fedora 44' },
           { value: '22', label: '22 — LTS Active (until Apr 2027)' },
           { value: '20', label: '20 — LTS Maintenance (until Apr 2026)' },
@@ -64,7 +65,12 @@ const CATEGORIES: CategoryDef[] = [
     name: 'Build Tools', dir: 'build-tools',
     scripts: [
       { name: 'maven.sh', label: 'Apache Maven', relPath: 'maven.sh', description: 'Apache Maven - sets M2_HOME and PATH',
-        argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['3.9.5'] },
+        argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['latest'],
+        argOptions: [[
+          { value: 'latest',  label: 'Latest 3.x (auto-detect)' },
+          { value: '3.9.9',   label: '3.9.9' },
+          { value: '3.9.5',   label: '3.9.5' },
+        ]] },
     ],
   },
   {
@@ -74,11 +80,14 @@ const CATEGORIES: CategoryDef[] = [
       { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
         argType: 'user+custom2',
         argPrompts:  ['Tomcat version', 'HTTP port'],
-        argDefaults: ['10.1.36', '8080'],
+        argDefaults: ['latest-10', '8080'],
         argOptions: [[
-          { value: '11.0.7',  label: '11.0.7  — latest 11.0 · Java 21+' },
-          { value: '10.1.36', label: '10.1.36 — latest 10.1 · Java 11+' },
-          { value: '9.0.102', label: '9.0.102 — latest  9.0 · Java  8+' },
+          { value: 'latest-11', label: '11.x — Latest (auto-detect) · Java 21+' },
+          { value: 'latest-10', label: '10.x — Latest (auto-detect) · Java 11+' },
+          { value: 'latest-9',  label: '9.x  — Latest (auto-detect) · Java  8+' },
+          { value: '11.0.7',    label: '11.0.7  — pinned · Java 21+' },
+          { value: '10.1.36',   label: '10.1.36 — pinned · Java 11+' },
+          { value: '9.0.102',   label: '9.0.102 — pinned · Java  8+' },
         ]] },
     ],
   },
