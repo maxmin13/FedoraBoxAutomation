@@ -47,6 +47,7 @@ export interface ProvisionScriptParams {
   scriptRelPath: string
   scriptArgs: string
   categoryDir?: string
+  scriptName?: string
 }
 
 export interface ProvisionFullParams {
@@ -131,7 +132,7 @@ declare global {
       deleteVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       runSanityChecks: () => Promise<{ ok: boolean; checks: CheckResult[]; error?: string }>
       installVirtualBox: () => Promise<{ ok: boolean }>
-      getScriptState: () => Promise<{ ok: boolean; running: boolean; done: boolean; exitCode: number | null; lines: ScriptLine[]; context: { vmName: string; type: string } | null }>
+      getScriptState: () => Promise<{ ok: boolean; running: boolean; done: boolean; exitCode: number | null; lines: ScriptLine[]; context: { vmName: string; type: string; categoryDir: string | null; scriptName: string | null } | null }>
       onScriptLine: (callback: (line: ScriptLine) => void) => () => void
       onScriptDone: (callback: (exitCode: number) => void) => () => void
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>

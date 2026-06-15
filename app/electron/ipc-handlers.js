@@ -613,7 +613,7 @@ function registerIpcHandlers(win) {
       '-NonInteractive',
     ]
     if (params.scriptArgs) psArgs.push('-ScriptArgs', params.scriptArgs)
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionScript, psArgs, { vmName: params.vmName, type: 'provision', categoryDir: params.categoryDir ?? null })
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionScript, psArgs, { vmName: params.vmName, type: 'provision', categoryDir: params.categoryDir ?? null, scriptName: params.scriptName ?? null })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })

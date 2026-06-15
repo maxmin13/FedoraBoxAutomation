@@ -300,7 +300,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [loginUser, setLoginUser] = useState('')
 
   const [pageState,    setPageState]    = useState<PageState>('idle')
-  const [idleView,     setIdleView]     = useState<IdleView>('mode')
+  const [idleView,     setIdleView]     = useState<IdleView>('categories')
   const [lines,        setLines]        = useState<ScriptLine[]>([])
   const [success,      setSuccess]      = useState<boolean | null>(null)
   const [error,        setError]        = useState<string | null>(null)
@@ -314,7 +314,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
-  const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
+  const seenResultsRef         = useRef<Set<string>>(new Set())
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
@@ -351,44 +351,53 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
-  useEffect(() => {
-    return () => { reconnectUnsubRef.current?.line(); reconnectUnsubRef.current?.done() }
-  }, [])
-
-  async function handleSelectCategory(cat: typeof CATEGORIES[number]) {
+  function handleSelectCategory(cat: typeof CATEGORIES[number]) {
     setSelectedCategory(cat)
+    setIdleView('scripts')
+  }
+
+  async function handleSelectScript(script: ScriptDef) {
     const state = await window.electronAPI.getScriptState()
-    const matchesThisCategory =
+    const matchesThisScript =
       state.ok &&
       (state.running || state.done) &&
       state.context?.vmName === vm.name &&
       state.context?.type === 'provision' &&
-      state.context?.categoryDir === cat.dir
+      state.context?.scriptName === script.name
 
-    if (matchesThisCategory) {
+    if (matchesThisScript && state.running) {
+      setSelectedScript(script)
+      setRunningLabel(script.label)
       setLines(state.lines)
-      if (state.running) {
-        setPageState('running')
-        setShowLog(true)
-        const unsubLine = window.electronAPI.onScriptLine((line) => {
-          setLines((prev) => [...prev, line])
-        })
-        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-          setSuccess(exitCode === 0)
-          setPageState('done')
-          setShowLog(false)
-          reconnectUnsubRef.current?.line()
-          reconnectUnsubRef.current?.done()
-          reconnectUnsubRef.current = null
-        })
-        reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
-      } else {
-        setSuccess(state.exitCode === 0)
+      setPageState('running')
+      setShowLog(true)
+      const unsubLine = window.electronAPI.onScriptLine((line) => {
+        setLines((prev) => [...prev, line])
+      })
+      const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+        setSuccess(exitCode === 0)
+        seenResultsRef.current.add(script.name)
         setPageState('done')
-      }
+        setShowLog(false)
+        unsubLine()
+        unsubDone()
+      })
       return
     }
-    setIdleView('scripts')
+
+    if (matchesThisScript && state.done && !seenResultsRef.current.has(script.name)) {
+      seenResultsRef.current.add(script.name)
+      setSelectedScript(script)
+      setRunningLabel(script.label)
+      setLines(state.lines)
+      setSuccess(state.exitCode === 0)
+      setPageState('done')
+      return
+    }
+
+    setSelectedScript(script)
+    setArgValues(['', ''])
+    setIdleView('script-args')
   }
 
   function handleNavBack() {
@@ -405,6 +414,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     runFn: () => Promise<{ ok: boolean; error?: string; errorDetail?: string }>,
     trackAlreadyInstalled = true
   ) {
+    const runScriptName = selectedScript?.name
+    const markSeen = () => { if (runScriptName) seenResultsRef.current.add(runScriptName) }
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -430,6 +441,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         setForceConfirm(true)
         setSuccess(false)
         setAlreadyInstalled(false)
+        markSeen()
         setPageState('done')
         setShowLog(false)
         unsubLine()
@@ -438,6 +450,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       }
       setAlreadyInstalled(alreadyInstalledRef.current)
       setSuccess(exitCode === 0)
+      markSeen()
       setPageState('done')
       setShowLog(false)
       unsubLine()
@@ -450,6 +463,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSuccess(false)
+      markSeen()
       setPageState('done')
       setShowLog(false)
       unsubLine()
@@ -471,6 +485,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         scriptRelPath: selectedScript.scriptPath ?? `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
         scriptArgs,
         categoryDir: selectedCategory.dir,
+        scriptName:  selectedScript.name,
       })
     )
   }
@@ -793,7 +808,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               {selectedCategory.scripts.map((script) => (
                 <button
                   key={script.name}
-                  onClick={() => { setSelectedScript(script); setArgValues(['', '']); setIdleView('script-args') }}
+                  onClick={() => handleSelectScript(script)}
                   className="w-full text-left px-4 py-3 hover:bg-zinc-700 transition-colors"
                 >
                   <p className="text-zinc-200 text-sm font-medium">{script.label}</p>
