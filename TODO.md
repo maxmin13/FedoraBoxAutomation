@@ -14,3 +14,7 @@
 # rebuild zip dist file
 
 # review readme file snapshots
+
+# provisioning jdk let the user select a version from drop down list,
+# see eclipse and most recent version handling
+# see if other programs can be handled with version

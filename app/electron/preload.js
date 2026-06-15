@@ -121,6 +121,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── Streaming output ──────────────────────────────────────
   // The renderer registers a listener for live script output lines.
   // Returns an unsubscribe function so the component can clean up.
+  getScriptState: () => ipcRenderer.invoke('get-script-state'),
+
   onScriptLine: (callback) => {
     const handler = (_event, line) => callback(line)
     ipcRenderer.on('script-line', handler)

@@ -6,8 +6,6 @@ import type { Page } from '../App'
 interface NavBarProps {
   currentPage: Page
   onNavigate: (page: Page) => void
-  scriptRunning?: boolean
-  scriptPage?: Page
 }
 
 const NAV_ITEMS: { page: Page; label: string }[] = [
@@ -18,9 +16,7 @@ const NAV_ITEMS: { page: Page; label: string }[] = [
   { page: 'docs', label: 'Docs' },
 ]
 
-const ALWAYS_ACCESSIBLE: Page[] = ['logs', 'docs']
-
-export default function NavBar({ currentPage, onNavigate, scriptRunning, scriptPage }: NavBarProps) {
+export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
   return (
     <nav className="bg-zinc-800 border-b border-zinc-700 px-6 py-3 flex items-center gap-6">
       {/* App title */}
@@ -31,20 +27,15 @@ export default function NavBar({ currentPage, onNavigate, scriptRunning, scriptP
       {/* Nav links */}
       {NAV_ITEMS.map((item) => {
         const isActive = item.page === currentPage
-        const locked = scriptRunning &&
-          !ALWAYS_ACCESSIBLE.includes(item.page) &&
-          item.page !== scriptPage
 
         const buttonClass = isActive
           ? 'px-3 py-1 rounded text-sm font-medium bg-zinc-600 text-white'
-          : locked
-            ? 'px-3 py-1 rounded text-sm font-medium text-zinc-600 cursor-not-allowed'
-            : 'px-3 py-1 rounded text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors'
+          : 'px-3 py-1 rounded text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors'
 
         return (
           <button
             key={item.page}
-            onClick={() => { if (!locked) onNavigate(item.page) }}
+            onClick={() => onNavigate(item.page)}
             className={buttonClass}
           >
             {item.label}

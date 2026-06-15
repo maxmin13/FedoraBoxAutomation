@@ -115,6 +115,7 @@ app/
 - **Streaming channels** (push from main to renderer via `win.webContents.send`):
   - `script-line` — one output line as it arrives (source: `stdout` | `stderr`)
   - `script-done` — exit code when the script finishes
+- **One script at a time**: `script-runner.js` holds a single `activeChild` reference and the streaming channels carry no script ID, so only one script can run concurrently. This is also enforced at the guest level: `dnf` holds an exclusive lock for the duration of any install, so a second provision script would fail immediately even if the app launched it in parallel.
 
 ---
 

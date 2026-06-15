@@ -24,39 +24,6 @@ describe('NavBar', () => {
     expect(onNavigate).toHaveBeenCalledWith('setup')
   })
 
-  it('disables non-Activity, non-Docs nav buttons when scriptRunning is true', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
-    fireEvent.click(screen.getByRole('button', { name: 'My VMs' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
-    expect(onNavigate).not.toHaveBeenCalled()
-  })
-
-  it('keeps Activity accessible when scriptRunning is true', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
-    expect(screen.getByRole('button', { name: 'Activity' })).not.toBeDisabled()
-  })
-
-  it('keeps Docs accessible when scriptRunning is true', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Docs' }))
-    expect(onNavigate).toHaveBeenCalledWith('docs')
-  })
-
-  it('keeps the script-running page button accessible during a script run', () => {
-    render(<NavBar currentPage="create-vm" onNavigate={onNavigate} scriptRunning={true} scriptPage="create-vm" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
-    expect(onNavigate).toHaveBeenCalledWith('create-vm')
-    onNavigate.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
-    expect(onNavigate).not.toHaveBeenCalled()
-  })
-
-  it('does not disable nav buttons when scriptRunning is false', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={false} />)
-    expect(screen.getByRole('button', { name: 'My VMs' })).not.toBeDisabled()
-  })
-
   it('calls onNavigate with "logs" when Activity is clicked', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }))

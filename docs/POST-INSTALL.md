@@ -144,3 +144,9 @@ After this reboot, **Test Connection** on the Provision page should succeed and 
 | 5 | Disable SELinux in `/etc/selinux/config` | Yes |
 
 Steps 3, 4, and 5 can all be done in the same session before the final reboot.
+
+---
+
+## Provisioning notes
+
+**One installation at a time.** Fedora's package manager (`dnf`) holds an exclusive lock while installing or updating packages. If you try to run a second provision script before the first one finishes, it will fail immediately with a lock error. Wait for the current operation to complete before starting another.

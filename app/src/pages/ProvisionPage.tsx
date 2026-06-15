@@ -314,6 +314,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
+  const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
@@ -349,6 +350,46 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   useEffect(() => {
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
+
+  useEffect(() => {
+    return () => { reconnectUnsubRef.current?.line(); reconnectUnsubRef.current?.done() }
+  }, [])
+
+  async function handleSelectCategory(cat: typeof CATEGORIES[number]) {
+    setSelectedCategory(cat)
+    const state = await window.electronAPI.getScriptState()
+    const matchesThisCategory =
+      state.ok &&
+      (state.running || state.done) &&
+      state.context?.vmName === vm.name &&
+      state.context?.type === 'provision' &&
+      state.context?.categoryDir === cat.dir
+
+    if (matchesThisCategory) {
+      setLines(state.lines)
+      if (state.running) {
+        setPageState('running')
+        setShowLog(true)
+        const unsubLine = window.electronAPI.onScriptLine((line) => {
+          setLines((prev) => [...prev, line])
+        })
+        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+          setSuccess(exitCode === 0)
+          setPageState('done')
+          setShowLog(false)
+          reconnectUnsubRef.current?.line()
+          reconnectUnsubRef.current?.done()
+          reconnectUnsubRef.current = null
+        })
+        reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
+      } else {
+        setSuccess(state.exitCode === 0)
+        setPageState('done')
+      }
+      return
+    }
+    setIdleView('scripts')
+  }
 
   function handleNavBack() {
     switch (idleView) {
@@ -429,6 +470,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         loginUser,
         scriptRelPath: selectedScript.scriptPath ?? `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
         scriptArgs,
+        categoryDir: selectedCategory.dir,
       })
     )
   }
@@ -727,7 +769,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.dir}
-                  onClick={() => { setSelectedCategory(cat); setIdleView('scripts') }}
+                  onClick={() => handleSelectCategory(cat)}
                   className="px-3 py-3 text-left bg-zinc-700 hover:bg-zinc-600 border border-zinc-600 hover:border-zinc-500 rounded transition-colors"
                 >
                   <p className="text-zinc-200 text-sm font-medium">{cat.name}</p>

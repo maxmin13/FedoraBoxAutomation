@@ -13,6 +13,13 @@ const log = require('./logger')
 // Only one script runs at a time.
 let activeChild = null
 
+// Buffer for the current (or most recent) run so the renderer can reconnect
+// after navigating away.  Cleared when a new script starts.
+let _runLines   = []
+let _runDone    = false
+let _runExitCode = null
+let _runContext  = null  // { vmName, type } set by callers that want reconnect support
+
 /**
  * Returns true if a script is currently running.
  * Used by main.js to decide whether to show the close warning.
@@ -64,9 +71,12 @@ function splitChunk(chunk, source) {
  * @param {function} onDone - Called with the exit code when the script finishes
  */
 function runScript(scriptPath, args, onLine, onDone) {
-  // Build the full argument list for PowerShell.
-  // -ExecutionPolicy Bypass lets us run unsigned scripts without changing system policy.
-  // -File tells PowerShell to run a script file rather than a command string.
+  // Reset run buffer for this new script.
+  _runLines    = []
+  _runDone     = false
+  _runExitCode = null
+  // _runContext is set by setRunContext() before runScript is called.
+
   const psArgs = [
     '-ExecutionPolicy', 'Bypass',
     '-File', scriptPath,
@@ -75,41 +85,57 @@ function runScript(scriptPath, args, onLine, onDone) {
 
   log.info('[script] spawning:', 'powershell', psArgs.join(' '))
 
-  // spawn() starts the process and returns immediately.
-  // stdout and stderr are streams — data arrives as the script produces it.
   activeChild = spawn('powershell', psArgs)
 
-  // stdout: normal output lines from the script (Write-Host, Write-Output)
   activeChild.stdout.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stdout')) {
+      _runLines.push(line)
       onLine(line)
     }
   })
 
-  // stderr: error output — PowerShell writes some warnings here too
   activeChild.stderr.on('data', (chunk) => {
     for (const line of splitChunk(chunk, 'stderr')) {
+      _runLines.push(line)
       onLine(line)
     }
   })
 
-  // 'close' fires when the process has exited and all streams are flushed.
-  // exitCode is 0 for success, non-zero for failure.
   activeChild.on('close', (exitCode) => {
     const code = exitCode ?? 1
     log.info(`[script] exited with code ${code}`)
-    activeChild = null
+    _runDone     = true
+    _runExitCode = code
+    activeChild  = null
     onDone(code)
   })
 
-  // 'error' fires if the process could not be started at all
-  // (e.g. powershell.exe not found on PATH)
   activeChild.on('error', (err) => {
     log.error('[script] failed to start process:', err.message)
-    activeChild = null
-    onLine({ text: `ERROR: Could not start PowerShell: ${err.message}`, source: 'stderr' })
+    const errLine = { text: `ERROR: Could not start PowerShell: ${err.message}`, source: 'stderr' }
+    _runLines.push(errLine)
+    _runDone     = true
+    _runExitCode = 1
+    activeChild  = null
+    onLine(errLine)
     onDone(1)
   })
 }
 
-module.exports = { runScript, killActiveScript, hasActiveScript, splitChunk }
+/** Called by ipc-handlers before starting a script so the renderer can match the run. */
+function setRunContext(context) {
+  _runContext = context
+}
+
+/** Returns the state of the current or most recently completed run. */
+function getScriptState() {
+  return {
+    running:  activeChild !== null,
+    done:     _runDone,
+    exitCode: _runExitCode,
+    lines:    [..._runLines],
+    context:  _runContext,
+  }
+}
+
+module.exports = { runScript, killActiveScript, hasActiveScript, splitChunk, setRunContext, getScriptState }

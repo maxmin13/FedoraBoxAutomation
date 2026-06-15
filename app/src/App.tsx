@@ -20,28 +20,15 @@ export default function App() {
   const [createVmNavKey, setCreateVmNavKey] = useState(0)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
-  // Set to true when a script that ran from 'landing' finishes while the user
-  // is on another page.  The next navigation to 'landing' will skip the key
-  // increment so the provision result stays visible; the one after that resets.
-  const [preserveLanding, setPreserveLanding] = useState(false)
 
   const currentPageRef = useRef(currentPage)
   useEffect(() => { currentPageRef.current = currentPage }, [currentPage])
 
-  const scriptPageRef = useRef<Page | null>(null)
-
   const handleScriptRunning = useCallback((running: boolean) => {
     if (running) {
-      const page = currentPageRef.current
-      scriptPageRef.current = page
       setScriptRunning(true)
-      setScriptPage(page)
-      setPreserveLanding(false)
+      setScriptPage(currentPageRef.current)
     } else {
-      if (scriptPageRef.current === 'landing' && currentPageRef.current !== 'landing') {
-        setPreserveLanding(true)
-      }
-      scriptPageRef.current = null
       setScriptRunning(false)
       setScriptPage(null)
     }
@@ -49,15 +36,7 @@ export default function App() {
 
   function handleNavigate(page: Page) {
     if (page === 'create-vm') setCreateVmNavKey((k) => k + 1)
-    if (page === 'landing') {
-      if (preserveLanding) {
-        // First return after script — show result, consume the flag
-        setPreserveLanding(false)
-      } else if (!scriptRunning) {
-        // Normal navigation — reset landing to VM grid
-        setLandingKey((k) => k + 1)
-      }
-    }
+    if (page === 'landing') setLandingKey((k) => k + 1)
     setCurrentPage(page)
   }
 

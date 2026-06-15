@@ -18,7 +18,7 @@ const execAsync = promisify(exec)
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
-const { runScript } = require('./script-runner')
+const { runScript, setRunContext, getScriptState } = require('./script-runner')
 const SCRIPTS = require('./scripts')
 const log = require('./logger')
 
@@ -141,10 +141,11 @@ async function isVmRunning(name) {
  * @param {string[]} args
  * @returns {Promise<{ exitCode: number, lines: { text: string, source: string }[] }>}
  */
-function streamScript(win, scriptPath, args) {
+function streamScript(win, scriptPath, args, context = null) {
   return new Promise((resolve) => {
     const scriptName = path.basename(scriptPath)
     log.hostMark(`START ${scriptName}`)
+    setRunContext(context)
     const lines = []
     runScript(
       scriptPath,
@@ -592,6 +593,14 @@ function registerIpcHandlers(win) {
     return { ok: true }
   })
 
+  // ── get-script-state ─────────────────────────────────────
+  // Returns the buffered output of the current or most recent script run so
+  // the renderer can reconnect to an in-progress or just-completed run after
+  // navigating away and back.
+  handleIpc('get-script-state', async () => {
+    return { ok: true, ...getScriptState() }
+  })
+
   // ── run-provision-script ─────────────────────────────────
   // Uploads and runs a single guest script via guestcontrol. Streams output to the renderer.
   handleIpc('run-provision-script', async (_event, params) => {
@@ -604,7 +613,7 @@ function registerIpcHandlers(win) {
       '-NonInteractive',
     ]
     if (params.scriptArgs) psArgs.push('-ScriptArgs', params.scriptArgs)
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionScript, psArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionScript, psArgs, { vmName: params.vmName, type: 'provision', categoryDir: params.categoryDir ?? null })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })
@@ -620,7 +629,7 @@ function registerIpcHandlers(win) {
       '-Hostname',  params.hostname,
       '-NonInteractive',
     ]
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionSetup, psArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.runProvisionSetup, psArgs, { vmName: params.vmName, type: 'provision' })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })
