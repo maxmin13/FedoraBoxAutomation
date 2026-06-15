@@ -9,12 +9,12 @@ describe('NavBar', () => {
     onNavigate.mockReset()
   })
 
-  it('shows all nav items: Requirements, My VMs, Create VM, Console, Docs', () => {
+  it('shows all nav items: Requirements, My VMs, Create VM, Activity, Docs', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
     expect(screen.getByRole('button', { name: 'Requirements' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'My VMs' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create VM' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Console' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Docs' })).toBeInTheDocument()
   })
 
@@ -24,7 +24,7 @@ describe('NavBar', () => {
     expect(onNavigate).toHaveBeenCalledWith('setup')
   })
 
-  it('disables non-Console, non-Docs nav buttons when scriptRunning is true', () => {
+  it('disables non-Activity, non-Docs nav buttons when scriptRunning is true', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
     fireEvent.click(screen.getByRole('button', { name: 'My VMs' }))
     fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
@@ -32,9 +32,9 @@ describe('NavBar', () => {
     expect(onNavigate).not.toHaveBeenCalled()
   })
 
-  it('keeps Console accessible when scriptRunning is true', () => {
+  it('keeps Activity accessible when scriptRunning is true', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
-    expect(screen.getByRole('button', { name: 'Console' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Activity' })).not.toBeDisabled()
   })
 
   it('keeps Docs accessible when scriptRunning is true', () => {
@@ -57,9 +57,9 @@ describe('NavBar', () => {
     expect(screen.getByRole('button', { name: 'My VMs' })).not.toBeDisabled()
   })
 
-  it('calls onNavigate with "logs" when Console is clicked', () => {
+  it('calls onNavigate with "logs" when Activity is clicked', () => {
     render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Console' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Activity' }))
     expect(onNavigate).toHaveBeenCalledWith('logs')
   })
 

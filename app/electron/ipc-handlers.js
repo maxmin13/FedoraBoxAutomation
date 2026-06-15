@@ -88,10 +88,6 @@ function execTracked(cmd, options, procs) {
 // Credential channels are excluded to keep passwords out of gui.log.
 const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready'])
 
-function truncate(str, max = 1000) {
-  return str.length <= max ? str : str.slice(0, max) + ` …[+${str.length - max} chars]`
-}
-
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
  * and console (development only, via logger).
@@ -102,13 +98,13 @@ function truncate(str, max = 1000) {
 function handleIpc(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] recv ${channel}`, args.length ? truncate(inspect(args, { depth: 3, breakLength: Infinity })) : '')
+      log.info(`[ipc] recv ${channel}`, args.length ? inspect(args, { depth: 3, breakLength: Infinity }) : '')
     }
 
     const result = await handler(event, ...args)
 
     if (!SILENT_CHANNELS.has(channel)) {
-      log.info(`[ipc] reply ${channel}`, truncate(inspect(result, { depth: 3, breakLength: Infinity })))
+      log.info(`[ipc] reply ${channel}`, inspect(result, { depth: 3, breakLength: Infinity }))
     }
 
     return result
