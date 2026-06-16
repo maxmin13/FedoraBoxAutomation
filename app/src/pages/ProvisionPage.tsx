@@ -376,17 +376,33 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
-      const isBaseSetupDone =
+      const isBaseSetup =
         state.ok &&
-        state.done &&
+        (state.running || state.done) &&
         state.context?.vmName === vm.name &&
         state.context?.type === 'provision' &&
         !state.context?.scriptName
       const seen = hasSeenScript(vm.name, BASE_SETUP_KEY)
       window.electronAPI.logUiAction(
-        `provision "${vm.name}": [dbg] mount baseSetup check: done=${state.done} matches=${isBaseSetupDone} seen=${seen}`
+        `provision "${vm.name}": [dbg] mount baseSetup check: running=${state.running} done=${state.done} matches=${isBaseSetup} seen=${seen}`
       )
-      if (isBaseSetupDone && !seen) {
+      if (isBaseSetup && state.running) {
+        window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect Base Setup (running)`)
+        setRunningLabel('Base Setup')
+        setLines(state.lines)
+        setPageState('running')
+        setShowLog(true)
+        const unsubLine = window.electronAPI.onScriptLine((line) => {
+          setLines((prev) => [...prev, line])
+        })
+        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+          setSuccess(exitCode === 0)
+          setPageState('done')
+          setShowLog(false)
+          unsubLine()
+          unsubDone()
+        })
+      } else if (isBaseSetup && state.done && !seen) {
         window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner`)
         markScriptSeen(vm.name, BASE_SETUP_KEY, 'restore')
         setRunningLabel('Base Setup')
