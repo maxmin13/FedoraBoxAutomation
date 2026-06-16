@@ -120,7 +120,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
         <h1 className="text-2xl font-semibold text-zinc-100">My VMs</h1>
 
         <button
-          onClick={loadVms}
+          onClick={() => { window.electronAPI.logUiAction('vm-list: Refresh'); loadVms() }}
           disabled={loading || createVmRunning}
           className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -314,6 +314,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   async function handleStart() {
+    window.electronAPI.logUiAction(`vm "${vm.name}": Start`)
     setBusy(true)
     setStarting(true)
     setError(null)
@@ -330,6 +331,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
   }
 
   async function handleStop() {
+    window.electronAPI.logUiAction(`vm "${vm.name}": Stop`)
     setShowStopModal(false)
     setBusy(true)
     setStopping(true)
@@ -347,6 +349,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
   }
 
   async function handleDelete() {
+    window.electronAPI.logUiAction(`vm "${vm.name}": Delete`)
     setBusy(true)
     setError(null)
     setShowDeleteModal(false)
@@ -422,7 +425,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
           </button>
 
           <button
-            onClick={onProvision}
+            onClick={() => { window.electronAPI.logUiAction(`vm "${vm.name}": Provision`); onProvision() }}
             disabled={busy}
             className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -430,7 +433,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
           </button>
 
           <button
-            onClick={onEdit}
+            onClick={() => { window.electronAPI.logUiAction(`vm "${vm.name}": Detail`); onEdit() }}
             disabled={busy}
             className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -438,7 +441,7 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
           </button>
 
           <button
-            onClick={onPerformance}
+            onClick={() => { window.electronAPI.logUiAction(`vm "${vm.name}": Performance`); onPerformance() }}
             disabled={busy}
             className="px-2 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

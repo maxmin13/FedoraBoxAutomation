@@ -58,6 +58,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   }, [vm.name, credKey])
 
   function handleRefresh() {
+    window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
     setInfoKey((k) => k + 1)
     runDiagnostics(vmUser, vmPass, loginUser)
   }
@@ -99,6 +100,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   }
 
   async function handleFix(setting: 'paravirt' | 'nicType' | 'acceleration3d' | 'cpuExecCap') {
+    window.electronAPI.logUiAction(`performance "${vm.name}": Fix ${setting}`)
     setFixing(setting)
     setFixError(null)
     try {
@@ -129,7 +131,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 shrink-0">
         <button
-          onClick={onBack}
+          onClick={() => { window.electronAPI.logUiAction(`performance "${vm.name}": Back`); onBack() }}
           className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
         >
           &larr; Back

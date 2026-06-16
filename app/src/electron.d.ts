@@ -142,6 +142,7 @@ declare global {
       pickFolder: () => Promise<{ folderPath: string | null }>
       pickIso: () => Promise<{ filePath: string | null }>
       logError: (message: string, stack: string) => Promise<void>
+      logUiAction: (action: string) => Promise<void>
     }
   }
 }

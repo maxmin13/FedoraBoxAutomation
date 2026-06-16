@@ -353,11 +353,13 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
 
   function handleSelectCategory(cat: typeof CATEGORIES[number]) {
+    window.electronAPI.logUiAction(`provision "${vm.name}": select category "${cat.name}"`)
     setSelectedCategory(cat)
     setIdleView('scripts')
   }
 
   async function handleSelectScript(script: ScriptDef) {
+    window.electronAPI.logUiAction(`provision "${vm.name}": select script "${script.label}"`)
     const state = await window.electronAPI.getScriptState()
     const matchesThisScript =
       state.ok &&
@@ -402,6 +404,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   function handleNavBack() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": Back (from ${idleView})`)
     switch (idleView) {
       case 'mode':        onBack();                   break
       case 'full-form':   setIdleView('mode');        break
@@ -474,6 +477,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   async function handleRunScript(force = false) {
     if (!selectedScript || !selectedCategory) return
+    window.electronAPI.logUiAction(`provision "${vm.name}": run "${selectedScript.label}"${force ? ' (force)' : ''}`)
     if (force) setForceConfirm(false)
     setRunningLabel(selectedScript.label)
     const scriptArgs = buildScriptArgs(selectedScript, argValues, loginUser) + (force ? ' --force' : '')
@@ -492,6 +496,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   async function handleRestart() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": Restart VM confirmed`)
     setShowRestartModal(false)
     setLines([])
     setShowLog(true)
@@ -511,6 +516,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }
 
   async function handleRunFull() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
     setRunningLabel('Base Setup')
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
@@ -574,7 +580,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               <div className="mt-3">
                 <p className="text-green-300 text-sm mb-2">Reboot the VM to apply desktop changes.</p>
                 <button
-                  onClick={() => setShowRestartModal(true)}
+                  onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Restart VM`); setShowRestartModal(true) }}
                   disabled={restarting || restarted}
                   className="px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
                 >
@@ -605,13 +611,13 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
             <div className="flex gap-2">
               <button
-                onClick={() => withAuth(() => handleRunScript(true))}
+                onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": force confirm "${selectedScript.forceConfirmDef.actionLabel}"`); withAuth(() => handleRunScript(true)) }}
                 className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
               >
                 {selectedScript.forceConfirmDef.actionLabel}
               </button>
               <button
-                onClick={() => setForceConfirm(false)}
+                onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": force confirm cancelled`); setForceConfirm(false) }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
               >
                 Cancel
@@ -636,7 +642,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           <div className="flex gap-2">
           {success === false && (
           <button
-            onClick={() => withAuth(() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript())}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Try again`); withAuth(() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript()) }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             Try again
@@ -644,6 +650,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           )}
           <button
             onClick={async () => {
+              window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
               if (!success) {
                 const saved = await window.electronAPI.loadVmCredentials(vm.name)
                 if (saved.ok) {
@@ -664,7 +671,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           </button>
           </div>
           <button
-            onClick={onBack}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
@@ -699,7 +706,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           {/* Mode buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => setIdleView('full-form')}
+              onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`); setIdleView('full-form') }}
               className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">Base Setup</p>
@@ -708,7 +715,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
               </p>
             </button>
             <button
-              onClick={() => setIdleView('categories')}
+              onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": select By Category`); setIdleView('categories') }}
               className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">By Category</p>

@@ -34,6 +34,7 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
   }, [pageState])
 
   async function runAnalysis() {
+    window.electronAPI.logUiAction('setup: Run Analysis')
     setPageState('running')
     setChecks([])
     setLogLines([])
@@ -134,7 +135,7 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
             {checks.map((check) => (
               <button
                 key={check.id}
-                onClick={() => setSelectedId(check.id)}
+                onClick={() => { window.electronAPI.logUiAction(`setup: select check "${check.label}"`); setSelectedId(check.id) }}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors border ${
                   selectedId === check.id
                     ? 'bg-zinc-600 border-zinc-500'
@@ -373,6 +374,7 @@ function InstallVirtualBoxAction() {
   const [done, setDone] = useState(false)
 
   async function handleInstall() {
+    window.electronAPI.logUiAction('setup: Install VirtualBox')
     setInstalling(true)
     try {
       const result = await window.electronAPI.installVirtualBox()

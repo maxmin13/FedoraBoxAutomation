@@ -108,6 +108,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const step2Valid = !ramError && !cpusError && !diskError && !vramError && !cpuCapError
 
   async function handleCreate() {
+    window.electronAPI.logUiAction(`create-vm: Create VM "${trimmedName}"`)
     setPageState('running')
     setLogLines([])
     setSuccess(null)
@@ -185,7 +186,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setPageState('next-steps')}
+                onClick={() => { window.electronAPI.logUiAction('create-vm: view Next steps'); setPageState('next-steps') }}
                 className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors"
               >
                 Next: What to do &rarr;
@@ -209,7 +210,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setPageState('idle')}
+                onClick={() => { window.electronAPI.logUiAction('create-vm: Try again'); setPageState('idle') }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
               >
                 &larr; Try again
@@ -237,7 +238,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
               </div>
               <button
                 type="button"
-                onClick={() => onNavigate('docs')}
+                onClick={() => { window.electronAPI.logUiAction('create-vm: Open Docs'); onNavigate('docs') }}
                 className="shrink-0 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white text-sm rounded font-medium transition-colors"
               >
                 Open Docs &rarr;
@@ -299,6 +300,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
                 value={isoPath ? isoPath.split(/[\\/]/).pop()! : ''}
                 readOnly
                 onClick={async () => {
+                  window.electronAPI.logUiAction('create-vm: browse ISO')
                   const result = await window.electronAPI.pickIso()
                   if (result.filePath) setIsoPath(result.filePath)
                 }}
@@ -473,14 +475,14 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
 
       {/* Pinned footer nav */}
       <div className="shrink-0 pt-3">
-        {step === 1 && <StepNav onBack={null} onNext={() => setStep(2)} nextEnabled={step1Valid} />}
-        {step === 2 && <StepNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextEnabled={step2Valid} />}
-        {step === 3 && <StepNav onBack={() => setStep(2)} onNext={() => setStep(4)} nextEnabled={true} nextLabel="Review" />}
+        {step === 1 && <StepNav onBack={null} onNext={() => { window.electronAPI.logUiAction('create-vm: step 1 next'); setStep(2) }} nextEnabled={step1Valid} />}
+        {step === 2 && <StepNav onBack={() => { window.electronAPI.logUiAction('create-vm: step 2 back'); setStep(1) }} onNext={() => { window.electronAPI.logUiAction('create-vm: step 2 next'); setStep(3) }} nextEnabled={step2Valid} />}
+        {step === 3 && <StepNav onBack={() => { window.electronAPI.logUiAction('create-vm: step 3 back'); setStep(2) }} onNext={() => { window.electronAPI.logUiAction('create-vm: step 3 next'); setStep(4) }} nextEnabled={true} nextLabel="Review" />}
         {step === 4 && (
           <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(3)}
+              onClick={() => { window.electronAPI.logUiAction('create-vm: step 4 back'); setStep(3) }}
               className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
             >
               Back

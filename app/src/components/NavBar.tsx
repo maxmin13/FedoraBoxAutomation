@@ -35,7 +35,7 @@ export default function NavBar({ currentPage, onNavigate }: NavBarProps) {
         return (
           <button
             key={item.page}
-            onClick={() => onNavigate(item.page)}
+            onClick={() => { window.electronAPI.logUiAction(`nav: ${item.label}`); onNavigate(item.page) }}
             className={buttonClass}
           >
             {item.label}

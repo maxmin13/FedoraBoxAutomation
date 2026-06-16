@@ -115,6 +115,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Forwards uncaught renderer errors (from the React error boundary) to the main process log
   logError: (message, stack) => ipcRenderer.invoke('log-error', message, stack),
 
+  // ── UI action logging ─────────────────────────────────────
+  // Writes a [ui] trace line to gui.log for every significant user click
+  logUiAction: (action) => ipcRenderer.invoke('log-ui-action', action),
+
   // Returns the OS downloads folder path (e.g. C:\Users\you\Downloads)
   getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
 

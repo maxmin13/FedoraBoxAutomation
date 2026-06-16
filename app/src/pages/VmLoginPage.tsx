@@ -81,6 +81,7 @@ export default function VmLoginPage({ onNavigate, initialVmName, onNext, onBack 
 
   async function handleNext() {
     if (!vmName || !rootUser || !rootPass || !vmUser) return
+    window.electronAPI.logUiAction(`vm-login "${vmName}": Save credentials`)
     setSaving(true)
     setError(null)
     try {

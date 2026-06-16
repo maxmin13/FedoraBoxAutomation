@@ -72,7 +72,7 @@ export default function DocsPage() {
                   if (docFile) {
                     return (
                       <button
-                        onClick={() => setSelectedFile(docFile.filename)}
+                        onClick={() => { window.electronAPI.logUiAction(`docs: open "${docFile.filename}"`); setSelectedFile(docFile.filename) }}
                         className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
                       >
                         {children}

@@ -50,6 +50,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
   }, [vm.name, credKey])
 
   async function handleRun() {
+    window.electronAPI.logUiAction(`share-logs "${vm.name}": Set up log sync`)
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -142,14 +143,14 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           <div className="flex justify-end">
             {success ? (
               <button
-                onClick={onBack}
+                onClick={() => { window.electronAPI.logUiAction(`share-logs "${vm.name}": Back to VM`); onBack() }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
               >
                 &larr; Back to VM
               </button>
             ) : (
               <button
-                onClick={() => setPageState('idle')}
+                onClick={() => { window.electronAPI.logUiAction(`share-logs "${vm.name}": Try again`); setPageState('idle') }}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
               >
                 &larr; Try again
@@ -167,7 +168,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
 
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={onBack}
+          onClick={() => { window.electronAPI.logUiAction(`share-logs "${vm.name}": Back`); onBack() }}
           className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
         >
           &larr; Back

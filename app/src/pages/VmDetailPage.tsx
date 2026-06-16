@@ -245,7 +245,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       {/* Header */}
       <div className="flex items-center gap-3 mb-3 shrink-0">
         <button
-          onClick={onBack}
+          onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Back`); onBack() }}
           className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
         >
           &larr; Back
@@ -290,7 +290,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               title="Log sync"
               action={
                 <button
-                  onClick={() => setView('share-logs')}
+                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Sync Logs`); setView('share-logs') }}
                   className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Sync
@@ -313,7 +313,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               title="Shared folders"
               action={
                 <button
-                  onClick={() => setView('share-folder')}
+                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Share Folder`); setView('share-folder') }}
                   className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                 >
                   Share
@@ -373,7 +373,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               title="Installed tools"
               action={info.state === 'running' && (
                 <button
-                  onClick={() => withAuth(() => setToolsKey((k) => k + 1))}
+                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
                   disabled={toolsStatus === 'loading'}
                   className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >

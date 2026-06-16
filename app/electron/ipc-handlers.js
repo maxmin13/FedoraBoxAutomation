@@ -86,7 +86,7 @@ function execTracked(cmd, options, procs) {
 // Channels excluded from IPC logging.
 // 'read-log' returns full file content — logging it back would create a feedback loop.
 // Credential channels are excluded to keep passwords out of gui.log.
-const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready'])
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action'])
 
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
@@ -885,6 +885,12 @@ function registerIpcHandlers(win) {
     if (!dir) return { ok: false, error: `Unknown log dir: ${which}` }
     const err = await shell.openPath(dir)
     return err ? { ok: false, error: err } : { ok: true }
+  })
+
+  // ── log-ui-action ─────────────────────────────────────────
+  // Writes a [ui] trace line to gui.log for every user click.
+  handleIpc('log-ui-action', async (_event, action) => {
+    log.info(`[ui] ${action}`)
   })
 
   // ── log-error ─────────────────────────────────────────────
