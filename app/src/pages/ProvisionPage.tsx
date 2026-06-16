@@ -351,6 +351,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
+
   function handleSelectCategory(cat: typeof CATEGORIES[number]) {
     setSelectedCategory(cat)
     setIdleView('scripts')
