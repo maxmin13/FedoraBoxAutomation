@@ -209,6 +209,20 @@ const CATEGORIES: CategoryDef[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+const _seenScripts = new Map<string, Set<string>>()
+function hasSeenScript(vmName: string, scriptName: string): boolean {
+  return _seenScripts.get(vmName)?.has(scriptName) ?? false
+}
+function markScriptSeen(vmName: string, scriptName: string, reason: string) {
+  if (!_seenScripts.has(vmName)) _seenScripts.set(vmName, new Set())
+  _seenScripts.get(vmName)!.add(scriptName)
+  window.electronAPI.logUiAction(`provision "${vmName}": [dbg] markSeen ${scriptName} (${reason})`)
+}
+function unmarkScriptSeen(vmName: string, scriptName: string) {
+  _seenScripts.get(vmName)?.delete(scriptName)
+  window.electronAPI.logUiAction(`provision "${vmName}": [dbg] unmarkSeen ${scriptName}`)
+}
+
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
     case 'none': return ''
@@ -351,6 +365,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
+  useEffect(() => {
+    if (pageState === 'done' && selectedScript)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}" seen=${hasSeenScript(vm.name, selectedScript.name)}`)
+  }, [pageState, selectedScript?.name])
+
 
   function handleSelectCategory(cat: typeof CATEGORIES[number]) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select category "${cat.name}"`)
@@ -368,7 +387,14 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       state.context?.type === 'provision' &&
       state.context?.scriptName === script.name
 
+    const seen = hasSeenScript(vm.name, script.name)
+    window.electronAPI.logUiAction(
+      `provision "${vm.name}": [dbg] script=${script.name} ok=${state.ok} running=${state.running} done=${state.done} ` +
+      `ctxVm=${state.context?.vmName} ctxScript=${state.context?.scriptName} matches=${matchesThisScript} seen=${seen}`
+    )
+
     if (matchesThisScript && state.running) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect (running)`)
       setSelectedScript(script)
       setRunningLabel(script.label)
       setLines(state.lines)
@@ -388,8 +414,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       return
     }
 
-    if (matchesThisScript && state.done && !seenResultsRef.current.has(script.name)) {
+    if (matchesThisScript && state.done && !seen) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (done, not seen)`)
       seenResultsRef.current.add(script.name)
+      markScriptSeen(vm.name, script.name, 'restore')
       setSelectedScript(script)
       setRunningLabel(script.label)
       setLines(state.lines)
@@ -398,6 +426,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       return
     }
 
+    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form (matches=${matchesThisScript} done=${state.done} seen=${seen})`)
     setSelectedScript(script)
     setArgValues(['', ''])
     setIdleView('script-args')
@@ -420,6 +449,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   ) {
     const runScriptName = selectedScript?.name
     const markSeen = () => { if (runScriptName) seenResultsRef.current.add(runScriptName) }
+    if (runScriptName) unmarkScriptSeen(vm.name, runScriptName)
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -611,7 +641,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
             <div className="flex gap-2">
               <button
-                onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": force confirm "${selectedScript.forceConfirmDef.actionLabel}"`); withAuth(() => handleRunScript(true)) }}
+                onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": force confirm "${selectedScript.forceConfirmDef?.actionLabel}"`); withAuth(() => handleRunScript(true)) }}
                 className="px-4 py-2 text-sm bg-amber-700 hover:bg-amber-600 text-white font-medium rounded transition-colors"
               >
                 {selectedScript.forceConfirmDef.actionLabel}
@@ -651,6 +681,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           <button
             onClick={async () => {
               window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
+              if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Run another')
               if (!success) {
                 const saved = await window.electronAPI.loadVmCredentials(vm.name)
                 if (saved.ok) {
@@ -671,7 +702,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           </button>
           </div>
           <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); onBack() }}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Back to My VMs'); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
