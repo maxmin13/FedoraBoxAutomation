@@ -209,6 +209,7 @@ const CATEGORIES: CategoryDef[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+const BASE_SETUP_KEY = '__base-setup__'
 const _seenScripts = new Map<string, Set<string>>()
 function hasSeenScript(vmName: string, scriptName: string): boolean {
   return _seenScripts.get(vmName)?.has(scriptName) ?? false
@@ -370,6 +371,28 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}" seen=${hasSeenScript(vm.name, selectedScript.name)}`)
   }, [pageState, selectedScript?.name])
 
+  useEffect(() => {
+    window.electronAPI.getScriptState().then((state) => {
+      const isBaseSetupDone =
+        state.ok &&
+        state.done &&
+        state.context?.vmName === vm.name &&
+        state.context?.type === 'provision' &&
+        !state.context?.scriptName
+      const seen = hasSeenScript(vm.name, BASE_SETUP_KEY)
+      window.electronAPI.logUiAction(
+        `provision "${vm.name}": [dbg] mount baseSetup check: done=${state.done} matches=${isBaseSetupDone} seen=${seen}`
+      )
+      if (isBaseSetupDone && !seen) {
+        window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner`)
+        markScriptSeen(vm.name, BASE_SETUP_KEY, 'restore')
+        setRunningLabel('Base Setup')
+        setLines(state.lines)
+        setSuccess(state.exitCode === 0)
+        setPageState('done')
+      }
+    })
+  }, [])
 
   function handleSelectCategory(cat: typeof CATEGORIES[number]) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select category "${cat.name}"`)
@@ -547,6 +570,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   async function handleRunFull() {
     window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
+    unmarkScriptSeen(vm.name, BASE_SETUP_KEY)
     setRunningLabel('Base Setup')
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
@@ -682,6 +706,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             onClick={async () => {
               window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
               if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Run another')
+              else if (runningLabel === 'Base Setup') markScriptSeen(vm.name, BASE_SETUP_KEY, 'Run another')
               if (!success) {
                 const saved = await window.electronAPI.loadVmCredentials(vm.name)
                 if (saved.ok) {
@@ -702,7 +727,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           </button>
           </div>
           <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Back to My VMs'); onBack() }}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Back to My VMs'); else if (runningLabel === 'Base Setup') markScriptSeen(vm.name, BASE_SETUP_KEY, 'Back to My VMs'); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
