@@ -367,9 +367,12 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }, [pageState, restarting, onScriptRunning])
 
   useEffect(() => {
-    if (pageState === 'done' && selectedScript)
+    if (pageState !== 'done') return
+    if (selectedScript)
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}" seen=${hasSeenScript(vm.name, selectedScript.name)}`)
-  }, [pageState, selectedScript?.name])
+    else if (runningLabel === 'Base Setup')
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for Base Setup seen=${hasSeenScript(vm.name, BASE_SETUP_KEY)}`)
+  }, [pageState, selectedScript?.name, runningLabel])
 
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
