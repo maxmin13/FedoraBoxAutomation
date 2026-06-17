@@ -38,8 +38,12 @@ ansible_ok() {
     | grep -q . && echo true || echo false
 }
 
-python_ok() {
-  compgen -G "/usr/local/bin/python3.*" >/dev/null 2>&1 && echo true || echo false
+python_version() {
+  local bin
+  bin=$(compgen -G "/usr/local/bin/python3.*" 2>/dev/null | sort -V | tail -1)
+  [[ -z "${bin}" ]] && { echo false; return; }
+  ver=$("${bin}" --version 2>&1 | awk '{print $2}')
+  echo "\"${ver}\""
 }
 
 cat <<JSON
@@ -47,7 +51,7 @@ cat <<JSON
   "baseSetup":        $(path_ok /etc/fedorabox/.base-setup),
   "java":             $(java_version),
   "php":              $(cmd_ok php),
-  "python":           $(python_ok),
+  "python":           $(python_version),
   "node":             $(cmd_ok node),
   "maven":            $(cmd_ok mvn),
   "httpd":            $(svc_ok httpd),
