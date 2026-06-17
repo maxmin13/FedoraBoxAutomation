@@ -315,7 +315,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [loginUser, setLoginUser] = useState('')
 
   const [pageState,    setPageState]    = useState<PageState>('idle')
-  const [idleView,     setIdleView]     = useState<IdleView>('categories')
+  const [idleView,     setIdleView]     = useState<IdleView>('mode')
   const [lines,        setLines]        = useState<ScriptLine[]>([])
   const [success,      setSuccess]      = useState<boolean | null>(null)
   const [error,        setError]        = useState<string | null>(null)
@@ -327,9 +327,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showRestartModal,  setShowRestartModal]  = useState(false)
   const [forceConfirm,      setForceConfirm]      = useState(false)
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
+  const [isReconnect, setIsReconnect] = useState(false)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
   const seenResultsRef         = useRef<Set<string>>(new Set())
+  const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
@@ -367,6 +369,12 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   }, [pageState, restarting, onScriptRunning])
 
   useEffect(() => {
+    window.electronAPI.logUiAction(
+      `provision "${vm.name}": [dbg] pageState=${pageState} idleView=${idleView} reconnect=${reconnectUnsubRef.current !== null}`
+    )
+  }, [pageState, idleView])
+
+  useEffect(() => {
     if (pageState !== 'done') return
     if (selectedScript)
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}" seen=${hasSeenScript(vm.name, selectedScript.name)}`)
@@ -376,33 +384,17 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
-      const isBaseSetup =
+      const isBaseSetupDone =
         state.ok &&
-        (state.running || state.done) &&
+        state.done &&
         state.context?.vmName === vm.name &&
         state.context?.type === 'provision' &&
         !state.context?.scriptName
       const seen = hasSeenScript(vm.name, BASE_SETUP_KEY)
       window.electronAPI.logUiAction(
-        `provision "${vm.name}": [dbg] mount baseSetup check: running=${state.running} done=${state.done} matches=${isBaseSetup} seen=${seen}`
+        `provision "${vm.name}": [dbg] mount baseSetup check: running=${state.running} done=${state.done} matchesDone=${isBaseSetupDone} seen=${seen}`
       )
-      if (isBaseSetup && state.running) {
-        window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect Base Setup (running)`)
-        setRunningLabel('Base Setup')
-        setLines(state.lines)
-        setPageState('running')
-        setShowLog(true)
-        const unsubLine = window.electronAPI.onScriptLine((line) => {
-          setLines((prev) => [...prev, line])
-        })
-        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-          setSuccess(exitCode === 0)
-          setPageState('done')
-          setShowLog(false)
-          unsubLine()
-          unsubDone()
-        })
-      } else if (isBaseSetup && state.done && !seen) {
+      if (isBaseSetupDone && !seen) {
         window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner`)
         markScriptSeen(vm.name, BASE_SETUP_KEY, 'restore')
         setRunningLabel('Base Setup')
@@ -587,6 +579,40 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     await window.electronAPI.restartVm(vm.name)
   }
 
+  async function handleSelectBaseSetup() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`)
+    const state = await window.electronAPI.getScriptState()
+    const isRunning =
+      state.ok &&
+      state.running &&
+      state.context?.vmName === vm.name &&
+      state.context?.type === 'provision' &&
+      !state.context?.scriptName
+    if (isRunning) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect Base Setup (running)`)
+      setRunningLabel('Base Setup')
+      setLines(state.lines)
+      setIsReconnect(true)
+      setPageState('running')
+      setShowLog(true)
+      const unsubLine = window.electronAPI.onScriptLine((line) => {
+        setLines((prev) => [...prev, line])
+      })
+      const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+        setSuccess(exitCode === 0)
+        setIsReconnect(false)
+        setPageState('done')
+        setShowLog(false)
+        reconnectUnsubRef.current = null
+        unsubLine()
+        unsubDone()
+      })
+      reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
+    } else {
+      setIdleView('full-form')
+    }
+  }
+
   async function handleRunFull() {
     window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
     unmarkScriptSeen(vm.name, BASE_SETUP_KEY)
@@ -622,6 +648,22 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
         <div className="shrink-0 space-y-2">
+          {isReconnect && (
+            <button
+              onClick={() => {
+                window.electronAPI.logUiAction(`provision "${vm.name}": disconnect from running Base Setup`)
+                reconnectUnsubRef.current?.line()
+                reconnectUnsubRef.current?.done()
+                reconnectUnsubRef.current = null
+                setIsReconnect(false)
+                setPageState('idle')
+                setIdleView('mode')
+              }}
+              className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors"
+            >
+              &larr; Back
+            </button>
+          )}
           <p className="text-zinc-300 text-sm font-medium">Running {runningLabel}...</p>
           <ProgressBar />
         </div>
@@ -781,7 +823,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
           {/* Mode buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`); setIdleView('full-form') }}
+              onClick={handleSelectBaseSetup}
               className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
             >
               <p className="text-zinc-100 font-semibold text-sm mb-1">Base Setup</p>

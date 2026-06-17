@@ -1,5 +1,4 @@
 
-
 # create a new vm, verify all the provision scripts after change most recent version
 
 # Give the user the ability to edit VM settings after creation: name, CPU cores, memory, VRAM, disk size, network adapter
@@ -20,6 +19,5 @@
 # see if other programs can be handled with version
 
 # after installing a program, don't start it, but write in the logs use examples
-
 
 # check why the success/error banner doesn't disapper after the user access the for the second time
