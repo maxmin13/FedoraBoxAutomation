@@ -328,12 +328,13 @@ try {
 
     Write-Host "  Adding '$loginUser' to vboxsf group..." -ForegroundColor Cyan
     $ErrorActionPreference = 'SilentlyContinue'
-    & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "usermod -aG vboxsf $loginUser" 2>&1 | Out-Null
+    $usermodOut = & $script:vbox guestcontrol $vmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- -c "usermod -aG vboxsf $loginUser" 2>&1
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
     if ($exitCode -ne 0) {
-        throw "Could not add '$loginUser' to vboxsf group. VM setup may be incomplete - make sure Guest Additions are fully installed inside the VM."
+        $detail = ($usermodOut | Where-Object { $_ }) -join ' '
+        throw "Could not add '$loginUser' to vboxsf group (exit $exitCode): $detail"
     }
 
     Write-Host "  '$loginUser' added to vboxsf group." -ForegroundColor Green
