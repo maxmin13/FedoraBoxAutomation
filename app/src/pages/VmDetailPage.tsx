@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
@@ -404,7 +404,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                         {groups.filter((_, i) => i % 2 === col).map((group) => (
                           <div key={group.category} className="flex gap-1.5 min-w-0">
                             <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
-                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
+                            <div className="flex flex-col gap-0.5 min-w-0">
                               {group.installed.map((tool) => (
                                 <div key={tool.key} className="flex items-center gap-0.5">
                                   <span className="text-green-400 text-xs shrink-0">&#10003;</span>
