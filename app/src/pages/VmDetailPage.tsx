@@ -34,7 +34,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     category: 'Web Servers',
     tools: [
       { key: 'httpd',  label: 'Apache HTTP Server' },
-      { key: 'tomcat', label: 'Apache Tomcat' },
+      { key: 'tomcat', label: 'Tomcat' },
     ],
   },
   {
