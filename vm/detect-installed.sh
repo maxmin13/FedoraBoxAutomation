@@ -32,6 +32,12 @@ intellij_version() {
   echo "\"${dir#/opt/idea-IC-}\""
 }
 
+maven_version() {
+  which mvn >/dev/null 2>&1 || { echo false; return; }
+  ver=$(mvn --version 2>&1 | head -1 | awk '{print $3}')
+  echo "\"${ver}\""
+}
+
 ansible_ok() {
   which ansible >/dev/null 2>&1 && echo true && return
   find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
@@ -53,7 +59,7 @@ cat <<JSON
   "php":              $(cmd_ok php),
   "python":           $(python_version),
   "node":             $(cmd_ok node),
-  "maven":            $(cmd_ok mvn),
+  "maven":            $(maven_version),
   "httpd":            $(svc_ok httpd),
   "tomcat":           $(glob_ok '/opt/tomcat-*'),
   "mariadb":          $(svc_ok mariadb),
