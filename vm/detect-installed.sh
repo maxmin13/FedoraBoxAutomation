@@ -32,6 +32,19 @@ intellij_version() {
   echo "\"${dir#/opt/idea-IC-}\""
 }
 
+tomcat_versions() {
+  local list="" dir base ver port
+  while IFS= read -r dir; do
+    base="${dir#/opt/apache-tomcat-}"
+    port="${base##*-}"
+    ver="${base%-*}"
+    [[ -n "${list}" ]] && list="${list}, "
+    list="${list}${ver}:${port}"
+  done < <(compgen -G "/opt/apache-tomcat-*" 2>/dev/null | sort -V)
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
+}
+
 maven_version() {
   which mvn >/dev/null 2>&1 || { echo false; return; }
   ver=$(mvn --version 2>&1 | head -1 | awk '{print $3}')
@@ -70,7 +83,7 @@ cat <<JSON
   "node":             $(cmd_ok node),
   "maven":            $(maven_version),
   "httpd":            $(svc_ok httpd),
-  "tomcat":           $(glob_ok '/opt/tomcat-*'),
+  "tomcat":           $(tomcat_versions),
   "mariadb":          $(svc_ok mariadb),
   "postgresql":       $(svc_ok postgresql),
   "dbeaver":          $(rpm_ok dbeaver-ce),
