@@ -70,7 +70,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
   {
     category: 'Security',
     tools: [
-      { key: 'openssl', label: 'OpenSSL 3.3.2' },
+      { key: 'openssl', label: 'OpenSSL' },
     ],
   },
   {
