@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { Vm, VmInfo, ScriptLine } from '../electron.d'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
+import WarnIcon from '../components/WarnIcon'
 
 
 interface PerformancePageProps {
@@ -346,47 +347,12 @@ function PerfRow({
   onFix?: () => void
   fixing?: boolean
 }) {
-  const [showTooltip, setShowTooltip] = useState(false)
-  const [tipStyle, setTipStyle]       = useState<React.CSSProperties>({})
-  const warnRef = useRef<HTMLSpanElement>(null)
-
-  function handleMouseEnter() {
-    if (warnRef.current) {
-      const r = warnRef.current.getBoundingClientRect()
-      setTipStyle({
-        position: 'fixed',
-        top:  r.top - 6,
-        left: r.left + r.width / 2,
-        transform: 'translate(-50%, -100%)',
-        zIndex: 9999,
-      })
-    }
-    setShowTooltip(true)
-  }
-
   return (
     <div className="flex items-center gap-2 text-sm">
       <span className="text-zinc-500 w-24 shrink-0">{label}</span>
       <span className="text-zinc-300">{value}</span>
-      {status === 'good' && <span className="text-green-400 text-xs ml-1">&#10003;</span>}
-      {status === 'warn' && (
-        <span
-          ref={warnRef}
-          className="text-amber-400 text-xs ml-1 cursor-default"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={() => setShowTooltip(false)}
-        >
-          &#9888;
-          {showTooltip && hint && (
-            <span
-              style={tipStyle}
-              className="w-56 bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs rounded px-2 py-1.5 whitespace-normal pointer-events-none shadow-lg"
-            >
-              {hint}
-            </span>
-          )}
-        </span>
-      )}
+      {status === 'good' && <span className="text-green-400 text-xs">&#10003;</span>}
+      {status === 'warn' && hint && <WarnIcon hint={hint} />}
       {onFix && (
         <button
           onClick={onFix}

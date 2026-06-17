@@ -5,6 +5,7 @@ import ShareLogsPage from './ShareLogsPage'
 import ProvisionPage from './ProvisionPage'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
+import WarnIcon from '../components/WarnIcon'
 
 // Maps detect-installed.sh JSON keys to user-facing labels, grouped by category.
 const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }[] = [
@@ -469,7 +470,7 @@ function CopyCell({ label, value, copyable = true, missing = false }: { label?: 
       {label && <p className="text-zinc-500 text-xs mb-0.5">{label}</p>}
       <div className="flex items-center gap-1 min-w-0">
         {missing && (
-          <span className="shrink-0 text-amber-400 text-xs" title="Host folder not found">&#9888;</span>
+          <WarnIcon hint="Host folder not found" />
         )}
         <span className={`font-mono text-xs truncate min-w-0 ${missing ? 'text-amber-400' : 'text-zinc-300'}`}>{value}</span>
         {copyable && (
