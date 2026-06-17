@@ -20,7 +20,8 @@ param(
     [string]$VmUser          = '',
     [string]$VmPass          = '',
     [string]$LoginUser       = '',
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$ForceRestart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -158,16 +159,18 @@ if ($runningVms -contains $vmName) {
         Where-Object { $_ -match '^VMState=' } |
         ForEach-Object { $_ -replace '.*="(.+)".*', '$1' } |
         Select-Object -First 1)
-    if ($currentState -match 'paused') {
-        Write-Host "  VM is paused - sending hard poweroff..." -ForegroundColor Cyan
+    if ($ForceRestart -or ($currentState -match 'paused')) {
+        Write-Host "  Force-stopping VM..." -ForegroundColor Cyan
         Invoke-VBox @('controlvm', $vmName, 'poweroff')
     } else {
         Write-Host "  Sending ACPI shutdown..." -ForegroundColor Cyan
         Invoke-VBox @('controlvm', $vmName, 'acpipowerbutton')
     }
     Write-Host "  Waiting for VM to stop..." -ForegroundColor Cyan
-    $deadline = (Get-Date).AddSeconds(120)
-    $vmStopped = $false
+    $deadline      = (Get-Date).AddSeconds(150)
+    $fallbackAt    = (Get-Date).AddSeconds(60)
+    $vmStopped     = $false
+    $hardPowerSent = ($ForceRestart -or ($currentState -match 'paused'))
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 3
         $ErrorActionPreference = 'SilentlyContinue'
@@ -178,6 +181,13 @@ if ($runningVms -contains $vmName) {
         if ($vmState -in 'poweroff','saved','aborted') {
             $vmStopped = $true
             break
+        }
+        if (-not $hardPowerSent -and (Get-Date) -gt $fallbackAt) {
+            Write-Host "  ACPI timeout - sending hard poweroff..." -ForegroundColor Yellow
+            $ErrorActionPreference = 'SilentlyContinue'
+            & $script:vbox controlvm $vmName poweroff 2>&1 | Out-Null
+            $ErrorActionPreference = 'Stop'
+            $hardPowerSent = $true
         }
     }
     if (-not $vmStopped) { Write-Host "  ERROR: VM did not stop in time. Shut it down manually and re-run." -ForegroundColor Red; exit 1 }
@@ -285,7 +295,19 @@ try {
     }
 
     Write-Host "  Starting VM '$vmName'..." -ForegroundColor Cyan
-    Invoke-VBox @('startvm', $vmName, '--type', 'gui')
+    Start-Sleep -Seconds 15
+    $startDeadline = (Get-Date).AddSeconds(60)
+    $started       = $false
+    while ((Get-Date) -lt $startDeadline) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox startvm $vmName --type gui 2>&1 | Out-Null
+        $startCode = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($startCode -eq 0) { $started = $true; break }
+        Write-Host "  ...waiting for session to release" -ForegroundColor DarkGray
+        Start-Sleep -Seconds 15
+    }
+    if (-not $started) { throw "Could not start VM '$vmName' - session not released after poweroff." }
 
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
     $deadline = (Get-Date).AddSeconds(300)

@@ -19,7 +19,8 @@ param(
     [string]$VmUser        = '',
     [string]$VmPass        = '',
     [string]$LoginUser     = '',
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$ForceRestart
 )
 
 $ErrorActionPreference = 'Stop'
@@ -93,6 +94,7 @@ if ($VmUser)         { $shareFolderArgs['VmUser']         = $VmUser    }
 if ($VmPass)         { $shareFolderArgs['VmPass']         = $VmPass    }
 if ($LoginUser)      { $shareFolderArgs['LoginUser']      = $LoginUser  }
 if ($NonInteractive) { $shareFolderArgs['NonInteractive'] = $true       }
+if ($ForceRestart)   { $shareFolderArgs['ForceRestart']   = $true       }
 & "$PSScriptRoot\share-folder.ps1" @shareFolderArgs
 if ($LASTEXITCODE -ne 0) {
     if ($hostDirCreated -and (Test-Path $HostPath -PathType Container)) {

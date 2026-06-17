@@ -37,6 +37,7 @@ export interface ShareLogsParams {
   vmUser: string
   vmPass: string
   loginUser: string
+  forceRestart?: boolean
 }
 
 export interface ProvisionScriptParams {

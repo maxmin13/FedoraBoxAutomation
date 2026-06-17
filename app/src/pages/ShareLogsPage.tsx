@@ -22,8 +22,9 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
   const [lines,      setLines]      = useState<ScriptLine[]>([])
   const [success,    setSuccess]    = useState<boolean | null>(null)
   const [error,      setError]      = useState<string | null>(null)
-  const [showLog,    setShowLog]    = useState(false)
-  const [credKey,    setCredKey]    = useState(0)
+  const [showLog,      setShowLog]      = useState(false)
+  const [showConfirm,  setShowConfirm]  = useState(false)
+  const [credKey,      setCredKey]      = useState(0)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -49,7 +50,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     })
   }, [vm.name, credKey])
 
-  async function handleRun() {
+  async function handleRun(forceRestart = false) {
     window.electronAPI.logUiAction(`share-logs "${vm.name}": Set up log sync`)
     setPageState('running')
     setLines([])
@@ -72,7 +73,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     })
 
     try {
-      const result = await window.electronAPI.runShareLogs({ vmName: vm.name, hostPath, vmUser, vmPass, loginUser })
+      const result = await window.electronAPI.runShareLogs({ vmName: vm.name, hostPath, vmUser, vmPass, loginUser, forceRestart })
       if (!result.ok && result.errorDetail) {
         setError(result.errorDetail)
       }
@@ -164,6 +165,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
 
   // ── Idle: form ──────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="max-w-2xl mx-auto">
 
       <div className="flex items-center gap-3 mb-6">
@@ -210,13 +212,41 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
         </div>
 
         <button
-          onClick={() => withAuth(handleRun)}
+          onClick={() => withAuth(() => {
+            if (vm.running) { setShowConfirm(true) } else { handleRun(false) }
+          })}
           className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
         >
           Set up log sync
         </button>
       </div>
     </div>
+
+    {showConfirm && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 max-w-sm w-full mx-4 space-y-4">
+          <h2 className="text-zinc-100 font-semibold">Force-stop VM?</h2>
+          <p className="text-zinc-300 text-sm">
+            <strong>{vm.name}</strong> is currently running. It will be force-stopped to register the log sync shared folder. Unsaved work in the VM will be lost.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setShowConfirm(false); handleRun(true) }}
+              className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors"
+            >
+              Force restart
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
