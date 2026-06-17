@@ -27,7 +27,7 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
   {
     category: 'Build Tools',
     tools: [
-      { key: 'maven', label: 'Apache Maven' },
+      { key: 'maven', label: 'Maven' },
     ],
   },
   {
