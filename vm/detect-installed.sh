@@ -38,6 +38,13 @@ maven_version() {
   echo "\"${ver}\""
 }
 
+openssl_version() {
+  local bin="/usr/local/ssl/bin/openssl"
+  [ -x "${bin}" ] || { echo false; return; }
+  ver=$("${bin}" version 2>&1 | awk '{print $2}')
+  echo "\"${ver}\""
+}
+
 ansible_ok() {
   which ansible >/dev/null 2>&1 && echo true && return
   find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
@@ -73,7 +80,7 @@ cat <<JSON
   "k3s":              $(cmd_ok k3s),
   "awsCli":           $(cmd_ok aws),
   "ecsCli":           $(cmd_ok ecs-cli),
-  "openssl":          $(path_ok /usr/local/ssl/bin/openssl),
+  "openssl":          $(openssl_version),
   "wireshark":        $(cmd_ok tshark),
   "git":              $(cmd_ok git),
   "vim":              $(cmd_ok vim),
