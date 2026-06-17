@@ -53,7 +53,9 @@ ansible_ok() {
 
 python_version() {
   local bin
-  bin=$(compgen -G "/usr/local/bin/python3.*" 2>/dev/null | sort -V | tail -1)
+  bin=$(compgen -G "/usr/local/bin/python3.*" 2>/dev/null \
+        | grep -E '^/usr/local/bin/python3\.[0-9]+$' \
+        | sort -V | tail -1)
   [[ -z "${bin}" ]] && { echo false; return; }
   ver=$("${bin}" --version 2>&1 | awk '{print $2}')
   echo "\"${ver}\""
