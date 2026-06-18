@@ -138,4 +138,12 @@ function getScriptState() {
   }
 }
 
-module.exports = { runScript, killActiveScript, hasActiveScript, splitChunk, setRunContext, getScriptState }
+/** Clears the done result so the next reconnect check starts fresh. */
+function clearScriptState() {
+  _runDone     = false
+  _runExitCode = null
+  _runLines    = []
+  _runContext  = null
+}
+
+module.exports = { runScript, killActiveScript, hasActiveScript, splitChunk, setRunContext, getScriptState, clearScriptState }

@@ -40,10 +40,11 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
       if (
-        state.running &&
-        state.context?.type === 'share-logs' &&
-        state.context?.vmName === vm.name
-      ) {
+        state.context?.type !== 'share-logs' ||
+        state.context?.vmName !== vm.name
+      ) return
+
+      if (state.running) {
         setLines(state.lines)
         setPageState('running')
         setShowLog(true)
@@ -58,6 +59,12 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           unsubLine()
           unsubDone()
         })
+      } else if (state.done) {
+        setLines(state.lines)
+        setSuccess(state.exitCode === 0)
+        setPageState('done')
+        setShowLog(false)
+        window.electronAPI.clearScriptState()
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps

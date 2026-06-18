@@ -18,7 +18,7 @@ const execAsync = promisify(exec)
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
-const { runScript, setRunContext, getScriptState } = require('./script-runner')
+const { runScript, setRunContext, getScriptState, clearScriptState } = require('./script-runner')
 const SCRIPTS = require('./scripts')
 const log = require('./logger')
 
@@ -599,6 +599,14 @@ function registerIpcHandlers(win) {
   // navigating away and back.
   handleIpc('get-script-state', async () => {
     return { ok: true, ...getScriptState() }
+  })
+
+  // ── clear-script-state ───────────────────────────────────
+  // Called by the renderer after it has consumed a done result via reconnect,
+  // so the next navigation back shows the idle form instead of the result again.
+  handleIpc('clear-script-state', async () => {
+    clearScriptState()
+    return { ok: true }
   })
 
   // ── run-provision-script ─────────────────────────────────

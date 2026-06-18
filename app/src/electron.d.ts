@@ -134,6 +134,7 @@ declare global {
       runSanityChecks: () => Promise<{ ok: boolean; checks: CheckResult[]; error?: string }>
       installVirtualBox: () => Promise<{ ok: boolean }>
       getScriptState: () => Promise<{ ok: boolean; running: boolean; done: boolean; exitCode: number | null; lines: ScriptLine[]; context: { vmName: string; type: string; categoryDir: string | null; scriptName: string | null } | null }>
+      clearScriptState: () => Promise<{ ok: boolean }>
       onScriptLine: (callback: (line: ScriptLine) => void) => () => void
       onScriptDone: (callback: (exitCode: number) => void) => () => void
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>

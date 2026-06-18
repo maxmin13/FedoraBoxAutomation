@@ -256,7 +256,9 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
       {loadError && (
         <div className="shrink-0 bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
-          {/E_ACCESSDENIED/i.test(loadError) ? 'VM is starting up — info will be available shortly.' : loadError}
+          {/E_ACCESSDENIED/i.test(loadError) || /LockMachine|VBOX_E_VM_ERROR/i.test(loadError)
+            ? 'VM is starting up — info will be available shortly.'
+            : loadError}
         </div>
       )}
 
