@@ -101,7 +101,6 @@ if ($LASTEXITCODE -ne 0) {
         Write-Host "  Removing host directory created during this run..." -ForegroundColor Yellow
         Remove-Item -Recurse -Force $HostPath -ErrorAction SilentlyContinue
     }
-    Write-Host "  ERROR: Could not set up the shared folder. See the output above for details." -ForegroundColor Red
     exit 1
 }
 
@@ -179,6 +178,12 @@ echo "log-sync.timer installed and started."
 
     $tmpFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "log-sync-setup.sh")
     [System.IO.File]::WriteAllText($tmpFile, ($setupScript -replace "`r`n", "`n"), [System.Text.UTF8Encoding]::new($false))
+
+    Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
+    if (-not (Wait-GuestReady -VmName $VmName -User $vmUser -Pass $vmPass)) {
+        throw "Guest Additions did not respond within 5 minutes."
+    }
+    Write-Host "  Guest Additions ready." -ForegroundColor Green
 
     Write-Host "  Uploading setup script..." -ForegroundColor Cyan
     $ErrorActionPreference = 'SilentlyContinue'

@@ -25,3 +25,5 @@
 # when the user clicks detail button, if the vm is not reacheable, display the login form
 
 # when a user start/stop a vm, then he navigates away, when he comes back, if the script is running, display the progressing bar
+
+# add Fix buttons to the diagnostics column in PerformancePage for actionable warnings (currently only the left Performance column has Fix buttons)

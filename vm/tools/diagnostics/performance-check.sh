@@ -42,7 +42,12 @@ if [[ $swap_used_mb -gt 0 ]]; then
 fi
 
 STEP "Network"
-nic=$(ls /sys/class/net 2>/dev/null | grep -v lo | head -1 || true)
+nic=''
+for _iface in $(ls /sys/class/net 2>/dev/null | grep -v lo); do
+    [[ -d "/sys/class/net/$_iface/bridge" ]] && continue
+    nic="$_iface"
+    break
+done
 if [[ -n "$nic" ]]; then
     driver=$(ethtool -i "$nic" 2>/dev/null | awk '/^driver:/ { print $2 }' || echo "unknown")
     log_info "Interface: $nic (driver: $driver)"

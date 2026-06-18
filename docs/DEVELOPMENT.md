@@ -521,4 +521,23 @@ React (SetupPage.tsx)                       <- (renderer) what did React receive
   -> setChecks(result.checks)
 ```
 
+---
+
+## Known Pitfalls
+
+### VirtualBox session lock after `controlvm poweroff`
+
+When a script uses `controlvm poweroff` and then needs to call `startvm`, the `VirtualBoxVM.exe` window process continues to hold the VirtualBox session lock for several seconds after the VM state reaches `poweroff`. During that window, `startvm` blocks for ~40 seconds per attempt before returning an error, and a short retry loop will time out before the lock is released.
+
+**Fix:** After confirming `VMState=poweroff`, kill the `VirtualBoxVM.exe` process for that VM before attempting `startvm`:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='VirtualBoxVM.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match [regex]::Escape($vmName) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 2
+```
+
+Match by VM name in the command line so only the correct window is killed. Never kill `VBoxSVC.exe` (the background service) or `VirtualBox.exe` (the manager window) — neither holds the per-VM session lock.
+
 **Tip:** start at the bottom. Put a breakpoint on `setChecks(result.checks)` and check whether `result` looks right. If it does not, work backwards up the chain until you find where the data went wrong.

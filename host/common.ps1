@@ -249,3 +249,27 @@ function Invoke-GuestScript {
 
     return $exitCode
 }
+
+# Polls VBoxService until it responds to a trivial command or the timeout expires.
+# Returns $true when ready, $false on timeout.
+function Wait-GuestReady {
+    param(
+        [string]$VmName,
+        [string]$User,
+        [string]$Pass,
+        [int]$TimeoutSec = 300,
+        [int]$PollSec    = 5
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $script:vbox guestcontrol $VmName run --exe /bin/bash `
+            --username $User --password $Pass `
+            --wait-stdout --wait-stderr -- -c 'echo ok' 2>&1 | Out-Null
+        $ok = $LASTEXITCODE -eq 0
+        $ErrorActionPreference = 'Stop'
+        if ($ok) { return $true }
+        Start-Sleep -Seconds $PollSec
+    }
+    return $false
+}

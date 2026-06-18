@@ -28,15 +28,6 @@ $ErrorActionPreference = 'Stop'
 
 . "$PSScriptRoot\common.ps1"
 
-function Test-GuestReady {
-    param([string]$VmName, [string]$User, [string]$Pass)
-    $ErrorActionPreference = 'SilentlyContinue'
-    & $script:vbox guestcontrol $VmName run --exe /bin/bash --username $User --password $Pass --wait-stdout --wait-stderr -- -c 'echo ok' 2>&1 | Out-Null
-    $ok = $LASTEXITCODE -eq 0
-    $ErrorActionPreference = 'Stop'
-    return $ok
-}
-
 # ---------------------------------------------------------------------------
 
 Write-Header "VirtualBox Shared Folder Setup"
@@ -192,6 +183,14 @@ if ($runningVms -contains $vmName) {
     }
     if (-not $vmStopped) { Write-Host "  ERROR: VM did not stop in time. Shut it down manually and re-run." -ForegroundColor Red; exit 1 }
     Write-Host "  VM stopped." -ForegroundColor Green
+
+    $vmProcs = Get-CimInstance Win32_Process -Filter "Name='VirtualBoxVM.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match [regex]::Escape($vmName) }
+    if ($vmProcs) {
+        Write-Host "  Closing VirtualBox GUI window..." -ForegroundColor Cyan
+        $vmProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Seconds 2
+    }
     Start-Sleep -Seconds 3
 }
 
@@ -295,29 +294,21 @@ try {
     }
 
     Write-Host "  Starting VM '$vmName'..." -ForegroundColor Cyan
-    Start-Sleep -Seconds 15
     $startDeadline = (Get-Date).AddSeconds(60)
     $started       = $false
     while ((Get-Date) -lt $startDeadline) {
         $ErrorActionPreference = 'SilentlyContinue'
-        & $script:vbox startvm $vmName --type gui 2>&1 | Out-Null
+        $startOut  = & $script:vbox startvm $vmName --type gui 2>&1
         $startCode = $LASTEXITCODE
         $ErrorActionPreference = 'Stop'
         if ($startCode -eq 0) { $started = $true; break }
         Write-Host "  ...waiting for session to release" -ForegroundColor DarkGray
-        Start-Sleep -Seconds 15
+        Start-Sleep -Seconds 5
     }
     if (-not $started) { throw "Could not start VM '$vmName' - session not released after poweroff." }
 
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
-    $deadline = (Get-Date).AddSeconds(300)
-    $gaReady  = $false
-    while ((Get-Date) -lt $deadline) {
-        Start-Sleep -Seconds 5
-        if (Test-GuestReady -VmName $vmName -User $vmUser -Pass $vmPass) { $gaReady = $true; break }
-        Write-Host "  ...still waiting" -ForegroundColor DarkGray
-    }
-    if (-not $gaReady) {
+    if (-not (Wait-GuestReady -VmName $vmName -User $vmUser -Pass $vmPass -TimeoutSec 300)) {
         throw "Guest Additions did not respond. Run manually: sudo usermod -aG vboxsf $loginUser"
     }
     Write-Host "  Guest Additions ready." -ForegroundColor Green
