@@ -24,6 +24,10 @@
 
 # when the user clicks detail button, if the vm is not reacheable, display the login form
 
-# when a user start/stop a vm, then he navigates away, when he comes back, if the script is running, display the progressing bar
+# when a user starts/stops a vm, then he navigates away, when he comes back, if the script is running, display the progressing bar
+
+# when a user shares a folder, then he navigates away, when he comes back, if the script is running, display the progressing bar
 
 # add Fix buttons to the diagnostics column in PerformancePage for actionable warnings (currently only the left Performance column has Fix buttons)
+
+# in the performance checks add a checks that says if in the vm there are running programs that are heavy on the vm and can slow it

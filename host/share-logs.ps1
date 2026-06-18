@@ -205,6 +205,8 @@ echo "log-sync.timer installed and started."
     Write-Host "  log-sync.timer active." -ForegroundColor Green
     Write-Host "  /var/log -> /mnt/log synced every 30 seconds." -ForegroundColor Cyan
     Write-Host "  View logs on host at: $HostPath" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  SUCCESS: Log sync is active. Guest logs will appear in the host folder every 30 seconds." -ForegroundColor Green
 
 } catch {
     $msg = $_.Exception.Message

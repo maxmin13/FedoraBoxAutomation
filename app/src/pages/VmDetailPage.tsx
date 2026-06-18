@@ -216,10 +216,6 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
     return <ShareFolderPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
   }
 
-  if (view === 'share-logs') {
-    return <ShareLogsPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
-  }
-
   if (view === 'provision') {
     return (
       <div className="h-full">
@@ -228,7 +224,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
     )
   }
 
-  if (loginRequired) {
+  if (loginRequired && view !== 'share-logs') {
     return (
       <div className="h-full overflow-y-auto">
         <VmLoginPage initialVmName={vm.name} onBack={onLoginBack} onNext={onLoginSuccess} />
@@ -241,7 +237,11 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
     : '—'
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <>
+    <div style={{ display: view === 'share-logs' ? '' : 'none' }} className="h-full">
+      <ShareLogsPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
+    </div>
+    <div style={{ display: view === 'share-logs' ? 'none' : '' }} className="h-full flex flex-col overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-3 shrink-0">
@@ -256,7 +256,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
       {loadError && (
         <div className="shrink-0 bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
-          {loadError}
+          {/E_ACCESSDENIED/i.test(loadError) ? 'VM is starting up — info will be available shortly.' : loadError}
         </div>
       )}
 
@@ -431,6 +431,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
         </div>
       )}
     </div>
+    </>
   )
 }
 

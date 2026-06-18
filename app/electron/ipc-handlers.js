@@ -811,7 +811,7 @@ function registerIpcHandlers(win) {
   handleIpc('run-share-logs', async (_event, params) => {
     const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-VmUser', params.vmUser, '-VmPass', params.vmPass, '-LoginUser', params.loginUser, '-NonInteractive']
     if (params.forceRestart) psArgs.push('-ForceRestart')
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs, { vmName: params.vmName, type: 'share-logs' })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })
