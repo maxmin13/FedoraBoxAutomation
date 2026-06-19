@@ -676,7 +676,7 @@ function registerIpcHandlers(win) {
       '-LoginUser', params.loginUser,
       '-NonInteractive',
     ]
-    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareFolder, psArgs)
+    const { exitCode, lines } = await streamScript(win, SCRIPTS.shareFolder, psArgs, { vmName: params.vmName, type: 'share-folder' })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }
   })
