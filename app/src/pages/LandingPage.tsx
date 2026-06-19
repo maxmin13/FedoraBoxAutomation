@@ -1,7 +1,7 @@
 // Landing page — shows all registered VirtualBox VMs.
 // Loads the VM list on mount and refreshes on demand.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Vm } from '../electron.d'
 import type { Page } from '../App'
 import VmDetailPage from './VmDetailPage'
@@ -43,6 +43,24 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     if (createVmRunning) return
     loadVms()
     setVmRefreshKey((k) => k + 1)
+  }, [isActive, createVmRunning])
+
+  // Poll every 5 s while the page is active to keep VM running states current.
+  // Silent — no loading spinner, no error banner — so the UI doesn't flicker.
+  // "running" now means Guest Additions are ready (checked in list-vms on the main process).
+  useEffect(() => {
+    if (!isActive || createVmRunning) return
+    const id = setInterval(async () => {
+      window.electronAPI.logUiAction('vm-list: poll')
+      const result = await window.electronAPI.listVms()
+      if (!result.ok) return
+      setVms(result.vms)
+      setSelectedVm((prev) => {
+        if (!prev) return null
+        return result.vms.find((v) => v.name === prev.name) ?? null
+      })
+    }, 5000)
+    return () => clearInterval(id)
   }, [isActive, createVmRunning])
 
   /**
@@ -116,16 +134,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     <div className="h-full overflow-y-auto">
     <div className="max-w-4xl mx-auto">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold text-zinc-100">My VMs</h1>
-
-        <button
-          onClick={() => { window.electronAPI.logUiAction('vm-list: Refresh'); loadVms() }}
-          disabled={loading || createVmRunning}
-          className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Loading...' : createVmRunning ? 'Creating VM...' : 'Refresh'}
-        </button>
       </div>
 
       {/* VirtualBox not found */}
@@ -313,6 +323,26 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
   const [showStopModal,   setShowStopModal]   = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
+  // Clear transient badges when the poll confirms the new state:
+  // - starting → cleared when GA becomes ready (running) or VM process dies (window closed mid-boot)
+  // - stopping → cleared when VM process fully stops
+  // Intermediate state (processRunning && !running) means the VM is booting or shutting down — keep badge.
+  const prevRunningRef = useRef(vm.running)
+  const prevProcessRunningRef = useRef(vm.processRunning)
+  useEffect(() => {
+    const runningChanged = prevRunningRef.current !== vm.running
+    const processChanged = prevProcessRunningRef.current !== vm.processRunning
+    prevRunningRef.current = vm.running
+    prevProcessRunningRef.current = vm.processRunning
+    if (!runningChanged && !processChanged) return
+    if (vm.running) {
+      setStarting(false)
+    } else if (!vm.processRunning) {
+      setStarting(false)
+      setStopping(false)
+    }
+  }, [vm.running, vm.processRunning])
+
   async function handleStart() {
     window.electronAPI.logUiAction(`vm "${vm.name}": Start`)
     setBusy(true)
@@ -321,12 +351,11 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
     try {
       const result = await window.electronAPI.startVm(vm.name)
       if (!result.ok) {
+        setStarting(false)
         setError('Could not start the VM — check the logs for details')
       }
     } finally {
       setBusy(false)
-      setStarting(false)
-      onRefresh()
     }
   }
 
@@ -339,12 +368,11 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
     try {
       const result = await window.electronAPI.stopVm(vm.name)
       if (!result.ok) {
+        setStopping(false)
         setError('Could not stop the VM — check the logs for details')
       }
     } finally {
       setBusy(false)
-      setStopping(false)
-      onRefresh()
     }
   }
 

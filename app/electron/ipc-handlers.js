@@ -201,7 +201,9 @@ function registerIpcHandlers(win) {
 
   // ── list-vms ──────────────────────────────────────────────
   // Returns all registered VMs with their running state.
-  // The renderer calls this on the landing page to populate the VM list.
+  // "running" means Guest Additions are loaded (run level >= 1), not just that the
+  // VirtualBox process is up. This lets the UI badge transition from "Starting..."
+  // to "Running" only once the guest is actually reachable via guestcontrol.
   handleIpc('list-vms', async () => {
     try {
       // 'vboxmanage list vms' outputs lines like: "MyVM" {uuid}
@@ -211,13 +213,31 @@ function registerIpcHandlers(win) {
       const runningOutput = execSync('VBoxManage list runningvms', { encoding: 'utf8' })
 
       const allVms = parseVmList(allOutput)
-      const runningNames = parseVmList(runningOutput).map((vm) => vm.name)
+      const runningNames = new Set(parseVmList(runningOutput).map((vm) => vm.name))
 
-      // Mark each VM as running or stopped
-      const vms = allVms.map((vm) => ({
+      // For each VM that VBox reports as running, check GA run level in parallel.
+      // Run level >= 1 means the GA kernel driver is loaded.
+      const gaLevels = await Promise.all(
+        allVms.map(async (vm) => {
+          if (!runningNames.has(vm.name)) return 0
+          try {
+            const { stdout } = await execAsync(
+              `VBoxManage showvminfo "${vm.name}" --machinereadable`,
+              { encoding: 'utf8' }
+            )
+            const m = stdout.match(/^GuestAdditionsRunLevel=(\d+)/m)
+            return m ? parseInt(m[1], 10) : 0
+          } catch {
+            return 0
+          }
+        })
+      )
+
+      const vms = allVms.map((vm, i) => ({
         name: vm.name,
         uuid: vm.uuid,
-        running: runningNames.includes(vm.name),
+        processRunning: runningNames.has(vm.name),
+        running: gaLevels[i] >= 1,
       }))
 
       return { ok: true, vms }

@@ -69,7 +69,8 @@ export interface CheckResult {
 export interface Vm {
   name: string
   uuid: string
-  running: boolean
+  processRunning: boolean  // VirtualBox VM process is up (but GA may not be ready yet)
+  running: boolean         // Guest Additions are loaded and reachable
 }
 
 export interface SharedFolder {

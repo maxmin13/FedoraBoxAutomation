@@ -16,7 +16,6 @@ export type Page = 'landing' | 'setup' | 'create-vm' | 'docs' | 'logs' | 'vm-log
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
-  const [landingKey, setLandingKey] = useState(0)
   const [createVmNavKey, setCreateVmNavKey] = useState(0)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
@@ -36,7 +35,6 @@ export default function App() {
 
   function handleNavigate(page: Page) {
     if (page === 'create-vm') setCreateVmNavKey((k) => k + 1)
-    if (page === 'landing') setLandingKey((k) => k + 1)
     setCurrentPage(page)
   }
 
@@ -49,7 +47,7 @@ export default function App() {
       <main className="flex-1 overflow-hidden p-6">
         <ErrorBoundary>
           <div style={{ display: currentPage === 'landing' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <LandingPage key={landingKey} onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} createVmRunning={scriptRunning && scriptPage === 'create-vm'} />
+            <LandingPage onNavigate={handleNavigate} onScriptRunning={handleScriptRunning} isActive={currentPage === 'landing'} createVmRunning={scriptRunning && scriptPage === 'create-vm'} />
           </div>
           {/* SetupPage and CreateVmPage stay mounted so their state survives navigation */}
           <div style={{ display: currentPage === 'setup' ? undefined : 'none' }} className="h-full overflow-hidden">
