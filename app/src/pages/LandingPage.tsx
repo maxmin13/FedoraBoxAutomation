@@ -51,7 +51,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   useEffect(() => {
     if (!isActive || createVmRunning) return
     const id = setInterval(async () => {
-      window.electronAPI.logUiAction('vm-list: poll')
+      window.electronAPI.logUiAction('vm-list: polling VM status')
       const result = await window.electronAPI.listVms()
       if (!result.ok) return
       setVms(result.vms)
