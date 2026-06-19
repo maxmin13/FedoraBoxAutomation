@@ -307,9 +307,10 @@ interface ProvisionPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
+  isActive?: boolean
 }
 
-export default function ProvisionPage({ vm, onBack, onScriptRunning }: ProvisionPageProps) {
+export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = true }: ProvisionPageProps) {
   const [vmUser,    setVmUser]    = useState('')
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
@@ -332,6 +333,65 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const alreadyInstalledRef    = useRef(false)
   const seenResultsRef         = useRef<Set<string>>(new Set())
   const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
+  const mountedRef             = useRef(true)
+  const isActiveRef            = useRef(isActive)
+
+  useEffect(() => { return () => { mountedRef.current = false } }, [])
+  useEffect(() => { isActiveRef.current = isActive }, [isActive])
+
+  // On mount, check for a script that finished (or is still running) while the user
+  // was away. If found, jump straight to the result banner or reconnect to the stream.
+  useEffect(() => {
+    window.electronAPI.getScriptState().then((state) => {
+      if (!state.ok || !state.context) return
+      if (state.context.vmName !== vm.name || state.context.type !== 'provision') return
+
+      const scriptName = state.context.scriptName ?? null
+      const scriptDef  = scriptName
+        ? CATEGORIES.flatMap((c) => c.scripts).find((s) => s.name === scriptName) ?? null
+        : null
+      const label   = scriptDef?.label ?? (scriptName ? scriptName : 'Base Setup')
+      const seenKey = scriptName ?? BASE_SETUP_KEY
+
+      if (state.running) {
+        setRunningLabel(label)
+        setSelectedScript(scriptDef)
+        setLines(state.lines)
+        setPageState('running')
+        setShowLog(true)
+        const unsubLine = window.electronAPI.onScriptLine((line) =>
+          setLines((prev) => [...prev, line])
+        )
+        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+          setSuccess(exitCode === 0)
+          if (mountedRef.current) {
+            markScriptSeen(vm.name, seenKey, 'mount-reconnect-done')
+            window.electronAPI.clearScriptState()
+          }
+          setPageState('done')
+          setShowLog(false)
+          unsubLine()
+          unsubDone()
+        })
+        return
+      }
+
+      if (state.done) {
+        if (hasSeenScript(vm.name, seenKey)) {
+          window.electronAPI.clearScriptState()
+          return
+        }
+        markScriptSeen(vm.name, seenKey, 'mount-restore')
+        window.electronAPI.clearScriptState()
+        setRunningLabel(label)
+        setSelectedScript(scriptDef)
+        setLines(state.lines)
+        setSuccess(state.exitCode === 0)
+        setPageState('done')
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
@@ -339,6 +399,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
   const [credKey,          setCredKey]          = useState(0)
+
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -486,8 +547,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (exitCode === 0 && loginUser) {
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
-      if (runScriptName) markScriptSeen(vm.name, runScriptName, 'done')
-      window.electronAPI.clearScriptState()
+      if (isActiveRef.current && mountedRef.current) {
+        if (runScriptName) markScriptSeen(vm.name, runScriptName, 'done')
+        window.electronAPI.clearScriptState()
+      }
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
         setSuccess(false)
