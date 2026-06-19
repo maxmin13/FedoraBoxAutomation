@@ -34,7 +34,12 @@ STEP "Maven"
 ####
 
 if [[ -x "${INSTALL_DIR}/bin/mvn" ]]; then
-    log_info "Maven ${MVN_VERSION} is already installed at ${INSTALL_DIR}."
+    if [[ "$(readlink /usr/local/bin/mvn 2>/dev/null)" == "${INSTALL_DIR}/bin/mvn" ]]; then
+        log_info "Maven ${MVN_VERSION} is already installed at ${INSTALL_DIR} — nothing to do."
+    else
+        ln -sfn "${INSTALL_DIR}/bin/mvn" /usr/local/bin/mvn
+        log_info "Symlink updated: /usr/local/bin/mvn -> ${INSTALL_DIR}/bin/mvn"
+    fi
 else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
@@ -51,12 +56,12 @@ else
     mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" "${INSTALL_DIR}"
     log_info "Extracted to ${INSTALL_DIR}."
 
+    ln -sfn "${INSTALL_DIR}/bin/mvn" /usr/local/bin/mvn
+    log_info "Symlink: /usr/local/bin/mvn -> ${INSTALL_DIR}/bin/mvn"
+
     "${INSTALL_DIR}/bin/mvn" -version
     log_info "Maven ${MVN_VERSION} successfully installed."
 fi
-
-ln -sfn "${INSTALL_DIR}/bin/mvn" /usr/local/bin/mvn
-log_info "Symlink: /usr/local/bin/mvn -> ${INSTALL_DIR}/bin/mvn"
 
 {
     echo "export M2_HOME=${INSTALL_DIR}"

@@ -110,8 +110,17 @@ teardown() {
     [ -L /usr/local/bin/mvn ]
 }
 
+@test "skips ln when symlink already points to the correct target" {
+    # Pre-create the correct symlink; script must not call ln again.
+    mkdir -p /opt/maven-3.9.9/bin
+    ln -sfn /opt/maven-3.9.9/bin/mvn /usr/local/bin/mvn
+    _stub ln 0
+    run bash "$SCRIPT" 3.9.9
+    ! grep -q "^ln " "$CALLS_FILE"
+}
+
 @test "updates /usr/local/bin/mvn symlink when already installed version is re-run" {
-    # 3.9.9 already present; re-running must still update the symlink to point at it.
+    # 3.9.9 already present; symlink must still point at it after re-run.
     run bash "$SCRIPT" 3.9.9
     [[ "$(readlink /usr/local/bin/mvn)" == */maven-3.9.9/* ]]
 }
