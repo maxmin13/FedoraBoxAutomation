@@ -1,8 +1,9 @@
 #!/bin/bash
 
 ##
-## Description: Downloads and installs Apache Maven to /opt/maven and
+## Description: Downloads and installs Apache Maven to /opt/maven-<version> and
 ##              configures M2_HOME and PATH system-wide via /etc/profile.d/maven.sh.
+##              Multiple versions can coexist; each gets its own directory.
 ##              Optionally pass a version as the first argument (default: latest).
 ##              Pass 'latest' to auto-resolve the current version from the Apache dist server.
 ## Usage:       sudo ./maven.sh [version]
@@ -15,7 +16,7 @@ MVN_VERSION="${1:-latest}"
 
 if [[ "${MVN_VERSION}" == 'latest' ]]; then
     log_info "Querying Apache dist server for the latest Maven 3.x release ..."
-    MVN_VERSION=$(curl -fsSL "https://downloads.apache.org/maven/maven-3/" \
+    MVN_VERSION=$(curl -fsSL --max-time 30 "https://downloads.apache.org/maven/maven-3/" \
         | grep -oP '(?<=href=")[0-9]+\.[0-9]+\.[0-9]+(?=/)' | sort -V | tail -1)
     if [[ -z "${MVN_VERSION}" ]]; then
         log_error "Could not determine the latest Maven version. Check network connectivity."
@@ -24,48 +25,47 @@ if [[ "${MVN_VERSION}" == 'latest' ]]; then
     log_info "Latest version: ${MVN_VERSION}"
 fi
 
+INSTALL_DIR="/opt/maven-${MVN_VERSION}"
+CACHE_DIR="/var/cache/maven"
+CACHED_TGZ="${CACHE_DIR}/apache-maven-${MVN_VERSION}-bin.tar.gz"
+
 ####
 STEP "Maven"
 ####
 
-if [[ -x '/opt/maven/bin/mvn' ]]; then
-    INSTALLED_MVN=$(/opt/maven/bin/mvn -version 2>/dev/null \
-        | grep -oP '(?<=Apache Maven )[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-    if [[ "${INSTALLED_MVN}" == "${MVN_VERSION}" ]]; then
-        log_info "Maven ${MVN_VERSION} is already installed at /opt/maven — nothing to do."
-    else
-        log_warn "Maven ${INSTALLED_MVN:-unknown} is installed at /opt/maven but version ${MVN_VERSION} was requested."
-        log_warn "To install a different version, remove the existing installation first:"
-        log_warn "  rm -rf /opt/maven && rm -f /etc/profile.d/maven.sh"
-        log_warn "Then re-run this script."
-    fi
+if [[ -x "${INSTALL_DIR}/bin/mvn" ]]; then
+    log_info "Maven ${MVN_VERSION} is already installed at ${INSTALL_DIR}."
 else
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "${WORK_DIR}"' EXIT
 
-    MVN_URL="https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz"
-    log_info "Downloading Maven ${MVN_VERSION} from ${MVN_URL} ..."
-    wget -q --tries=3 "${MVN_URL}" -O "${WORK_DIR}/maven.tar.gz"
-    tar -xf "${WORK_DIR}/maven.tar.gz" -C "${WORK_DIR}"
-    mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" /opt/maven
-    log_info "Extracted to /opt/maven."
-
-    if [[ ! -f /etc/profile.d/maven.sh ]]; then
-        {
-            echo 'export M2_HOME=/opt/maven'
-            echo 'export PATH=${M2_HOME}/bin:${PATH}'
-        } > /etc/profile.d/maven.sh
-        log_info "M2_HOME and PATH configured in /etc/profile.d/maven.sh."
+    mkdir -p "${CACHE_DIR}"
+    if [[ -f "${CACHED_TGZ}" ]]; then
+        log_info "Using cached tarball: ${CACHED_TGZ}"
     else
-        log_info "/etc/profile.d/maven.sh already present — PATH not modified."
+        MVN_URL="https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz"
+        log_info "Downloading Maven ${MVN_VERSION} from ${MVN_URL} ..."
+        wget -q --tries=3 --timeout=60 "${MVN_URL}" -O "${CACHED_TGZ}"
     fi
+    tar -xf "${CACHED_TGZ}" -C "${WORK_DIR}"
+    mv "${WORK_DIR}/apache-maven-${MVN_VERSION}" "${INSTALL_DIR}"
+    log_info "Extracted to ${INSTALL_DIR}."
 
-    /opt/maven/bin/mvn -version
+    "${INSTALL_DIR}/bin/mvn" -version
     log_info "Maven ${MVN_VERSION} successfully installed."
 fi
+
+ln -sfn "${INSTALL_DIR}/bin/mvn" /usr/local/bin/mvn
+log_info "Symlink: /usr/local/bin/mvn -> ${INSTALL_DIR}/bin/mvn"
+
+{
+    echo "export M2_HOME=${INSTALL_DIR}"
+    echo 'export PATH=${M2_HOME}/bin:${PATH}'
+} > /etc/profile.d/maven.sh
+log_info "M2_HOME configured in /etc/profile.d/maven.sh -> ${INSTALL_DIR}."
 
 log_info "Version : mvn -version"
 log_info "Build   : mvn clean install"
 log_info "Test    : mvn test"
 log_info "Package : mvn package"
-log_info "Install : /opt/maven"
+log_info "Install : ${INSTALL_DIR}"

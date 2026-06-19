@@ -418,6 +418,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
         setSuccess(exitCode === 0)
         seenResultsRef.current.add(script.name)
+        markScriptSeen(vm.name, script.name, 'reconnect-done')
+        window.electronAPI.clearScriptState()
         setPageState('done')
         setShowLog(false)
         unsubLine()
@@ -430,6 +432,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (done, not seen)`)
       seenResultsRef.current.add(script.name)
       markScriptSeen(vm.name, script.name, 'restore')
+      window.electronAPI.clearScriptState()
       setSelectedScript(script)
       setRunningLabel(script.label)
       setLines(state.lines)
@@ -483,6 +486,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       if (exitCode === 0 && loginUser) {
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
+      if (runScriptName) markScriptSeen(vm.name, runScriptName, 'done')
+      window.electronAPI.clearScriptState()
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
         setSuccess(false)

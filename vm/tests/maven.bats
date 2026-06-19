@@ -36,10 +36,19 @@ STUB
     _stub wget 0
     _stub tar  0
 
-    # Default: Maven already installed — create the sentinel binary
-    mkdir -p /opt/maven/bin
-    printf '#!/bin/bash\necho "Apache Maven 3.9.5"\n' > /opt/maven/bin/mvn
-    chmod +x /opt/maven/bin/mvn
+    # curl stub: returns a fake Apache directory listing so MVN_VERSION resolves
+    # to 3.9.9 without hitting the network.
+    cat > "$TEST_TMPDIR/bin/curl" << 'EOF'
+#!/bin/bash
+printf '<a href="3.9.9/">3.9.9/</a>\n'
+exit 0
+EOF
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    # Default: Maven 3.9.9 already installed at the versioned path.
+    mkdir -p /opt/maven-3.9.9/bin
+    printf '#!/bin/bash\necho "Apache Maven 3.9.9"\n' > /opt/maven-3.9.9/bin/mvn
+    chmod +x /opt/maven-3.9.9/bin/mvn
 }
 
 teardown() {
@@ -48,28 +57,67 @@ teardown() {
     else
         rm -f /tmp/common.sh
     fi
-    rm -rf /opt/maven
+    rm -rf /opt/maven-3.9.9 /opt/maven-3.9.5 /opt/maven-3.8.8
+    rm -f /usr/local/bin/mvn
+    rm -rf /var/cache/maven
     rm -rf "$TEST_TMPDIR"
 }
 
-@test "exits 0 when Maven is already installed" {
-    run bash "$SCRIPT"
+@test "exits 0 when the requested version is already installed" {
+    run bash "$SCRIPT" 3.9.9
     [ "$status" -eq 0 ]
 }
 
-@test "skips wget when Maven is already installed" {
-    run bash "$SCRIPT"
+@test "skips wget when the requested version is already installed" {
+    run bash "$SCRIPT" 3.9.9
     ! grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "downloads Maven when not installed" {
-    rm -rf /opt/maven   # remove the sentinel so the install path runs
-    run bash "$SCRIPT"
+    rm -rf /opt/maven-3.9.9
+    run bash "$SCRIPT" 3.9.9
     grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "accepts an explicit version argument" {
-    rm -rf /opt/maven
     run bash "$SCRIPT" 3.8.8
     grep -q "3.8.8" "$CALLS_FILE"
+}
+
+@test "resolves latest version via curl when no version is given" {
+    rm -rf /opt/maven-3.9.9
+    run bash "$SCRIPT"
+    grep -q "3.9.9" "$CALLS_FILE"
+}
+
+@test "installs a second version alongside the first without conflict" {
+    # 3.9.9 already present; installing 3.9.5 should download without error.
+    run bash "$SCRIPT" 3.9.5
+    grep -q "3.9.5" "$CALLS_FILE"
+}
+
+@test "skips wget when tarball is already cached" {
+    rm -rf /opt/maven-3.9.9
+    mkdir -p /var/cache/maven
+    touch /var/cache/maven/apache-maven-3.9.9-bin.tar.gz
+    run bash "$SCRIPT" 3.9.9
+    ! grep -q "^wget " "$CALLS_FILE"
+}
+
+@test "creates /usr/local/bin/mvn symlink on install" {
+    rm -rf /opt/maven-3.9.9
+    run bash "$SCRIPT" 3.9.9
+    [ -L /usr/local/bin/mvn ]
+}
+
+@test "updates /usr/local/bin/mvn symlink when already installed version is re-run" {
+    # 3.9.9 already present; re-running must still update the symlink to point at it.
+    run bash "$SCRIPT" 3.9.9
+    [[ "$(readlink /usr/local/bin/mvn)" == */maven-3.9.9/* ]]
+}
+
+@test "updates /usr/local/bin/mvn symlink when switching to a different version" {
+    # Install 3.9.5 on top of an already-present 3.9.9; symlink must point to 3.9.5.
+    run bash "$SCRIPT" 3.9.5
+    [[ "$(readlink /usr/local/bin/mvn)" == */maven-3.9.5/* ]]
 }
