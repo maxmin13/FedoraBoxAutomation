@@ -309,6 +309,12 @@ try {
 
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
     if (-not (Wait-GuestReady -VmName $vmName -User $vmUser -Pass $vmPass -TimeoutSec 300)) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $stillRunning = & $script:vbox list runningvms 2>$null | Where-Object { $_ -match [regex]::Escape("`"$vmName`"") }
+        $ErrorActionPreference = 'Stop'
+        if (-not $stillRunning) {
+            throw "VM stopped before Guest Additions became ready."
+        }
         throw "Guest Additions did not respond. Run manually: sudo usermod -aG vboxsf $loginUser"
     }
     Write-Host "  Guest Additions ready." -ForegroundColor Green

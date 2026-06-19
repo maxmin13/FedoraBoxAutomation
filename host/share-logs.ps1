@@ -181,6 +181,12 @@ echo "log-sync.timer installed and started."
 
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
     if (-not (Wait-GuestReady -VmName $VmName -User $vmUser -Pass $vmPass)) {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $stillRunning = & $script:vbox list runningvms 2>$null | Where-Object { $_ -match [regex]::Escape("`"$VmName`"") }
+        $ErrorActionPreference = 'Stop'
+        if (-not $stillRunning) {
+            throw "VM stopped before Guest Additions became ready."
+        }
         throw "Guest Additions did not respond within 5 minutes."
     }
     Write-Host "  Guest Additions ready." -ForegroundColor Green

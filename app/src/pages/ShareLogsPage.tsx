@@ -58,6 +58,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
           setShowLog(false)
           unsubLine()
           unsubDone()
+          window.electronAPI.clearScriptState()
         })
       } else if (state.done) {
         setLines(state.lines)
@@ -103,6 +104,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
       setShowLog(false)
       unsubLine()
       unsubDone()
+      window.electronAPI.clearScriptState()
     })
 
     try {

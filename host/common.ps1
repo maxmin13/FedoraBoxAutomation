@@ -263,6 +263,12 @@ function Wait-GuestReady {
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
         $ErrorActionPreference = 'SilentlyContinue'
+        $runningVms = & $script:vbox list runningvms 2>$null
+        $ErrorActionPreference = 'Stop'
+        $isRunning = $runningVms | Where-Object { $_ -match [regex]::Escape("`"$VmName`"") }
+        if (-not $isRunning) { return $false }
+
+        $ErrorActionPreference = 'SilentlyContinue'
         & $script:vbox guestcontrol $VmName run --exe /bin/bash `
             --username $User --password $Pass `
             --wait-stdout --wait-stderr -- -c 'echo ok' 2>&1 | Out-Null

@@ -68,6 +68,7 @@ export default function ShareFolderPage({ vm, onBack, onScriptRunning }: ShareFo
       setShowLog(false)
       unsubLine()
       unsubDone()
+      window.electronAPI.clearScriptState()
     })
 
     try {

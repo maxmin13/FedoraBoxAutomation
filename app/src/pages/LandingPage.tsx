@@ -14,9 +14,10 @@ interface LandingPageProps {
   onScriptRunning: (running: boolean) => void
   isActive: boolean
   createVmRunning: boolean
+  navKey: number
 }
 
-export default function LandingPage({ onNavigate, onScriptRunning, isActive, createVmRunning }: LandingPageProps) {
+export default function LandingPage({ onNavigate, onScriptRunning, isActive, createVmRunning, navKey }: LandingPageProps) {
   // The list of VMs returned by VBoxManage
   const [vms, setVms] = useState<Vm[]>([])
 
@@ -34,6 +35,14 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
 
   // Incremented each time we want VmDetailPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
+
+  // Reset sub-views when the user clicks "My VMs" in the nav bar.
+  // navKey increments on every navigate('landing') call, even when already on this page.
+  useEffect(() => {
+    setSelectedVm(null)
+    setPerfVm(null)
+    setPendingPerfVm(null)
+  }, [navKey])
 
   // Load VMs on mount and whenever this page becomes active, but not while
   // create-vm is running — the VM appears in VBoxManage before it's fully set up.
