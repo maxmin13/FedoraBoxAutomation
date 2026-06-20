@@ -1,5 +1,5 @@
 
-# create a new vm, verify all the provision scripts after change most recent version
+
 
 # Give the user the ability to edit VM settings after creation: name, CPU cores, memory, VRAM, disk size, network adapter
 
@@ -12,8 +12,15 @@
 # see eclipse and most recent version handling
 # see if other programs can be handled with version
 
-# when a user shares a folder, then he navigates away, when he comes back, if the script is running, display the progressing bar
-
 # add Fix buttons to the diagnostics column in PerformancePage for actionable warnings (currently only the left Performance column has Fix buttons)
 
 # in the performance checks add a checks that says if in the vm there are running programs that are heavy on the vm and can slow it
+
+# create a new vm, verify all the provision scripts after change most recent version
+
+
+# fix the error banner in provisioning by category when navigating away
+
+# add in memo and analysis to build a traking system to help with debugging, that can be switch on and off
+
+# save in memo and analysis the success/error pattern

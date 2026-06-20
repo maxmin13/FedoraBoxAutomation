@@ -224,6 +224,15 @@ function unmarkScriptSeen(vmName: string, scriptName: string) {
   window.electronAPI.logUiAction(`provision "${vmName}": [dbg] unmarkSeen ${scriptName}`)
 }
 
+interface LastRunFailure { error: string; lines: ScriptLine[] }
+const _lastErrors = new Map<string, LastRunFailure | null>()
+function getLastError(vmName: string, scriptName: string): LastRunFailure | null {
+  return _lastErrors.get(`${vmName}::${scriptName}`) ?? null
+}
+function saveLastError(vmName: string, scriptName: string, data: LastRunFailure | null) {
+  _lastErrors.set(`${vmName}::${scriptName}`, data)
+}
+
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
     case 'none': return ''
@@ -383,6 +392,20 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         }
         markScriptSeen(vm.name, seenKey, 'mount-restore')
         window.electronAPI.clearScriptState()
+
+        // Individual script failure: skip the done banner — the "Last run failed"
+        // box in the script-args form shows it. Populate from lines on app restart.
+        if (scriptName && state.exitCode !== 0) {
+          if (!getLastError(vm.name, scriptName)) {
+            const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
+            saveLastError(vm.name, scriptName, {
+              error: errLine ? errLine.text.replace(/^ERROR:\s*/, '') : `Script failed (exit ${state.exitCode})`,
+              lines: state.lines,
+            })
+          }
+          return
+        }
+
         setRunningLabel(label)
         setSelectedScript(scriptDef)
         setLines(state.lines)
@@ -396,6 +419,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
   const [argValues,        setArgValues]        = useState(['', ''])
+  const [showLastRunLog,   setShowLastRunLog]   = useState(false)
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
   const [credKey,          setCredKey]          = useState(0)
@@ -428,6 +452,19 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   useEffect(() => {
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
+
+  // Clear the last-run error whenever leaving the script-args view (any path:
+  // Back button, Run another, ← My VMs, NavBar navigation, or component unmount).
+  // The cleanup captures the values from when the effect last ran, so it sees
+  // the correct idleView/selectedScript at the moment of navigation.
+  useEffect(() => {
+    return () => {
+      if (idleView === 'script-args' && selectedScript) {
+        saveLastError(vm.name, selectedScript.name, null)
+        window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (left script-args, script=${selectedScript.name})`)
+      }
+    }
+  }, [idleView, selectedScript?.name])
 
   useEffect(() => {
     window.electronAPI.logUiAction(
@@ -502,9 +539,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       return
     }
 
-    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form (matches=${matchesThisScript} done=${state.done} seen=${seen})`)
+    const lastErr = getLastError(vm.name, script.name)
+    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form (matches=${matchesThisScript} done=${state.done} seen=${seen} lastErr=${lastErr ? 'yes' : 'no'})`)
     setSelectedScript(script)
     setArgValues(['', ''])
+    setShowLastRunLog(false)
     setIdleView('script-args')
   }
 
@@ -515,7 +554,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       case 'full-form':   setIdleView('mode');        break
       case 'categories':  setIdleView('mode');        break
       case 'scripts':     setIdleView('categories');  break
-      case 'script-args': setIdleView('scripts');     break
+      case 'script-args':
+        if (selectedScript) saveLastError(vm.name, selectedScript.name, null)
+        setIdleView('scripts')
+        break
     }
   }
 
@@ -534,7 +576,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     forceConfirmNeededRef.current = false
     alreadyInstalledRef.current   = false
 
+    const capturedLines: ScriptLine[] = []
     const unsubLine = window.electronAPI.onScriptLine((line) => {
+      capturedLines.push(line)
       setLines((prev) => [...prev, line])
       if (/Use 'Install anyway'/i.test(line.text)) {
         forceConfirmNeededRef.current = true
@@ -550,6 +594,24 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       if (isActiveRef.current && mountedRef.current) {
         if (runScriptName) markScriptSeen(vm.name, runScriptName, 'done')
         window.electronAPI.clearScriptState()
+        // Done page will show — no need to store error for script-args form.
+        if (runScriptName) {
+          saveLastError(vm.name, runScriptName, null)
+          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (done page active, exit ${exitCode})`)
+        }
+      } else if (runScriptName) {
+        // Page inactive — store result for display in script-args form on next visit.
+        if (exitCode !== 0) {
+          const errLine = [...capturedLines].reverse().find(l => l.text.startsWith('ERROR: '))
+          saveLastError(vm.name, runScriptName, {
+            error: errLine ? errLine.text.replace(/^ERROR:\s*/, '') : `Script failed (exit ${exitCode})`,
+            lines: [...capturedLines],
+          })
+          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr saved (page inactive, exit ${exitCode})`)
+        } else {
+          saveLastError(vm.name, runScriptName, null)
+          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (page inactive, success)`)
+        }
       }
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
@@ -575,7 +637,10 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       const result = await runFn()
       if (!result.ok && result.errorDetail) setError(result.errorDetail)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const errMsg = err instanceof Error ? err.message : String(err)
+      setError(errMsg)
+      // unsubDone won't fire on exception — save here.
+      if (runScriptName) saveLastError(vm.name, runScriptName, { error: errMsg, lines: [...capturedLines] })
       setSuccess(false)
       markSeen()
       setPageState('done')
@@ -1000,96 +1065,134 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         </div>
       )}
 
-      {idleView === 'script-args' && selectedScript && (
-        <div className="flex-1 overflow-y-auto">
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
+      {idleView === 'script-args' && selectedScript && (() => {
+        const lastRun = getLastError(vm.name, selectedScript.name)
 
-            <div>
-              <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
-              <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
-            </div>
-
-            {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (() => {
-              const opts   = selectedScript.argOptions?.[0]
-              const curVal = argValues[0]
-              const defVal = selectedScript.argDefaults?.[0] ?? ''
-              return (
-                <div>
-                  <label className="block text-zinc-400 text-xs mb-1">
-                    {selectedScript.argPrompts?.[0] ?? 'Argument'}
-                  </label>
-                  {opts?.length ? (
-                    <select
-                      value={curVal || defVal}
-                      onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                      className={ic(curVal || defVal) + ' cursor-pointer'}
-                    >
-                      {opts.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={curVal}
-                      onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                      placeholder={defVal}
-                      autoComplete="off"
-                      className={ic(curVal)}
-                    />
-                  )}
-                </div>
-              )
-            })()}
-
-            {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
-              <div className="space-y-3">
-                {([0, 1] as const).map((i) => {
-                  const opts      = selectedScript.argOptions?.[i]
-                  const curVal    = argValues[i]
-                  const defVal    = selectedScript.argDefaults?.[i] ?? ''
-                  const label     = selectedScript.argPrompts?.[i] ?? `Argument ${i + 1}`
-                  const handleChange = (val: string) =>
-                    setArgValues(i === 0 ? [val, argValues[1]] : [argValues[0], val])
-                  return (
-                    <div key={i}>
-                      <label className="block text-zinc-400 text-xs mb-1">{label}</label>
-                      {opts?.length ? (
-                        <select
-                          value={curVal || defVal}
-                          onChange={(e) => handleChange(e.target.value)}
-                          className={ic(curVal || defVal) + ' cursor-pointer'}
-                        >
-                          {opts.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={curVal}
-                          onChange={(e) => handleChange(e.target.value)}
-                          placeholder={defVal}
-                          autoComplete="off"
-                          className={ic(curVal)}
-                        />
-                      )}
-                    </div>
-                  )
-                })}
+        if (lastRun) {
+          return (
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
+              <div className="bg-red-900 border border-red-700 rounded-lg p-4 space-y-1 shrink-0">
+                <p className="text-red-200 font-medium">{selectedScript.label} failed.</p>
+                <p className="text-red-300 text-sm font-mono break-words">{lastRun.error}</p>
               </div>
-            )}
+              <LogPanel lines={lastRun.lines} showLog={showLastRunLog} onToggle={() => setShowLastRunLog(v => !v)} />
+              <div className="mt-auto flex justify-between shrink-0">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Try again`); withAuth(() => handleRunScript()) }}
+                    className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+                  >
+                    Try again
+                  </button>
+                  <button
+                    onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Run another`); saveLastError(vm.name, selectedScript.name, null); setIdleView('categories') }}
+                    className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+                  >
+                    Run another
+                  </button>
+                </div>
+                <button
+                  onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); saveLastError(vm.name, selectedScript.name, null); onBack() }}
+                  className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+                >
+                  &larr; My VMs
+                </button>
+              </div>
+            </div>
+          )
+        }
 
-            <button
-              onClick={() => withAuth(() => handleRunScript())}
-              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
-            >
-              Run {selectedScript.label}
-            </button>
+        return (
+          <div className="flex-1 overflow-y-auto">
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
 
+              <div>
+                <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
+                <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
+              </div>
+
+              {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (() => {
+                const opts   = selectedScript.argOptions?.[0]
+                const curVal = argValues[0]
+                const defVal = selectedScript.argDefaults?.[0] ?? ''
+                return (
+                  <div>
+                    <label className="block text-zinc-400 text-xs mb-1">
+                      {selectedScript.argPrompts?.[0] ?? 'Argument'}
+                    </label>
+                    {opts?.length ? (
+                      <select
+                        value={curVal || defVal}
+                        onChange={(e) => setArgValues([e.target.value, argValues[1]])}
+                        className={ic(curVal || defVal) + ' cursor-pointer'}
+                      >
+                        {opts.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={curVal}
+                        onChange={(e) => setArgValues([e.target.value, argValues[1]])}
+                        placeholder={defVal}
+                        autoComplete="off"
+                        className={ic(curVal)}
+                      />
+                    )}
+                  </div>
+                )
+              })()}
+
+              {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
+                <div className="space-y-3">
+                  {([0, 1] as const).map((i) => {
+                    const opts      = selectedScript.argOptions?.[i]
+                    const curVal    = argValues[i]
+                    const defVal    = selectedScript.argDefaults?.[i] ?? ''
+                    const label     = selectedScript.argPrompts?.[i] ?? `Argument ${i + 1}`
+                    const handleChange = (val: string) =>
+                      setArgValues(i === 0 ? [val, argValues[1]] : [argValues[0], val])
+                    return (
+                      <div key={i}>
+                        <label className="block text-zinc-400 text-xs mb-1">{label}</label>
+                        {opts?.length ? (
+                          <select
+                            value={curVal || defVal}
+                            onChange={(e) => handleChange(e.target.value)}
+                            className={ic(curVal || defVal) + ' cursor-pointer'}
+                          >
+                            {opts.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={curVal}
+                            onChange={(e) => handleChange(e.target.value)}
+                            placeholder={defVal}
+                            autoComplete="off"
+                            className={ic(curVal)}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <button
+                onClick={() => withAuth(() => handleRunScript())}
+                className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+              >
+                Run {selectedScript.label}
+              </button>
+
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
     </div>
   )
