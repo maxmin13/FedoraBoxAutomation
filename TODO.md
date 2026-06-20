@@ -18,9 +18,3 @@
 
 # create a new vm, verify all the provision scripts after change most recent version
 
-
-# fix the error banner in provisioning by category when navigating away
-
-# add in memo and analysis to build a traking system to help with debugging, that can be switch on and off
-
-# save in memo and analysis the success/error pattern

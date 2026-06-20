@@ -10,6 +10,11 @@
 
 source /tmp/common.sh
 
+if ! command -v java &>/dev/null; then
+    log_error "Java is not installed or not on PATH. Run java.sh before running this script."
+    exit 2
+fi
+
 if [[ -z "${1:-}" ]]; then
     log_error "Eclipse release argument is required (e.g. 2026-03 or 'latest')"
     exit 1
@@ -19,11 +24,11 @@ ECLIPSE_RELEASE="$1"
 if [[ "${ECLIPSE_RELEASE}" == 'latest' ]]; then
     log_info "Querying Eclipse EPP downloads for the latest release ..."
     ECLIPSE_RELEASE=$(curl -fsSL "https://download.eclipse.org/technology/epp/downloads/release/" \
-        | grep -Eo '"[0-9]{4}-[0-9]{2}/"' \
+        | grep -Eo 'release/[0-9]{4}-[0-9]{2}' \
         | grep -Eo '[0-9]{4}-[0-9]{2}' \
-        | sort -r | head -1)
+        | sort -r | head -1) || true
     if [[ -z "${ECLIPSE_RELEASE}" ]]; then
-        log_error "Could not determine the latest Eclipse release. Check network connectivity."
+        log_error "Could not determine the latest Eclipse release. Check network connectivity or pass the release explicitly (e.g. 2026-03)."
         exit 1
     fi
     log_info "Latest release: ${ECLIPSE_RELEASE}"
@@ -101,3 +106,17 @@ fi
 
 log_info "Launch  : eclipse-${ECLIPSE_RELEASE} &   or open Applications menu"
 log_info "Install : ${ECLIPSE_DIR}"
+log_info ""
+log_info "--- Post-install setup ---"
+log_info "1. First launch: choose a workspace directory when prompted."
+log_info "2. Set JAVA_HOME in ~/.bashrc if not already set:"
+log_info "     export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java))))"
+log_info "     export PATH=\$JAVA_HOME/bin:\$PATH"
+log_info "3. Configure JDK in Eclipse: Window > Preferences > Java > Installed JREs > Add."
+log_info "   Point it to \$JAVA_HOME (java.sh installs under /usr/lib/jvm/)."
+log_info ""
+log_info "--- Claude Code (AI assistant) ---"
+log_info "Eclipse has no native Claude Code plugin. Use the CLI alongside Eclipse:"
+log_info "  Install : npm install -g @anthropic-ai/claude-code   (requires Node.js)"
+log_info "  Auth    : set ANTHROPIC_API_KEY in ~/.bashrc, or run 'claude' and sign in via browser"
+log_info "  Use     : open a terminal, cd to your project, run 'claude'"
