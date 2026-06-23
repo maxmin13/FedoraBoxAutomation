@@ -218,6 +218,8 @@ interface ScriptResult {
 }
 const _scriptResults = new Map<string, ScriptResult>()
 
+export function clearScriptResultsCache() { _scriptResults.clear() }
+
 function srKey(vmName: string, scriptName: string | null): string {
   return `${vmName}::${scriptName ?? '__base-setup__'}`
 }
@@ -479,6 +481,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
     const result = _scriptResults.get(key)
     if (result) {
+      _scriptResults.delete(key)
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (${result.state})`)
       setSelectedScript(script)
       setRunningLabel(script.label)
@@ -660,6 +663,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
     const result = _scriptResults.get(key)
     if (result) {
+      _scriptResults.delete(key)
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner (${result.state})`)
       setSelectedScript(null)
       setRunningLabel('Base Setup')
