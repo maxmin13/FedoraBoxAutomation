@@ -171,7 +171,7 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
 
         <LogPanel
           lines={lines}
-          showLog={showLog}
+          showLog={pageState === 'running' || showLog}
           onToggle={() => setShowLog((v) => !v)}
         />
 

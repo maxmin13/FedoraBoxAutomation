@@ -730,7 +730,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           <p className="text-zinc-300 text-sm font-medium">Running {runningLabel}...</p>
           <ProgressBar />
         </div>
-        <LogPanel lines={lines} showLog={showLog} onToggle={() => setShowLog((v) => !v)} />
+        <LogPanel lines={lines} showLog={pageState === 'running' || showLog} onToggle={() => setShowLog((v) => !v)} />
       </div>
     )
   }
@@ -814,7 +814,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           </div>
         )}
 
-        <LogPanel lines={lines} showLog={showLog} onToggle={() => setShowLog((v) => !v)} />
+        <LogPanel lines={lines} showLog={pageState === 'running' || showLog} onToggle={() => setShowLog((v) => !v)} />
 
         <div className="mt-auto flex justify-between shrink-0">
           <div className="flex gap-2">

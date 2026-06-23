@@ -21,9 +21,9 @@ ECLIPSE_RELEASE="$1"
 if [[ "${ECLIPSE_RELEASE}" == 'latest' ]]; then
     log_info "Querying Eclipse EPP downloads for the latest release ..."
     ECLIPSE_RELEASE=$(curl -fsSL "https://download.eclipse.org/technology/epp/downloads/release/" \
-        | grep -Eo '"[0-9]{4}-[0-9]{2}/"' \
-        | grep -Eo '[0-9]{4}-[0-9]{2}' \
-        | sort -r | head -1)
+        | grep -Eo '[0-9]{4}-[0-9]{2}/' \
+        | tr -d '/' \
+        | sort -r | head -1 || true)
     if [[ -z "${ECLIPSE_RELEASE}" ]]; then
         log_error "Could not determine the latest Eclipse release. Check network connectivity."
         exit 1
