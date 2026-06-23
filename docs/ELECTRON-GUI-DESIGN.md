@@ -150,6 +150,8 @@ A top navigation bar shows which page is active.
 
 **State persistence:** `LandingPage`, `SetupPage`, `CreateVmPage`, and `LogsPage` are kept always-mounted and hidden with `display: none` (via wrapping `<div>`s in `App.tsx`) so their React state — VM grid, analysis results, wizard step, log content — survives navigation. Only `DocsPage` is unmounted when inactive.
 
+**ProvisionPage — navigate-away result persistence:** ProvisionPage is rendered inside `VmDetailPage` and receives an `isActive` prop. A `prevActiveRef` effect detects the false→true transition on navigation-back: if `pageState === 'done'` at that moment, it resets to the mode selector so the user sees the form, not a stale result banner. Results are stored in a module-level `_scriptResults: Map<string, ScriptResult>` keyed by `srKey(vmName, scriptName | null)` (`null` = Base Setup). `saveResult()` is always called on completion — there is no "user stayed" vs "navigated away" branch. When the user selects a script, `handleSelectScript` checks (in order): still running → reconnect; done in main process → drain to map; in `_scriptResults` → restore banner; otherwise → show form. "Run another" and "← My VMs" delete the map entry using `runningLabel` (not `selectedScript`) to compute the key, because `selectedScript` can be stale when the Base Setup banner is showing.
+
 ---
 
 ## Sanity Checks — JSON Output for the GUI

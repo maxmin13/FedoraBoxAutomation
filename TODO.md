@@ -1,6 +1,4 @@
 
-
-
 # Give the user the ability to edit VM settings after creation: name, CPU cores, memory, VRAM, disk size, network adapter
 
 # integrate and fix unit tests
@@ -17,5 +15,3 @@
 # in the performance checks add a checks that says if in the vm there are running programs that are heavy on the vm and can slow it
 
 # create a new vm, verify all the provision scripts after change most recent version
-
-# update docs and analysis after refactoring of navigate away
