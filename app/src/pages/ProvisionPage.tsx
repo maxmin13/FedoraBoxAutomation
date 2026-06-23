@@ -222,6 +222,14 @@ function srKey(vmName: string, scriptName: string | null): string {
   return `${vmName}::${scriptName ?? '__base-setup__'}`
 }
 
+function saveResult(key: string, exitCode: number | null, lines: ScriptLine[]): void {
+  const errMsg = [...lines].reverse().find(l => l.text.startsWith('ERROR: '))?.text.replace(/^ERROR:\s*/, '')
+  _scriptResults.set(key, exitCode === 0
+    ? { state: 'success', lines }
+    : { state: 'error', lines, error: errMsg ?? `Script failed (exit ${exitCode ?? '?'})` }
+  )
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
@@ -333,10 +341,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   const alreadyInstalledRef    = useRef(false)
   const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
   const mountedRef             = useRef(true)
-  const isActiveRef            = useRef(isActive)
 
   useEffect(() => { return () => { mountedRef.current = false } }, [])
-  useEffect(() => { isActiveRef.current = isActive }, [isActive])
 
   // When the user navigates back to this page after seeing a result banner,
   // reset to the mode selector so they start fresh. The result is still in
@@ -362,11 +368,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       if (!state.done) return
 
       const key = srKey(vm.name, state.context.scriptName ?? null)
-      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
-      _scriptResults.set(key, state.exitCode === 0
-        ? { state: 'success', lines: state.lines }
-        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
-      )
+      saveResult(key, state.exitCode, state.lines)
       window.electronAPI.clearScriptState()
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -458,11 +460,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         setLines((prev) => [...prev, line])
       })
       const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-        const errLine = [...liveLines].reverse().find(l => l.text.startsWith('ERROR: '))
-        _scriptResults.set(key, exitCode === 0
-          ? { state: 'success', lines: liveLines }
-          : { state: 'error', lines: liveLines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
-        )
+        saveResult(key, exitCode, liveLines)
         setSuccess(exitCode === 0)
         window.electronAPI.clearScriptState()
         setPageState('done')
@@ -475,11 +473,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
     // Script finished between mount and now (state still held by main process)
     if (matchesThisScript && state.done) {
-      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
-      _scriptResults.set(key, state.exitCode === 0
-        ? { state: 'success', lines: state.lines }
-        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
-      )
+      saveResult(key, state.exitCode, state.lines)
       window.electronAPI.clearScriptState()
     }
 
@@ -544,11 +538,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
       // Always persist result so navigate-away + return can show it.
-      const errLine = [...capturedLines].reverse().find(l => l.text.startsWith('ERROR: '))
-      _scriptResults.set(runKey, exitCode === 0
-        ? { state: 'success', lines: [...capturedLines] }
-        : { state: 'error', lines: [...capturedLines], error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
-      )
+      saveResult(runKey, exitCode, [...capturedLines])
       if (mountedRef.current) window.electronAPI.clearScriptState()
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
@@ -647,13 +637,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         setLines((prev) => [...prev, line])
       })
       const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-        const errLine = [...liveLines].reverse().find(l => l.text.startsWith('ERROR: '))
-        _scriptResults.set(key, exitCode === 0
-          ? { state: 'success', lines: liveLines }
-          : { state: 'error', lines: liveLines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
-        )
+        saveResult(key, exitCode, liveLines)
+        setSelectedScript(null)
         setSuccess(exitCode === 0)
         setIsReconnect(false)
+        window.electronAPI.clearScriptState()
         setPageState('done')
         setShowLog(false)
         reconnectUnsubRef.current = null
@@ -666,11 +654,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
     // Script finished between mount and now
     if (isBaseSetup && state.done) {
-      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
-      _scriptResults.set(key, state.exitCode === 0
-        ? { state: 'success', lines: state.lines }
-        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
-      )
+      saveResult(key, state.exitCode, state.lines)
       window.electronAPI.clearScriptState()
     }
 
@@ -841,7 +825,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           <button
             onClick={async () => {
               window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
-              _scriptResults.delete(srKey(vm.name, selectedScript?.name ?? null))
+              _scriptResults.delete(srKey(vm.name, runningLabel === 'Base Setup' ? null : selectedScript?.name ?? null))
               if (!success) {
                 const saved = await window.electronAPI.loadVmCredentials(vm.name)
                 if (saved.ok) {
@@ -862,7 +846,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           </button>
           </div>
           <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); _scriptResults.delete(srKey(vm.name, selectedScript?.name ?? null)); onBack() }}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); _scriptResults.delete(srKey(vm.name, runningLabel === 'Base Setup' ? null : selectedScript?.name ?? null)); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
