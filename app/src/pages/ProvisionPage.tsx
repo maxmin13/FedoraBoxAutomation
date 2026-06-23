@@ -131,7 +131,16 @@ const CATEGORIES: CategoryDef[] = [
           { value: '2024.2.5', label: '2024.2.5' },
           { value: '2024.1.7', label: '2024.1.7' },
         ]] },
-      { name: 'visualstudiocode.sh', label: 'VS Code',   relPath: 'visualstudiocode.sh', description: 'Visual Studio Code via Microsoft repo', argType: 'none' },
+      { name: 'visualstudiocode.sh', label: 'VS Code', relPath: 'visualstudiocode.sh',
+        description: 'Visual Studio Code - installs to /opt/vscode-<version>, multiple versions can coexist',
+        argType: 'custom', argPrompts: ['VS Code version'], argDefaults: ['latest'],
+        argOptions: [[
+          { value: 'latest',  label: 'Latest stable (auto-detect)' },
+          { value: '1.100.0', label: '1.100.0 — May 2025' },
+          { value: '1.99.0',  label: '1.99.0  — Apr 2025' },
+          { value: '1.98.0',  label: '1.98.0  — Mar 2025' },
+          { value: '1.97.0',  label: '1.97.0  — Feb 2025' },
+        ]] },
     ],
   },
   {
