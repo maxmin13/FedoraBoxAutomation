@@ -39,8 +39,8 @@ print(d['IIC'][0]['downloads']['linux']['link'])
 fi
 
 IDEA_DIR="/opt/idea-IC-${IDEA_VERSION}"
-IDEA_BIN="/usr/bin/idea"
-IDEA_DESKTOP="/usr/share/applications/intellij-idea-ce.desktop"
+IDEA_BIN="/usr/bin/idea-${IDEA_VERSION}"
+IDEA_DESKTOP="/usr/share/applications/intellij-idea-ce-${IDEA_VERSION}.desktop"
 CACHE_DIR="/opt/intellij-cache"
 
 ####
@@ -99,9 +99,9 @@ else
 	[Desktop Entry]
 	Version=1.0
 	Type=Application
-	Name=IntelliJ IDEA Community Edition
+	Name=IntelliJ IDEA Community ${IDEA_VERSION}
 	Comment=Intelligent Java IDE
-	Exec=${IDEA_BIN} %f
+	Exec=${IDEA_DIR}/bin/idea.sh %f
 	Icon=${IDEA_DIR}/bin/idea.svg
 	Categories=Development;IDE;Java;
 	Terminal=false
@@ -113,5 +113,5 @@ else
     log_info "IntelliJ IDEA Community ${IDEA_VERSION} successfully installed."
 fi
 
-log_info "Launch  : idea  or open Applications menu"
+log_info "Launch  : idea-${IDEA_VERSION}  or open Applications menu"
 log_info "Install : ${IDEA_DIR}"
