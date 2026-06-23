@@ -76,10 +76,11 @@ else
     log_info "Extracting ..."
     EXTRACT_TMP=$(mktemp -d)
     tar -xf "${CACHED_TAR}" --directory "${EXTRACT_TMP}"
-    EXTRACTED_DIR=$(find "${EXTRACT_TMP}" -maxdepth 1 -type d -name 'idea-IC-*' | head -1)
+    EXTRACTED_DIR=$(find "${EXTRACT_TMP}" -maxdepth 1 -mindepth 1 -type d | head -1)
     if [[ -z "${EXTRACTED_DIR}" ]]; then
         rm -rf "${EXTRACT_TMP}"
-        log_error "Extraction produced no 'idea-IC-*' directory - the archive may be corrupt or use an unexpected layout."
+        rm -f "${CACHED_TAR}"
+        log_error "Extraction produced no directory - archive may be corrupt. Cache cleared; re-run to re-download."
         exit 1
     fi
     mv "${EXTRACTED_DIR}" "${IDEA_DIR}"
