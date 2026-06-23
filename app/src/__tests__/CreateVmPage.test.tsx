@@ -23,6 +23,7 @@ beforeEach(() => {
     onScriptDone:       vi.fn().mockReturnValue(() => {}),
     // Default: clicking the ISO input fills in ISO_PATH
     pickIso:            vi.fn().mockResolvedValue({ filePath: ISO_PATH }),
+    logUiAction:        vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 

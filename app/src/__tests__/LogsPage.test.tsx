@@ -6,8 +6,9 @@ const SAMPLE_CONTENT = '2026-05-16 10:00:00 [info] [ipc] recv list-vms\n2026-05-
 
 beforeEach(() => {
   window.electronAPI = {
-    readLog:    vi.fn().mockResolvedValue({ ok: true, content: SAMPLE_CONTENT }),
-    openLogDir: vi.fn().mockResolvedValue({ ok: true }),
+    readLog:     vi.fn().mockResolvedValue({ ok: true, content: SAMPLE_CONTENT }),
+    openLogDir:  vi.fn().mockResolvedValue({ ok: true }),
+    logUiAction: vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 

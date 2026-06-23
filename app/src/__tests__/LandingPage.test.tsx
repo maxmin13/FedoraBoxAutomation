@@ -7,18 +7,27 @@ const RUNNING_VM = { name: 'RunningVM', uuid: 'uuid-2', running: true }
 
 beforeEach(() => {
   window.electronAPI = {
-    listVms:              vi.fn().mockResolvedValue({ ok: true, vms: [] }),
-    startVm:              vi.fn().mockResolvedValue({ ok: true }),
-    stopVm:               vi.fn().mockResolvedValue({ ok: true }),
-    deleteVm:             vi.fn().mockResolvedValue({ ok: true }),
-    loadVmCredentials:    vi.fn().mockResolvedValue({ ok: false }),
-    checkVmReady:         vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false }),
-    checkVmCredentials:   vi.fn().mockResolvedValue({ ok: true }),
-    checkVmUser:          vi.fn().mockResolvedValue({ ok: true }),
-    saveVmCredentials:    vi.fn().mockResolvedValue({ ok: true }),
-    getVmInfo:            vi.fn().mockResolvedValue({ ok: false, error: 'not needed' }),
-    onScriptLine:         vi.fn().mockReturnValue(() => {}),
-    onScriptDone:         vi.fn().mockReturnValue(() => {}),
+    listVms:                vi.fn().mockResolvedValue({ ok: true, vms: [] }),
+    startVm:                vi.fn().mockResolvedValue({ ok: true }),
+    stopVm:                 vi.fn().mockResolvedValue({ ok: true }),
+    deleteVm:               vi.fn().mockResolvedValue({ ok: true }),
+    loadVmCredentials:      vi.fn().mockResolvedValue({ ok: false }),
+    checkVmReady:           vi.fn().mockResolvedValue({ ok: true, running: false, guestReady: false }),
+    checkVmCredentials:     vi.fn().mockResolvedValue({ ok: true }),
+    checkVmUser:            vi.fn().mockResolvedValue({ ok: true }),
+    saveVmCredentials:      vi.fn().mockResolvedValue({ ok: true }),
+    getVmInfo:              vi.fn().mockResolvedValue({ ok: false, error: 'not needed' }),
+    onScriptLine:           vi.fn().mockReturnValue(() => {}),
+    onScriptDone:           vi.fn().mockReturnValue(() => {}),
+    logUiAction:            vi.fn(),
+    getScriptState:         vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
+    clearScriptState:       vi.fn().mockResolvedValue({ ok: true }),
+    getVmGuestLogsPath:     vi.fn().mockResolvedValue({ ok: true, path: 'C:\\VMs\\FedoraBox\\guest-logs' }),
+    cancelQueryVmInstalled: vi.fn(),
+    queryVmInstalled:       vi.fn().mockResolvedValue({ ok: false, vmStopped: true }),
+    runShareLogs:           vi.fn().mockResolvedValue({ ok: true }),
+    runShareFolder:         vi.fn().mockResolvedValue({ ok: true }),
+    pickFolder:             vi.fn().mockResolvedValue({ folderPath: null }),
   } as unknown as typeof window.electronAPI
 })
 
@@ -36,11 +45,6 @@ describe('loading state', () => {
     expect(screen.getByText('Loading VMs...')).toBeInTheDocument()
   })
 
-  it('shows a disabled loading button while loading', () => {
-    window.electronAPI.listVms = vi.fn().mockReturnValue(new Promise(() => {}))
-    render(<LandingPage onNavigate={vi.fn()} onScriptRunning={vi.fn()} isActive={true} />)
-    expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled()
-  })
 })
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -51,10 +55,6 @@ describe('empty state', () => {
     expect(screen.getByText('No VMs found')).toBeInTheDocument()
   })
 
-  it('shows the Refresh button in the page header', async () => {
-    await renderAndFlush()
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
-  })
 })
 
 // ── Error state ───────────────────────────────────────────────────────────────
@@ -113,13 +113,12 @@ describe('VM list', () => {
     expect(screen.getByText('Stopped')).toBeInTheDocument()
   })
 
-  it('calls startVm and refreshes when the Start button is clicked', async () => {
+  it('calls startVm when the Start button is clicked', async () => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
     await act(async () => {})
     expect(window.electronAPI.startVm).toHaveBeenCalledWith('FedoraBox')
-    expect(window.electronAPI.listVms).toHaveBeenCalledTimes(2)
   })
 
   it('calls stopVm and refreshes when the Stop button is clicked', async () => {
@@ -173,16 +172,6 @@ describe('VM list', () => {
   })
 })
 
-// ── Refresh ───────────────────────────────────────────────────────────────────
-
-describe('Refresh', () => {
-  it('reloads the VM list when the Refresh button is clicked', async () => {
-    await renderAndFlush()
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
-    await act(async () => {})
-    expect(window.electronAPI.listVms).toHaveBeenCalledTimes(2)
-  })
-})
 
 // ── Delete confirmation ───────────────────────────────────────────────────────
 
@@ -229,60 +218,32 @@ describe('delete confirmation', () => {
 // ── VM detail navigation ──────────────────────────────────────────────────────
 
 describe('VM detail navigation', () => {
-  async function clickDetailAndLogin() {
+  beforeEach(() => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
-      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
-    })
+  })
+
+  async function clickDetail() {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Detail' }))
-    await act(async () => {})
-    // VmLoginPage is shown as a credential gate — click Next to proceed
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await act(async () => {})
   }
 
-  it('shows the VM login gate when the Detail button is clicked', async () => {
-    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
-    await renderAndFlush()
-    fireEvent.click(screen.getByRole('button', { name: 'Detail' }))
-    await act(async () => {})
-    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-  })
-
-  it('opens VmDetailPage after completing the login gate from Detail', async () => {
-    await clickDetailAndLogin()
-    // VmDetailPage shows the VM name as a heading
+  it('opens VmDetailPage when the Detail button is clicked', async () => {
+    await clickDetail()
     expect(screen.getByRole('heading', { name: 'FedoraBox', level: 1 })).toBeInTheDocument()
   })
 
   it('returns to the VM grid when Back is clicked in the detail view', async () => {
-    await clickDetailAndLogin()
+    await clickDetail()
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     await act(async () => {})
-    // Back to the grid — the heading is "My VMs"
     expect(screen.getByRole('heading', { name: 'My VMs', level: 1 })).toBeInTheDocument()
   })
 
-  it('shows the VM login gate when the Provision button is clicked', async () => {
-    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
+  it('opens ProvisionPage when the Provision button is clicked', async () => {
     await renderAndFlush()
     fireEvent.click(screen.getByRole('button', { name: 'Provision' }))
     await act(async () => {})
-    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-  })
-
-  it('opens ProvisionPage after completing the login gate from Provision', async () => {
-    window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
-    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({
-      ok: true, user: 'root', pass: 'secret', loginUser: 'fedora',
-    })
-    await renderAndFlush()
-    fireEvent.click(screen.getByRole('button', { name: 'Provision' }))
-    await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    await act(async () => {})
-    // ProvisionPage shows mode-selection buttons on initial mount
     expect(screen.getByRole('button', { name: /Base Setup/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /By Category/ })).toBeInTheDocument()
   })

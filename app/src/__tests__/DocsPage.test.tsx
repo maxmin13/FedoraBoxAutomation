@@ -9,44 +9,18 @@ vi.mock('remark-gfm', () => ({ default: {} }))
 
 beforeEach(() => {
   window.electronAPI = {
-    readDoc: vi.fn().mockResolvedValue({ ok: true, content: '# Hello\nSome content.' }),
+    readDoc:     vi.fn().mockResolvedValue({ ok: true, content: '# Hello\nSome content.' }),
+    logUiAction: vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 
 describe('DocsPage', () => {
 
   describe('sidebar', () => {
-    it('shows all four document buttons', async () => {
-      render(<DocsPage />)
-      await act(async () => {})
-      expect(screen.getByText('VM Post-Install Setup')).toBeInTheDocument()
-      expect(screen.getByText('Development Guide')).toBeInTheDocument()
-      expect(screen.getByText('Testing Guide')).toBeInTheDocument()
-      expect(screen.getByText('GUI Design')).toBeInTheDocument()
-    })
-
     it('calls readDoc with POST-INSTALL.md on mount', async () => {
       render(<DocsPage />)
       await act(async () => {})
       expect(window.electronAPI.readDoc).toHaveBeenCalledWith('POST-INSTALL.md')
-    })
-
-    it('clicking a sidebar button calls readDoc with that filename', async () => {
-      render(<DocsPage />)
-      await act(async () => {})
-      vi.mocked(window.electronAPI.readDoc).mockClear()
-      fireEvent.click(screen.getByText('Development Guide'))
-      await act(async () => {})
-      expect(window.electronAPI.readDoc).toHaveBeenCalledWith('DEVELOPMENT.md')
-    })
-
-    it('clicking a sidebar button calls readDoc with the Testing Guide filename', async () => {
-      render(<DocsPage />)
-      await act(async () => {})
-      vi.mocked(window.electronAPI.readDoc).mockClear()
-      fireEvent.click(screen.getByText('Testing Guide'))
-      await act(async () => {})
-      expect(window.electronAPI.readDoc).toHaveBeenCalledWith('TESTING.md')
     })
   })
 

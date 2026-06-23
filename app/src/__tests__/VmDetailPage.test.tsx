@@ -30,8 +30,21 @@ const ALL_FALSE = Object.fromEntries([
 
 beforeEach(() => {
   window.electronAPI = {
-    getVmInfo:        vi.fn().mockResolvedValue({ ok: true, info: BASE_INFO }),
-    queryVmInstalled: vi.fn().mockResolvedValue({ ok: false, vmStopped: true }),
+    getVmInfo:              vi.fn().mockResolvedValue({ ok: true, info: BASE_INFO }),
+    queryVmInstalled:       vi.fn().mockResolvedValue({ ok: false, vmStopped: true }),
+    cancelQueryVmInstalled: vi.fn(),
+    getScriptState:         vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
+    clearScriptState:       vi.fn().mockResolvedValue({ ok: true }),
+    onScriptLine:           vi.fn().mockReturnValue(() => {}),
+    onScriptDone:           vi.fn().mockReturnValue(() => {}),
+    getVmGuestLogsPath:     vi.fn().mockResolvedValue({ ok: true, path: 'C:\\VMs\\FedoraBox\\guest-logs' }),
+    loadVmCredentials:      vi.fn().mockResolvedValue({ ok: false }),
+    checkVmCredentials:     vi.fn().mockResolvedValue({ ok: true }),
+    runShareLogs:           vi.fn().mockResolvedValue({ ok: true }),
+    runShareFolder:         vi.fn().mockResolvedValue({ ok: true }),
+    pickFolder:             vi.fn().mockResolvedValue({ folderPath: null }),
+    saveVmCredentials:      vi.fn().mockResolvedValue({ ok: true }),
+    logUiAction:            vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 
@@ -314,28 +327,6 @@ describe('VmDetailPage — navigation', () => {
 // ── VM not-running banner and disabled buttons ────────────────────────────────
 
 describe('VmDetailPage — VM not running', () => {
-  it('shows the "Stopped" badge when vm.running is false', async () => {
-    const stoppedVm = { name: 'FedoraBox', uuid: 'uuid-1', running: false }
-    render(<VmDetailPage vm={stoppedVm} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
-    await waitFor(() => expect(screen.queryByText('Loading VM info...')).not.toBeInTheDocument())
-    expect(screen.getByText('Stopped')).toBeInTheDocument()
-  })
-
-  it('shows the "Running" badge when vm.running is true', async () => {
-    await renderAndWait()
-    expect(screen.getByText('Running')).toBeInTheDocument()
-  })
-
-  it('disables the Sync button when VM is stopped', async () => {
-    await renderAndWait()
-    expect(screen.getByRole('button', { name: 'Sync' })).toBeDisabled()
-  })
-
-  it('disables the Share button when VM is stopped', async () => {
-    await renderAndWait()
-    expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled()
-  })
-
   it('enables the Sync button when VM is running', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })

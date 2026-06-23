@@ -7,6 +7,7 @@ describe('NavBar', () => {
 
   beforeEach(() => {
     onNavigate.mockReset()
+    window.electronAPI = { logUiAction: vi.fn() } as unknown as typeof window.electronAPI
   })
 
   it('shows all nav items: Requirements, My VMs, Create VM, Activity, Docs', () => {

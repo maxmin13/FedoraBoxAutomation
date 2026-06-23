@@ -475,10 +475,10 @@ describe('query-vm-installed handler', () => {
   })
 
   it('returns { ok: true, installed } when guestcontrol succeeds', async () => {
-    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
-    mockExecSync
-      .mockReturnValueOnce('')             // copyto
-      .mockReturnValueOnce(INSTALLED_JSON) // run detect-installed.sh
+    mockExec
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' })) // isVmRunning
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, ''))                                            // execTracked copyto
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, INSTALLED_JSON))                               // execTracked run
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'secret' } })
     )
@@ -491,8 +491,9 @@ describe('query-vm-installed handler', () => {
   })
 
   it('returns { ok: false, error } when guestcontrol throws', async () => {
-    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
-    mockExecSync.mockImplementationOnce(() => { throw new Error('VERR_AUTHENTICATION_FAILURE') })
+    mockExec
+      .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' })) // isVmRunning
+      .mockImplementationOnce((cmd, opts, cb) => cb(new Error('VERR_AUTHENTICATION_FAILURE')))            // execTracked copyto throws
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'wrong' } })
     )
@@ -687,13 +688,15 @@ describe('read-log handler', () => {
 describe('list-vms handler', () => {
   let listVmsHandler
   let mockExecSync
+  let mockExec
 
   beforeAll(() => {
     const cpId = require.resolve('child_process')
     mockExecSync = vi.fn()
+    mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: mockExec },
     }
     listVmsHandler = loadHandlers()('list-vms')
   })
@@ -705,17 +708,22 @@ describe('list-vms handler', () => {
 
   beforeEach(() => {
     mockExecSync.mockReset()
+    mockExec.mockReset()
   })
 
   it('returns all VMs with the running field set correctly', async () => {
     mockExecSync
       .mockReturnValueOnce('"FedoraBox" {uuid-1}\n"OtherVM" {uuid-2}\n') // list vms
       .mockReturnValueOnce('"FedoraBox" {uuid-1}\n')                       // list runningvms
+    // FedoraBox is running so execAsync (promisify(exec)) is called for GA run level check
+    mockExec.mockImplementationOnce((cmd, opts, cb) =>
+      cb(null, { stdout: 'GuestAdditionsRunLevel=1\n', stderr: '' })
+    )
     const result = await listVmsHandler({})
     expect(result.ok).toBe(true)
     expect(result.vms).toEqual([
-      { name: 'FedoraBox', uuid: 'uuid-1', running: true },
-      { name: 'OtherVM',   uuid: 'uuid-2', running: false },
+      { name: 'FedoraBox', uuid: 'uuid-1', processRunning: true,  running: true  },
+      { name: 'OtherVM',   uuid: 'uuid-2', processRunning: false, running: false },
     ])
   })
 
@@ -1211,7 +1219,7 @@ describe('run-share-folder handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runShareFolderHandler = loadHandlers()('run-share-folder')
   })
@@ -1274,7 +1282,7 @@ describe('run-share-logs handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runShareLogsHandler = loadHandlers()('run-share-logs')
   })
@@ -1336,7 +1344,7 @@ describe('extractError — Script exited with code filtering', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runShareFolderHandler = loadHandlers()('run-share-folder')
   })
@@ -1382,7 +1390,7 @@ describe('run-provision-script handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runProvisionScriptHandler = loadHandlers()('run-provision-script')
   })
@@ -1450,7 +1458,7 @@ describe('run-provision-setup handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runProvisionSetupHandler = loadHandlers()('run-provision-setup')
   })
@@ -1613,7 +1621,7 @@ describe('run-sanity-checks handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     runSanityChecksHandler = loadHandlers()('run-sanity-checks')
   })
@@ -1681,7 +1689,7 @@ describe('create-vm handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     createVmHandler = loadHandlers()('create-vm')
   })
@@ -1742,7 +1750,7 @@ describe('install-virtualbox handler', () => {
     const srId = require.resolve('../script-runner')
     require.cache[srId] = {
       id: srId, filename: srId, loaded: true,
-      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn() },
+      exports: { runScript: mockRunScript, hasActiveScript: vi.fn(), killActiveScript: vi.fn(), setRunContext: vi.fn(), getScriptState: vi.fn(), clearScriptState: vi.fn() },
     }
     installVirtualBoxHandler = loadHandlers()('install-virtualbox')
   })

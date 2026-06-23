@@ -6,12 +6,16 @@ const VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 
 beforeEach(() => {
   window.electronAPI = {
-    loadVmCredentials: vi.fn().mockResolvedValue({ ok: false }),
-    runShareFolder:    vi.fn().mockResolvedValue({ ok: true }),
-    saveVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
-    pickFolder:        vi.fn().mockResolvedValue({ folderPath: 'C:\\Users\\test\\shared' }),
-    onScriptLine:      vi.fn().mockReturnValue(() => {}),
-    onScriptDone:      vi.fn().mockReturnValue(() => {}),
+    loadVmCredentials:  vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' }),
+    checkVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
+    runShareFolder:     vi.fn().mockResolvedValue({ ok: true }),
+    saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
+    pickFolder:         vi.fn().mockResolvedValue({ folderPath: 'C:\\Users\\test\\shared' }),
+    getScriptState:     vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
+    clearScriptState:   vi.fn().mockResolvedValue({ ok: true }),
+    onScriptLine:       vi.fn().mockReturnValue(() => {}),
+    onScriptDone:       vi.fn().mockReturnValue(() => {}),
+    logUiAction:        vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 
@@ -45,8 +49,9 @@ describe('idle form', () => {
     expect(screen.getByPlaceholderText('/mnt/shared')).toBeInTheDocument()
   })
 
-  it('the run button is always enabled', async () => {
+  it('the run button is enabled when the form is filled', async () => {
     await renderAndFlush()
+    await fillForm()
     expect(screen.getByRole('button', { name: 'Set up shared folder' })).not.toBeDisabled()
   })
 
@@ -79,6 +84,8 @@ describe('credential pre-fill', () => {
     await renderAndFlush()
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() =>
       expect(window.electronAPI.runShareFolder).toHaveBeenCalledWith(
         expect.objectContaining({ vmUser: 'root', vmPass: 'mypass', loginUser: 'alice' })
@@ -95,6 +102,8 @@ describe('running state', () => {
     await renderAndFlush()
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => {
       expect(screen.getByText('Setting up shared folder...')).toBeInTheDocument()
     })
@@ -105,6 +114,8 @@ describe('running state', () => {
     await renderAndFlush()
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Set up shared folder' })).not.toBeInTheDocument()
     })
@@ -122,6 +133,8 @@ describe('success state', () => {
     await renderAndFlush()
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => {
       expect(screen.getByText('Shared folder set up successfully.')).toBeInTheDocument()
     })
@@ -151,6 +164,8 @@ describe('failure state', () => {
     await renderAndFlush()
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => {
       expect(screen.getByText('Setup failed.')).toBeInTheDocument()
     })
@@ -210,6 +225,8 @@ describe('onScriptRunning callback', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await act(async () => {})
     expect(onScriptRunning).toHaveBeenCalledWith(true)
   })
 
@@ -220,6 +237,8 @@ describe('onScriptRunning callback', () => {
     await act(async () => {})
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => {
       expect(onScriptRunning).toHaveBeenCalledWith(false)
     })

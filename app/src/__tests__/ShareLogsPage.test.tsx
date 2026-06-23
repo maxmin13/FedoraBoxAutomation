@@ -9,11 +9,15 @@ beforeEach(() => {
   window.electronAPI = {
     getVmGuestLogsPath: vi.fn().mockResolvedValue({ ok: true, path: HOST_PATH }),
     loadVmCredentials:  vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' }),
+    checkVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
     runShareLogs:       vi.fn().mockResolvedValue({ ok: true }),
     saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
     pickFolder:         vi.fn().mockResolvedValue({ folderPath: HOST_PATH }),
+    getScriptState:     vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
+    clearScriptState:   vi.fn().mockResolvedValue({ ok: true }),
     onScriptLine:       vi.fn().mockReturnValue(() => {}),
     onScriptDone:       vi.fn().mockReturnValue(() => {}),
+    logUiAction:        vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 
@@ -67,6 +71,8 @@ describe('idle form', () => {
     await renderAndFlush()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() =>
       expect(window.electronAPI.runShareLogs).toHaveBeenCalledWith(
         expect.objectContaining({ vmUser: 'root', vmPass: 'mypass', loginUser: 'alice' })
@@ -106,6 +112,8 @@ describe('running state', () => {
     await renderAndFlush()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Setting up log sync...')).toBeInTheDocument()
     })
@@ -116,6 +124,8 @@ describe('running state', () => {
     await renderAndFlush()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Set up log sync' })).not.toBeInTheDocument()
     })
@@ -130,6 +140,8 @@ describe('success state', () => {
     await renderAndFlush()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Log sync active.')).toBeInTheDocument()
     })
@@ -159,6 +171,8 @@ describe('failure state', () => {
     await renderAndFlush()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Set up log sync' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Set up log sync' }))
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Setup failed.')).toBeInTheDocument()
     })
