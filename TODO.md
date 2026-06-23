@@ -18,3 +18,4 @@
 
 # create a new vm, verify all the provision scripts after change most recent version
 
+# update docs and analysis after refactoring of navigate away

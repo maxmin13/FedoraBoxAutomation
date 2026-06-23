@@ -207,6 +207,12 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   )
 }
 
+// ── VM operation state ─────────────────────────────────────────────────────
+// Persists starting/stopping flags across VmCard mount/unmount so the badge
+// survives navigation away and back.
+
+const _vmOps = new Map<string, 'starting' | 'stopping'>()
+
 // ── StopModal ──────────────────────────────────────────────────────────────
 
 interface StopModalProps {
@@ -326,8 +332,8 @@ interface VmCardProps {
 
 function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardProps) {
   const [busy,     setBusy]     = useState(false)
-  const [starting, setStarting] = useState(false)
-  const [stopping, setStopping] = useState(false)
+  const [starting, setStarting] = useState(() => _vmOps.get(vm.name) === 'starting')
+  const [stopping, setStopping] = useState(() => _vmOps.get(vm.name) === 'stopping')
   const [error, setError] = useState<string | null>(null)
   const [showStopModal,   setShowStopModal]   = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -345,8 +351,10 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
     prevProcessRunningRef.current = vm.processRunning
     if (!runningChanged && !processChanged) return
     if (vm.running) {
+      _vmOps.delete(vm.name)
       setStarting(false)
     } else if (!vm.processRunning) {
+      _vmOps.delete(vm.name)
       setStarting(false)
       setStopping(false)
     }
@@ -354,12 +362,14 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
 
   async function handleStart() {
     window.electronAPI.logUiAction(`vm "${vm.name}": Start`)
+    _vmOps.set(vm.name, 'starting')
     setBusy(true)
     setStarting(true)
     setError(null)
     try {
       const result = await window.electronAPI.startVm(vm.name)
       if (!result.ok) {
+        _vmOps.delete(vm.name)
         setStarting(false)
         setError('Could not start the VM — check the logs for details')
       }
@@ -371,12 +381,14 @@ function VmCard({ vm, onRefresh, onEdit, onProvision, onPerformance }: VmCardPro
   async function handleStop() {
     window.electronAPI.logUiAction(`vm "${vm.name}": Stop`)
     setShowStopModal(false)
+    _vmOps.set(vm.name, 'stopping')
     setBusy(true)
     setStopping(true)
     setError(null)
     try {
       const result = await window.electronAPI.stopVm(vm.name)
       if (!result.ok) {
+        _vmOps.delete(vm.name)
         setStopping(false)
         setError('Could not stop the VM — check the logs for details')
       }

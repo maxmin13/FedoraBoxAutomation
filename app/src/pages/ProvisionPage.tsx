@@ -207,31 +207,22 @@ const CATEGORIES: CategoryDef[] = [
   },
 ]
 
+// ── Script result map ─────────────────────────────────────────────────────────
+// Persists across React mount/unmount so the user sees the outcome when they
+// navigate back and explicitly open the script form they submitted from.
+
+interface ScriptResult {
+  state: 'success' | 'error'
+  lines: ScriptLine[]
+  error?: string
+}
+const _scriptResults = new Map<string, ScriptResult>()
+
+function srKey(vmName: string, scriptName: string | null): string {
+  return `${vmName}::${scriptName ?? '__base-setup__'}`
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-const BASE_SETUP_KEY = '__base-setup__'
-const _seenScripts = new Map<string, Set<string>>()
-function hasSeenScript(vmName: string, scriptName: string): boolean {
-  return _seenScripts.get(vmName)?.has(scriptName) ?? false
-}
-function markScriptSeen(vmName: string, scriptName: string, reason: string) {
-  if (!_seenScripts.has(vmName)) _seenScripts.set(vmName, new Set())
-  _seenScripts.get(vmName)!.add(scriptName)
-  window.electronAPI.logUiAction(`provision "${vmName}": [dbg] markSeen ${scriptName} (${reason})`)
-}
-function unmarkScriptSeen(vmName: string, scriptName: string) {
-  _seenScripts.get(vmName)?.delete(scriptName)
-  window.electronAPI.logUiAction(`provision "${vmName}": [dbg] unmarkSeen ${scriptName}`)
-}
-
-interface LastRunFailure { error: string; lines: ScriptLine[] }
-const _lastErrors = new Map<string, LastRunFailure | null>()
-function getLastError(vmName: string, scriptName: string): LastRunFailure | null {
-  return _lastErrors.get(`${vmName}::${scriptName}`) ?? null
-}
-function saveLastError(vmName: string, scriptName: string, data: LastRunFailure | null) {
-  _lastErrors.set(`${vmName}::${scriptName}`, data)
-}
 
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
@@ -340,7 +331,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   const [isReconnect, setIsReconnect] = useState(false)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
-  const seenResultsRef         = useRef<Set<string>>(new Set())
   const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
   const mountedRef             = useRef(true)
   const isActiveRef            = useRef(isActive)
@@ -348,70 +338,36 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   useEffect(() => { return () => { mountedRef.current = false } }, [])
   useEffect(() => { isActiveRef.current = isActive }, [isActive])
 
-  // On mount, check for a script that finished (or is still running) while the user
-  // was away. If found, jump straight to the result banner or reconnect to the stream.
+  // When the user navigates back to this page after seeing a result banner,
+  // reset to the mode selector so they start fresh. The result is still in
+  // _scriptResults and comes back if they click the same script form again.
+  const prevActiveRef = useRef(isActive)
+  useEffect(() => {
+    const wasActive = prevActiveRef.current
+    prevActiveRef.current = isActive
+    if (isActive && !wasActive && pageState === 'done') {
+      setPageState('idle')
+      setIdleView('mode')
+    }
+  }, [isActive, pageState])
+
+  // On mount, sweep up any done state that was never cleared (script finished while
+  // the component was unmounted). Save to _scriptResults so handleSelectScript /
+  // handleSelectBaseSetup can show the result when the user opens that form.
+  // Running state is left alone — handleSelectScript calls getScriptState() itself.
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
       if (!state.ok || !state.context) return
       if (state.context.vmName !== vm.name || state.context.type !== 'provision') return
+      if (!state.done) return
 
-      const scriptName = state.context.scriptName ?? null
-      const scriptDef  = scriptName
-        ? CATEGORIES.flatMap((c) => c.scripts).find((s) => s.name === scriptName) ?? null
-        : null
-      const label   = scriptDef?.label ?? (scriptName ? scriptName : 'Base Setup')
-      const seenKey = scriptName ?? BASE_SETUP_KEY
-
-      if (state.running) {
-        setRunningLabel(label)
-        setSelectedScript(scriptDef)
-        setLines(state.lines)
-        setPageState('running')
-        setShowLog(true)
-        const unsubLine = window.electronAPI.onScriptLine((line) =>
-          setLines((prev) => [...prev, line])
-        )
-        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-          setSuccess(exitCode === 0)
-          if (mountedRef.current) {
-            markScriptSeen(vm.name, seenKey, 'mount-reconnect-done')
-            window.electronAPI.clearScriptState()
-          }
-          setPageState('done')
-          setShowLog(false)
-          unsubLine()
-          unsubDone()
-        })
-        return
-      }
-
-      if (state.done) {
-        if (hasSeenScript(vm.name, seenKey)) {
-          window.electronAPI.clearScriptState()
-          return
-        }
-        markScriptSeen(vm.name, seenKey, 'mount-restore')
-        window.electronAPI.clearScriptState()
-
-        // Individual script failure: skip the done banner — the "Last run failed"
-        // box in the script-args form shows it. Populate from lines on app restart.
-        if (scriptName && state.exitCode !== 0) {
-          if (!getLastError(vm.name, scriptName)) {
-            const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
-            saveLastError(vm.name, scriptName, {
-              error: errLine ? errLine.text.replace(/^ERROR:\s*/, '') : `Script failed (exit ${state.exitCode})`,
-              lines: state.lines,
-            })
-          }
-          return
-        }
-
-        setRunningLabel(label)
-        setSelectedScript(scriptDef)
-        setLines(state.lines)
-        setSuccess(state.exitCode === 0)
-        setPageState('done')
-      }
+      const key = srKey(vm.name, state.context.scriptName ?? null)
+      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
+      _scriptResults.set(key, state.exitCode === 0
+        ? { state: 'success', lines: state.lines }
+        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
+      )
+      window.electronAPI.clearScriptState()
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -419,7 +375,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
   const [argValues,        setArgValues]        = useState(['', ''])
-  const [showLastRunLog,   setShowLastRunLog]   = useState(false)
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
   const [credKey,          setCredKey]          = useState(0)
@@ -453,19 +408,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
-  // Clear the last-run error whenever leaving the script-args view (any path:
-  // Back button, Run another, ← My VMs, NavBar navigation, or component unmount).
-  // The cleanup captures the values from when the effect last ran, so it sees
-  // the correct idleView/selectedScript at the moment of navigation.
-  useEffect(() => {
-    return () => {
-      if (idleView === 'script-args' && selectedScript) {
-        saveLastError(vm.name, selectedScript.name, null)
-        window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (left script-args, script=${selectedScript.name})`)
-      }
-    }
-  }, [idleView, selectedScript?.name])
-
   useEffect(() => {
     window.electronAPI.logUiAction(
       `provision "${vm.name}": [dbg] pageState=${pageState} idleView=${idleView} reconnect=${reconnectUnsubRef.current !== null}`
@@ -475,9 +417,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   useEffect(() => {
     if (pageState !== 'done') return
     if (selectedScript)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}" seen=${hasSeenScript(vm.name, selectedScript.name)}`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}"`)
     else if (runningLabel === 'Base Setup')
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for Base Setup seen=${hasSeenScript(vm.name, BASE_SETUP_KEY)}`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for Base Setup`)
   }, [pageState, selectedScript?.name, runningLabel])
 
 
@@ -489,6 +431,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
   async function handleSelectScript(script: ScriptDef) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select script "${script.label}"`)
+    const key = srKey(vm.name, script.name)
     const state = await window.electronAPI.getScriptState()
     const matchesThisScript =
       state.ok &&
@@ -497,10 +440,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       state.context?.type === 'provision' &&
       state.context?.scriptName === script.name
 
-    const seen = hasSeenScript(vm.name, script.name)
     window.electronAPI.logUiAction(
-      `provision "${vm.name}": [dbg] script=${script.name} ok=${state.ok} running=${state.running} done=${state.done} ` +
-      `ctxVm=${state.context?.vmName} ctxScript=${state.context?.scriptName} matches=${matchesThisScript} seen=${seen}`
+      `provision "${vm.name}": [dbg] script=${script.name} running=${state.running} done=${state.done} ` +
+      `matches=${matchesThisScript} mapEntry=${_scriptResults.get(key)?.state ?? 'none'}`
     )
 
     if (matchesThisScript && state.running) {
@@ -510,13 +452,18 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       setLines(state.lines)
       setPageState('running')
       setShowLog(true)
+      const liveLines = [...state.lines]
       const unsubLine = window.electronAPI.onScriptLine((line) => {
+        liveLines.push(line)
         setLines((prev) => [...prev, line])
       })
       const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+        const errLine = [...liveLines].reverse().find(l => l.text.startsWith('ERROR: '))
+        _scriptResults.set(key, exitCode === 0
+          ? { state: 'success', lines: liveLines }
+          : { state: 'error', lines: liveLines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
+        )
         setSuccess(exitCode === 0)
-        seenResultsRef.current.add(script.name)
-        markScriptSeen(vm.name, script.name, 'reconnect-done')
         window.electronAPI.clearScriptState()
         setPageState('done')
         setShowLog(false)
@@ -526,24 +473,30 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       return
     }
 
-    if (matchesThisScript && state.done && !seen) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (done, not seen)`)
-      seenResultsRef.current.add(script.name)
-      markScriptSeen(vm.name, script.name, 'restore')
+    // Script finished between mount and now (state still held by main process)
+    if (matchesThisScript && state.done) {
+      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
+      _scriptResults.set(key, state.exitCode === 0
+        ? { state: 'success', lines: state.lines }
+        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
+      )
       window.electronAPI.clearScriptState()
+    }
+
+    const result = _scriptResults.get(key)
+    if (result) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (${result.state})`)
       setSelectedScript(script)
       setRunningLabel(script.label)
-      setLines(state.lines)
-      setSuccess(state.exitCode === 0)
+      setLines(result.lines)
+      setSuccess(result.state === 'success')
       setPageState('done')
       return
     }
 
-    const lastErr = getLastError(vm.name, script.name)
-    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form (matches=${matchesThisScript} done=${state.done} seen=${seen} lastErr=${lastErr ? 'yes' : 'no'})`)
+    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form`)
     setSelectedScript(script)
     setArgValues(['', ''])
-    setShowLastRunLog(false)
     setIdleView('script-args')
   }
 
@@ -555,7 +508,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       case 'categories':  setIdleView('mode');        break
       case 'scripts':     setIdleView('categories');  break
       case 'script-args':
-        if (selectedScript) saveLastError(vm.name, selectedScript.name, null)
         setIdleView('scripts')
         break
     }
@@ -563,11 +515,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
   async function startRun(
     runFn: () => Promise<{ ok: boolean; error?: string; errorDetail?: string }>,
-    trackAlreadyInstalled = true
+    trackAlreadyInstalled = true,
+    runScriptName: string | null = selectedScript?.name ?? null
   ) {
-    const runScriptName = selectedScript?.name
-    const markSeen = () => { if (runScriptName) seenResultsRef.current.add(runScriptName) }
-    if (runScriptName) unmarkScriptSeen(vm.name, runScriptName)
+    const runKey = srKey(vm.name, runScriptName)
+    _scriptResults.delete(runKey)
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -591,33 +543,17 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       if (exitCode === 0 && loginUser) {
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
-      if (isActiveRef.current && mountedRef.current) {
-        if (runScriptName) markScriptSeen(vm.name, runScriptName, 'done')
-        window.electronAPI.clearScriptState()
-        // Done page will show — no need to store error for script-args form.
-        if (runScriptName) {
-          saveLastError(vm.name, runScriptName, null)
-          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (done page active, exit ${exitCode})`)
-        }
-      } else if (runScriptName) {
-        // Page inactive — store result for display in script-args form on next visit.
-        if (exitCode !== 0) {
-          const errLine = [...capturedLines].reverse().find(l => l.text.startsWith('ERROR: '))
-          saveLastError(vm.name, runScriptName, {
-            error: errLine ? errLine.text.replace(/^ERROR:\s*/, '') : `Script failed (exit ${exitCode})`,
-            lines: [...capturedLines],
-          })
-          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr saved (page inactive, exit ${exitCode})`)
-        } else {
-          saveLastError(vm.name, runScriptName, null)
-          window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] lastErr cleared (page inactive, success)`)
-        }
-      }
+      // Always persist result so navigate-away + return can show it.
+      const errLine = [...capturedLines].reverse().find(l => l.text.startsWith('ERROR: '))
+      _scriptResults.set(runKey, exitCode === 0
+        ? { state: 'success', lines: [...capturedLines] }
+        : { state: 'error', lines: [...capturedLines], error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
+      )
+      if (mountedRef.current) window.electronAPI.clearScriptState()
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
         setSuccess(false)
         setAlreadyInstalled(false)
-        markSeen()
         setPageState('done')
         setShowLog(false)
         unsubLine()
@@ -626,7 +562,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       }
       setAlreadyInstalled(alreadyInstalledRef.current)
       setSuccess(exitCode === 0)
-      markSeen()
       setPageState('done')
       setShowLog(false)
       unsubLine()
@@ -639,10 +574,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       setError(errMsg)
-      // unsubDone won't fire on exception — save here.
-      if (runScriptName) saveLastError(vm.name, runScriptName, { error: errMsg, lines: [...capturedLines] })
+      _scriptResults.set(runKey, { state: 'error', lines: [...capturedLines], error: errMsg })
       setSuccess(false)
-      markSeen()
       setPageState('done')
       setShowLog(false)
       unsubLine()
@@ -692,6 +625,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
 
   async function handleSelectBaseSetup() {
     window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`)
+    const key = srKey(vm.name, null)
     const state = await window.electronAPI.getScriptState()
     const isBaseSetup =
       state.ok &&
@@ -699,7 +633,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       state.context?.vmName === vm.name &&
       state.context?.type === 'provision' &&
       !state.context?.scriptName
-    const seen = hasSeenScript(vm.name, BASE_SETUP_KEY)
 
     if (isBaseSetup && state.running) {
       window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect Base Setup (running)`)
@@ -708,10 +641,17 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       setIsReconnect(true)
       setPageState('running')
       setShowLog(true)
+      const liveLines = [...state.lines]
       const unsubLine = window.electronAPI.onScriptLine((line) => {
+        liveLines.push(line)
         setLines((prev) => [...prev, line])
       })
       const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
+        const errLine = [...liveLines].reverse().find(l => l.text.startsWith('ERROR: '))
+        _scriptResults.set(key, exitCode === 0
+          ? { state: 'success', lines: liveLines }
+          : { state: 'error', lines: liveLines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${exitCode})` }
+        )
         setSuccess(exitCode === 0)
         setIsReconnect(false)
         setPageState('done')
@@ -721,21 +661,36 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         unsubDone()
       })
       reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
-    } else if (isBaseSetup && state.done && !seen) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner`)
-      markScriptSeen(vm.name, BASE_SETUP_KEY, 'restore')
-      setRunningLabel('Base Setup')
-      setLines(state.lines)
-      setSuccess(state.exitCode === 0)
-      setPageState('done')
-    } else {
-      setIdleView('full-form')
+      return
     }
+
+    // Script finished between mount and now
+    if (isBaseSetup && state.done) {
+      const errLine = [...state.lines].reverse().find(l => l.text.startsWith('ERROR: '))
+      _scriptResults.set(key, state.exitCode === 0
+        ? { state: 'success', lines: state.lines }
+        : { state: 'error', lines: state.lines, error: errLine?.text.replace(/^ERROR:\s*/, '') ?? `Script failed (exit ${state.exitCode})` }
+      )
+      window.electronAPI.clearScriptState()
+    }
+
+    const result = _scriptResults.get(key)
+    if (result) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner (${result.state})`)
+      setSelectedScript(null)
+      setRunningLabel('Base Setup')
+      setLines(result.lines)
+      setSuccess(result.state === 'success')
+      setPageState('done')
+      return
+    }
+
+    setIdleView('full-form')
   }
 
   async function handleRunFull() {
     window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
-    unmarkScriptSeen(vm.name, BASE_SETUP_KEY)
+    setSelectedScript(null)
     setRunningLabel('Base Setup')
     await startRun(() =>
       window.electronAPI.runProvisionSetup({
@@ -744,7 +699,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         vmPass,
         loginUser,
         hostname: changeHostname ? hostname.trim() : '',
-      }), false
+      }), false, null
     )
   }
 
@@ -886,8 +841,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           <button
             onClick={async () => {
               window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
-              if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Run another')
-              else if (runningLabel === 'Base Setup') markScriptSeen(vm.name, BASE_SETUP_KEY, 'Run another')
+              _scriptResults.delete(srKey(vm.name, selectedScript?.name ?? null))
               if (!success) {
                 const saved = await window.electronAPI.loadVmCredentials(vm.name)
                 if (saved.ok) {
@@ -908,7 +862,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
           </button>
           </div>
           <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); if (selectedScript) markScriptSeen(vm.name, selectedScript.name, 'Back to My VMs'); else if (runningLabel === 'Base Setup') markScriptSeen(vm.name, BASE_SETUP_KEY, 'Back to My VMs'); onBack() }}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); _scriptResults.delete(srKey(vm.name, selectedScript?.name ?? null)); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
@@ -1066,42 +1020,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       )}
 
       {idleView === 'script-args' && selectedScript && (() => {
-        const lastRun = getLastError(vm.name, selectedScript.name)
-
-        if (lastRun) {
-          return (
-            <div className="flex-1 flex flex-col gap-4 min-h-0">
-              <div className="bg-red-900 border border-red-700 rounded-lg p-4 space-y-1 shrink-0">
-                <p className="text-red-200 font-medium">{selectedScript.label} failed.</p>
-                <p className="text-red-300 text-sm font-mono break-words">{lastRun.error}</p>
-              </div>
-              <LogPanel lines={lastRun.lines} showLog={showLastRunLog} onToggle={() => setShowLastRunLog(v => !v)} />
-              <div className="mt-auto flex justify-between shrink-0">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Try again`); withAuth(() => handleRunScript()) }}
-                    className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-                  >
-                    Try again
-                  </button>
-                  <button
-                    onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Run another`); saveLastError(vm.name, selectedScript.name, null); setIdleView('categories') }}
-                    className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-                  >
-                    Run another
-                  </button>
-                </div>
-                <button
-                  onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); saveLastError(vm.name, selectedScript.name, null); onBack() }}
-                  className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-                >
-                  &larr; My VMs
-                </button>
-              </div>
-            </div>
-          )
-        }
-
         return (
           <div className="flex-1 overflow-y-auto">
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
