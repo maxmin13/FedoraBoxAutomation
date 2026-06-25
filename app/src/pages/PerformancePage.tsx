@@ -296,7 +296,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
             </div>
 
             {/* Running Processes card */}
-            <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
+            <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-2 overflow-hidden">
               <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol — click Refresh to update">
                 <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
               </Tooltip>
@@ -318,7 +318,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
               )}
 
               {procState === 'ok' && procSnapshot && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <UsageBar label="CPU" used={Math.round(procSnapshot.cpuPct)} total={100} unit="%" tip="Overall CPU usage across all cores, sampled over 500 ms from /proc/stat" />
                   <UsageBar label="RAM" used={procSnapshot.ramUsedMB} total={procSnapshot.ramTotalMB} unit="MB" tip="Physical memory usage reported by free -m inside the VM" />
                   <table className="w-full text-xs">
@@ -335,10 +335,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                         const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
                         return (
                           <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
-                            <td className="py-1.5 pr-2 font-medium truncate max-w-[7rem]">{p.name}</td>
-                            <td className="py-1.5 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
-                            <td className="py-1.5 pr-2 text-right font-mono">{p.rssMB}</td>
-                            <td className="py-1.5 text-right">
+                            <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">{p.name}</td>
+                            <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
+                            <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
+                            <td className="py-1 text-right">
                               <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
                                 <button
                                   onClick={() => setKillTarget({ pid: p.pid, name: p.name })}
