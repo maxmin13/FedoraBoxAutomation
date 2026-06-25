@@ -138,7 +138,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     }
   }
 
-  async function handleKill(pid: number) {
+  async function handleKill(pid: number, name: string) {
+    if (!window.confirm(`Kill process "${name}" (PID ${pid})?`)) return
     window.electronAPI.logUiAction(`performance "${vm.name}": Kill PID ${pid}`)
     setKilling(pid)
     setKillError(null)
@@ -327,7 +328,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                             <td className="py-1.5 text-right">
                               <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
                                 <button
-                                  onClick={() => handleKill(p.pid)}
+                                  onClick={() => handleKill(p.pid, p.name)}
                                   disabled={killing !== null}
                                   className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
