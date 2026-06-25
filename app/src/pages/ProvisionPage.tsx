@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import type { Vm, ScriptLine } from '../electron.d'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
-// ── Types ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
 
@@ -16,7 +16,7 @@ interface ArgOption {
 interface ForceConfirmDef {
   title: string        // heading shown in the amber panel
   details?: string[]  // bullet points below the heading
-  actionLabel: string // label on the confirm button ("Install anyway", "Update", …)
+  actionLabel: string // label on the confirm button ("Install anyway", "Update", â€¦)
 }
 
 interface ScriptDef {
@@ -41,25 +41,33 @@ interface CategoryDef {
 type PageState = 'idle' | 'running' | 'done'
 type IdleView  = 'mode' | 'full-form' | 'categories' | 'scripts' | 'script-args'
 
-// ── Script Catalog ─────────────────────────────────────────────────────────────
+// â”€â”€ Script Catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CATEGORIES: CategoryDef[] = [
   {
     name: 'Languages', dir: 'languages',
     scripts: [
-      { name: 'java.sh',   label: 'Java JDK',  relPath: 'java.sh',   description: 'Oracle JDK latest LTS - sets JAVA_HOME in ~/.bash_profile', argType: 'user' },
+      { name: 'java.sh', label: 'Java JDK', relPath: 'java.sh',
+        description: 'Oracle JDK for v21+ (free download), Eclipse Temurin for older LTS — sets JAVA_HOME in ~/.bash_profile',
+        argType: 'user+custom', argPrompts: ['JDK version'], argDefaults: [''],
+        argOptions: [[
+          { value: '',   label: 'Latest GA (auto-detect)' },
+          { value: '21', label: '21 — LTS · Oracle · supported until 2031' },
+          { value: '17', label: '17 — LTS · Temurin · supported until 2029' },
+          { value: '11', label: '11 — LTS · Temurin · supported until 2026' },
+        ]] },
       { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
       { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv (blank = latest stable)',
         argType: 'user+custom', argPrompts: ['Python version'], argDefaults: ['3.13.3'] },
-      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource — includes npm',
+      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€” includes npm',
         argType: 'user+custom',
         argPrompts:  ['Node.js version'],
         argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest', label: 'Latest LTS (auto-detect)' },
-          { value: '24', label: '24 — Current stable · ships natively in Fedora 44' },
-          { value: '22', label: '22 — LTS Active (until Apr 2027)' },
-          { value: '20', label: '20 — LTS Maintenance (until Apr 2026)' },
+          { value: '24', label: '24 â€” Current stable Â· ships natively in Fedora 44' },
+          { value: '22', label: '22 â€” LTS Active (until Apr 2027)' },
+          { value: '20', label: '20 â€” LTS Maintenance (until Apr 2026)' },
         ]] },
     ],
   },
@@ -84,12 +92,12 @@ const CATEGORIES: CategoryDef[] = [
         argPrompts:  ['Tomcat version', 'HTTP port'],
         argDefaults: ['latest-10', '8080'],
         argOptions: [[
-          { value: 'latest-11', label: '11.x — Latest (auto-detect) · Java 21+' },
-          { value: 'latest-10', label: '10.x — Latest (auto-detect) · Java 11+' },
-          { value: 'latest-9',  label: '9.x  — Latest (auto-detect) · Java  8+' },
-          { value: '11.0.7',    label: '11.0.7  — pinned · Java 21+' },
-          { value: '10.1.36',   label: '10.1.36 — pinned · Java 11+' },
-          { value: '9.0.102',   label: '9.0.102 — pinned · Java  8+' },
+          { value: 'latest-11', label: '11.x â€” Latest (auto-detect) Â· Java 21+' },
+          { value: 'latest-10', label: '10.x â€” Latest (auto-detect) Â· Java 11+' },
+          { value: 'latest-9',  label: '9.x  â€” Latest (auto-detect) Â· Java  8+' },
+          { value: '11.0.7',    label: '11.0.7  â€” pinned Â· Java 21+' },
+          { value: '10.1.36',   label: '10.1.36 â€” pinned Â· Java 11+' },
+          { value: '9.0.102',   label: '9.0.102 â€” pinned Â· Java  8+' },
         ]] },
     ],
   },
@@ -107,19 +115,19 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 — 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 — 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 — 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 — 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 â€” 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 â€” 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 â€” 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 â€” 4.32 (Jun 2025)' },
         ]] },
       { name: 'eclipse-ee.sh',       label: 'Eclipse IDE (installer)', relPath: 'eclipse-ee.sh',    description: 'Eclipse IDE for Java EE via installer',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 — 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 — 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 — 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 — 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 â€” 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 â€” 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 â€” 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 â€” 4.32 (Jun 2025)' },
         ]] },
       { name: 'intellij.sh', label: 'IntelliJ IDEA CE', relPath: 'intellij.sh',
         description: 'IntelliJ IDEA Community Edition - installs to /opt/idea-IC-<version>',
@@ -136,10 +144,10 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['VS Code version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest stable (auto-detect)' },
-          { value: '1.100.0', label: '1.100.0 — May 2025' },
-          { value: '1.99.0',  label: '1.99.0  — Apr 2025' },
-          { value: '1.98.0',  label: '1.98.0  — Mar 2025' },
-          { value: '1.97.0',  label: '1.97.0  — Feb 2025' },
+          { value: '1.100.0', label: '1.100.0 â€” May 2025' },
+          { value: '1.99.0',  label: '1.99.0  â€” Apr 2025' },
+          { value: '1.98.0',  label: '1.98.0  â€” Mar 2025' },
+          { value: '1.97.0',  label: '1.97.0  â€” Feb 2025' },
         ]] },
     ],
   },
@@ -172,7 +180,7 @@ const CATEGORIES: CategoryDef[] = [
           title: 'OpenSSL is already installed on this system',
           details: [
             'System tools (curl, wget, sshd) may silently link against the new libraries',
-            'dnf update will not patch /usr/local/ssl — you must rebuild manually when CVEs drop',
+            'dnf update will not patch /usr/local/ssl â€” you must rebuild manually when CVEs drop',
             'The system OpenSSL still wins in the terminal unless PATH is manually adjusted',
           ],
           actionLabel: 'Install anyway',
@@ -216,7 +224,7 @@ const CATEGORIES: CategoryDef[] = [
   },
 ]
 
-// ── Script result map ─────────────────────────────────────────────────────────
+// â”€â”€ Script result map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Persists across React mount/unmount so the user sees the outcome when they
 // navigate back and explicitly open the script form they submitted from.
 
@@ -241,7 +249,7 @@ function saveResult(key: string, exitCode: number | null, lines: ScriptLine[]): 
   )
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
@@ -269,7 +277,7 @@ function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: stri
   }
 }
 
-// ── RestartModal ───────────────────────────────────────────────────────────────
+// â”€â”€ RestartModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface RestartModalProps {
   vmName: string
@@ -320,7 +328,7 @@ function RestartModal({ vmName, busy, onConfirm, onCancel }: RestartModalProps) 
   )
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ProvisionPageProps {
   vm: Vm
@@ -371,7 +379,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   // On mount, sweep up any done state that was never cleared (script finished while
   // the component was unmounted). Save to _scriptResults so handleSelectScript /
   // handleSelectBaseSetup can show the result when the user opens that form.
-  // Running state is left alone — handleSelectScript calls getScriptState() itself.
+  // Running state is left alone â€” handleSelectScript calls getScriptState() itself.
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
       if (!state.ok || !state.context) return
@@ -459,7 +467,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     )
 
     if (matchesThisScript && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect (running)`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ reconnect (running)`)
       setSelectedScript(script)
       setRunningLabel(script.label)
       setLines(state.lines)
@@ -488,19 +496,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       window.electronAPI.clearScriptState()
     }
 
-    const result = _scriptResults.get(key)
-    if (result) {
-      _scriptResults.delete(key)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore banner (${result.state})`)
-      setSelectedScript(script)
-      setRunningLabel(script.label)
-      setLines(result.lines)
-      setSuccess(result.state === 'success')
-      setPageState('done')
-      return
-    }
-
-    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → form`)
+    _scriptResults.delete(key)
+    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ form`)
     setSelectedScript(script)
     setArgValues(['', ''])
     setIdleView('script-args')
@@ -637,7 +634,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       !state.context?.scriptName
 
     if (isBaseSetup && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → reconnect Base Setup (running)`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ reconnect Base Setup (running)`)
       setRunningLabel('Base Setup')
       setLines(state.lines)
       setIsReconnect(true)
@@ -673,7 +670,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     const result = _scriptResults.get(key)
     if (result) {
       _scriptResults.delete(key)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] → restore Base Setup banner (${result.state})`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ restore Base Setup banner (${result.state})`)
       setSelectedScript(null)
       setRunningLabel('Base Setup')
       setLines(result.lines)
@@ -706,7 +703,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     (val ? 'border-zinc-400' : 'border-zinc-600')
 
 
-  // ── Login gate ──────────────────────────────────────────────────────────────
+  // â”€â”€ Login gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loginRequired) {
     return (
       <div className="h-full overflow-y-auto">
@@ -715,7 +712,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     )
   }
 
-  // ── Running ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Running â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (pageState === 'running') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
@@ -744,7 +741,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     )
   }
 
-  // ── Done ─────────────────────────────────────────────────────────────────────
+  // â”€â”€ Done â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (pageState === 'done') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
@@ -870,7 +867,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     )
   }
 
-  // ── Idle ─────────────────────────────────────────────────────────────────────
+  // â”€â”€ Idle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="h-full max-w-2xl w-full mx-auto flex flex-col">
 
@@ -887,7 +884,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         </h1>
       </div>
 
-      {/* ── Mode (main landing) ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Mode (main landing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {idleView === 'mode' && (
         <div className="flex flex-col gap-3">
 
@@ -915,7 +912,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
         </div>
       )}
 
-      {/* ── Sub-views (full width, back button navigates) ───────────────────── */}
+      {/* â”€â”€ Sub-views (full width, back button navigates) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
       {idleView === 'full-form' && (
         <div className="flex-1 overflow-y-auto">
@@ -935,7 +932,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
                     <span className="shrink-0 w-4 text-zinc-600 text-right">{i + 1}.</span>
                     <span>
                       <span className="text-zinc-300">{step.label}</span>
-                      <span className="text-zinc-500"> — {step.desc}</span>
+                      <span className="text-zinc-500"> â€” {step.desc}</span>
                     </span>
                   </li>
                 ))}
@@ -959,7 +956,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
                   placeholder="e.g. fedorabox"
                   className={ic(hostname)}
                 />
-                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora — not the VirtualBox VM name.</p>
+                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora â€” not the VirtualBox VM name.</p>
               </div>
             )}
             <button

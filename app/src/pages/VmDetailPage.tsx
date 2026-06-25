@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import type { Vm, VmInfo } from '../electron.d'
 import ShareFolderPage from './ShareFolderPage'
 import ShareLogsPage from './ShareLogsPage'
@@ -234,7 +234,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
   const diskValue = info?.diskCapacityMB != null
     ? `${Math.round(info.diskCapacityMB / 1024)} GB (${info.diskType ?? 'dynamic'})`
-    : '—'
+    : 'â€”'
 
   return (
     <>
@@ -257,7 +257,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       {loadError && (
         <div className="shrink-0 bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
           {/E_ACCESSDENIED/i.test(loadError) || /LockMachine|VBOX_E_VM_ERROR/i.test(loadError)
-            ? 'VM is starting up — info will be available shortly.'
+            ? 'VM is starting up â€” info will be available shortly.'
             : loadError}
         </div>
       )}
@@ -269,7 +269,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       {info && (
         <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
 
-          {/* Left column — read-only info */}
+          {/* Left column â€” read-only info */}
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
 
             <Section title="General">
@@ -286,7 +286,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
             <Section title="Network">
               <Row label="Adapter 1" value={formatNic(info.nic)} />
-              <Row label="MAC"       value={info.mac ? formatMac(info.mac) : '—'} />
+              <Row label="MAC"       value={info.mac ? formatMac(info.mac) : 'â€”'} />
             </Section>
 
             <Section
@@ -309,7 +309,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
           </div>
 
-          {/* Right column — action sections */}
+          {/* Right column â€” action sections */}
           <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
 
             <Section
@@ -338,7 +338,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                       {valid.map((sf) => (
                         <div key={sf.name} className="grid grid-cols-2 gap-3">
                           <CopyCell value={sf.hostPath} />
-                          <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                          <CopyCell value={sf.mountPoint || 'â€”'} copyable={!!sf.mountPoint} />
                         </div>
                       ))}
                     </div>
@@ -348,7 +348,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                           onClick={() => setMissingOpen((o) => !o)}
                           className="flex items-center gap-1 text-amber-400 text-xs hover:text-amber-300 transition-colors"
                         >
-                          <span>{missingOpen ? '▾' : '▸'}</span>
+                          <span>{missingOpen ? 'â–¾' : 'â–¸'}</span>
                           <span>&#9888; {missing.length} host {missing.length === 1 ? 'folder' : 'folders'} not found</span>
                         </button>
                         {missingOpen && (
@@ -360,7 +360,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                             {missing.map((sf) => (
                               <div key={sf.name} className="grid grid-cols-2 gap-3">
                                 <CopyCell value={sf.hostPath} missing />
-                                <CopyCell value={sf.mountPoint || '—'} copyable={!!sf.mountPoint} />
+                                <CopyCell value={sf.mountPoint || 'â€”'} copyable={!!sf.mountPoint} />
                               </div>
                             ))}
                           </div>
@@ -387,7 +387,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
                 <p className="text-zinc-500 text-sm">Checking...</p>
               ) : toolsStatus === 'stopped' ? (
-                <p className="text-zinc-500 text-sm">VM is stopped — data not available</p>
+                <p className="text-zinc-500 text-sm">VM is stopped â€” data not available</p>
               ) : toolsStatus === 'no-credentials' ? (
                 <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
               ) : toolsStatus === 'error' ? (
@@ -408,12 +408,36 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                             <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
                             <div className="flex flex-col gap-0.5 min-w-0">
                               {group.installed.map((tool) => (
-                                <div key={tool.key} className="flex items-center gap-0.5">
-                                  <span className="text-green-400 text-xs shrink-0">&#10003;</span>
-                                  <span className="text-zinc-300 text-xs">{tool.label}</span>
-                                  {typeof installedTools[tool.key] === 'string' && (
-                                    <span className="text-zinc-500 text-xs">({installedTools[tool.key] as string})</span>
-                                  )}
+                                <div key={tool.key} className="flex items-start gap-0.5 min-w-0">
+                                  <span className="text-green-400 text-xs shrink-0 mt-px">&#10003;</span>
+                                  <div className="min-w-0">
+                                    <span className="text-zinc-300 text-xs">{tool.label}</span>
+                                    {typeof installedTools[tool.key] === 'string' && (() => {
+                                      const raw = installedTools[tool.key] as string
+                                      const parts = raw.split(', ')
+                                      if (parts.length <= 1) {
+                                        return (
+                                          <div className="text-zinc-500 text-xs leading-tight truncate" title={raw}>
+                                            {raw}
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <div className="flex flex-col gap-px">
+                                          {parts.map((part) => {
+                                            const isActive = part.endsWith(' (active)')
+                                            const ver = isActive ? part.replace(' (active)', '') : part
+                                            return (
+                                              <div key={ver} className="flex items-center gap-1 text-xs leading-tight">
+                                                <span className={isActive ? 'text-zinc-300' : 'text-zinc-500'}>{ver}</span>
+                                                {isActive && <span className="text-green-500 text-[10px] leading-none">active</span>}
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -437,7 +461,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   )
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Section({
   title,

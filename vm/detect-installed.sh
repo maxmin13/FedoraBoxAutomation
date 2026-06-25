@@ -19,10 +19,30 @@ path_ok() { [ -e "$1" ] && echo true || echo false; }
 glob_ok() { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
 rpm_ok()  { rpm -q "$1" &>/dev/null && echo true || echo false; }
 
-java_version() {
-  which java >/dev/null 2>&1 || { echo false; return; }
-  ver=$(java -version 2>&1 | head -1 | sed 's/.*version "\([^"]*\)".*/\1/')
-  echo "\"${ver}\""
+java_versions() {
+  # Detect active major version from the alternatives/PATH default.
+  local active_major=""
+  if which java >/dev/null 2>&1; then
+    active_major=$(java -version 2>&1 | awk -F'"' '/version/ {
+      split($2, a, "."); print (a[1]=="1") ? a[2] : a[1]
+    }')
+  fi
+  # Collect installed versions from both Oracle JDK RPMs (jdk-*) and
+  # OpenJDK RPMs (java-*-openjdk-devel), newest major first.
+  local list="" ver major label
+  while IFS= read -r ver; do
+    [[ -z "${ver}" ]] && continue
+    major=$(echo "${ver}" | grep -Eo '^[0-9]+')
+    label="${ver}$([[ "${major}" == "${active_major}" ]] && echo ' (active)')"
+    [[ -n "${list}" ]] && list="${list}, "
+    list="${list}${label}"
+  done < <(
+    { rpm -qa --queryformat '%{VERSION}\n' 'jdk-*' 2>/dev/null
+      rpm -qa --queryformat '%{VERSION}\n' 'temurin-*-jdk' 2>/dev/null
+    } | sort -rVu
+  )
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
 }
 
 intellij_version() {
@@ -77,7 +97,7 @@ python_version() {
 cat <<JSON
 {
   "baseSetup":        $(path_ok /etc/fedorabox/.base-setup),
-  "java":             $(java_version),
+  "java":             $(java_versions),
   "php":              $(cmd_ok php),
   "python":           $(python_version),
   "node":             $(cmd_ok node),

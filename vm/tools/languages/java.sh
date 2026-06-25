@@ -1,8 +1,14 @@
 #!/bin/bash
 
 ##
-## Description: Installs the latest Oracle JDK via the Foojay API, and sets
-##              JAVA_HOME in the login user's ~/.bash_profile.
+## Description: Installs a JDK alongside any existing versions and sets
+##              JAVA_HOME in the login user's ~/.bash_profile. Multiple JDK
+##              versions coexist; the requested version becomes the active
+##              default via the alternatives system.
+##
+##              Oracle JDK is used for versions 21+ (freely downloadable).
+##              OpenJDK from Fedora repos is used for versions 17 and below.
+##
 ## Usage:       sudo ./java.sh <login-user> [major-version]
 ## Parameters:  $1  <login-user>     Non-root desktop username (e.g. maxmin)
 ##              $2  [major-version]  Optional JDK major version (e.g. 21).
@@ -20,78 +26,154 @@ HOME_DIR=$(eval echo "~${LOGIN_USER}")
 STEP "Java"
 ####
 
-if java --version > /dev/null 2>&1
-then
-   log_info "Java already installed: $(java --version 2>&1 | head -1)"
+REQUESTED="${2:-}"
+
+# Resolve the target major version before checking if it is already installed.
+if [[ -n "${REQUESTED}" ]]; then
+   TARGET_MAJOR="${REQUESTED}"
 else
-   log_info 'Installing Oracle JDK (latest) ...'
-
-   WORK_DIR=$(mktemp -d)
-   trap 'rm -rf "${WORK_DIR}"' EXIT
-
-   if [[ -n "${2:-}" ]]; then
-      LATEST_MAJOR="${2}"
-   else
-      LATEST_MAJOR=$(curl -s 'https://api.foojay.io/disco/v3.0/major_versions?ea=false&ga=true' \
-        | python3 -c "import sys,json; versions=json.load(sys.stdin)['result']; print(max(v['major_version'] for v in versions))" || true)
-      if [[ -z "${LATEST_MAJOR}" ]]; then
-         log_error 'Could not determine latest JDK version from Foojay API.'
-         exit 1
-      fi
-   fi
-
-   log_info "Latest Oracle JDK major version: ${LATEST_MAJOR}"
-
-   JDK_URL="https://download.oracle.com/java/${LATEST_MAJOR}/latest/jdk-${LATEST_MAJOR}_linux-x64_bin.rpm"
-   log_info "Downloading Oracle JDK ${LATEST_MAJOR} from ${JDK_URL} ..."
-   wget -q --tries=3 "${JDK_URL}" -O "${WORK_DIR}/jdk.rpm"
-   dnf install -y "${WORK_DIR}/jdk.rpm"
-
-   java -version
-   alternatives --display java
-
-   log_info 'Oracle JDK successfully installed.'
-fi
-
-log_info "Version  : java --version"
-log_info "Compiler : javac --version"
-log_info "JAVA_HOME: echo \$JAVA_HOME"
-
-BASH_PROFILE="${HOME_DIR}/.bash_profile"
-if ! grep -q 'JAVA_HOME' "${BASH_PROFILE}"; then
-   # Ask the JVM itself — reliable across install methods (RPM, alternatives, custom).
-   # Some JDK versions exit non-zero for diagnostic -X flags even on success;
-   # catch that with a named warning instead of letting trap ERR fire.
-   # 1. Ask the JVM itself (works when java is on PATH after alternatives setup).
-   JAVA_HOME_VAL="$(java -XshowSettings:property -version 2>&1 \
-       | awk -F' = ' '/[[:space:]]java\.home/{print $2; exit}')" \
-       || { log_warn 'java -XshowSettings:property exited non-zero; trying filesystem search.'; true; }
-
-   # 2. Search standard Oracle JDK / OpenJDK filesystem paths.
-   #    Needed when the RPM was just installed and alternatives are not yet on PATH.
-   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
-      for _dir in /usr/java/jdk-* /usr/lib/jvm/java-*-oracle /usr/lib/jvm/java-*-openjdk-*; do
-         if [[ -x "${_dir}/bin/java" ]]; then
-            JAVA_HOME_VAL="${_dir}"
-            log_warn "java not on PATH; found JDK at ${JAVA_HOME_VAL}."
-            break
-         fi
-      done
-   fi
-
-   # 3. Follow /usr/bin/java symlink chain as a last resort.
-   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
-      JAVA_HOME_VAL="$(readlink -f /usr/bin/java 2>/dev/null | sed 's:/bin/java::')" \
-          || { log_warn 'readlink /usr/bin/java failed.'; true; }
-   fi
-
-   if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
-      log_error 'Could not determine JAVA_HOME. Verify java.sh completed successfully.'
+   log_info 'Querying Foojay API for latest GA JDK version ...'
+   TARGET_MAJOR=$(curl -s 'https://api.foojay.io/disco/v3.0/major_versions?ea=false&ga=true' \
+     | python3 -c "import sys,json; versions=json.load(sys.stdin)['result']; print(max(v['major_version'] for v in versions))" || true)
+   if [[ -z "${TARGET_MAJOR}" ]]; then
+      log_error 'Could not determine latest JDK version from Foojay API.'
       exit 1
    fi
-
-   printf "\nexport JAVA_HOME=%s\n" "${JAVA_HOME_VAL}" >> "${BASH_PROFILE}"
-   log_info "JAVA_HOME set to ${JAVA_HOME_VAL} in ${BASH_PROFILE}"
-else
-   log_info 'JAVA_HOME already in .bash_profile.'
+   log_info "Latest GA JDK major version: ${TARGET_MAJOR}"
 fi
+
+# Oracle only keeps a free /latest/ download for version 21+.
+# Older versions use Eclipse Temurin (Adoptium) — freely available for all LTS versions.
+USE_ORACLE=false
+if [[ "${TARGET_MAJOR}" -ge 21 ]]; then
+   USE_ORACLE=true
+   log_info "JDK ${TARGET_MAJOR}: using Oracle JDK (free download available for 21+)"
+else
+   log_info "JDK ${TARGET_MAJOR}: using Eclipse Temurin (Oracle does not offer a free download for versions older than 21)"
+fi
+
+ensure_adoptium_repo() {
+   if [[ ! -f /etc/yum.repos.d/adoptium.repo ]]; then
+      log_info 'Adding Eclipse Adoptium RPM repository ...'
+      cat > /etc/yum.repos.d/adoptium.repo << 'EOF'
+[Adoptium]
+name=Eclipse Adoptium
+baseurl=https://packages.adoptium.net/artifactory/rpm/fedora/$releasever/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
+EOF
+   fi
+}
+
+active_java_major() {
+   java -version 2>&1 \
+     | awk -F'"' '/version/ { split($2, a, "."); print (a[1]=="1") ? a[2] : a[1] }' \
+     || true
+}
+
+install_jdk() {
+   if [[ "${USE_ORACLE}" == true ]]; then
+      if rpm -q "jdk-${TARGET_MAJOR}" &>/dev/null; then
+         if [[ "$(active_java_major)" == "${TARGET_MAJOR}" ]]; then
+            log_info "Oracle JDK ${TARGET_MAJOR} is already installed and already the active version."
+            exit 0
+         fi
+         log_info "Oracle JDK ${TARGET_MAJOR} is installed — making it the active version."
+         return 0
+      fi
+      local WORK_DIR
+      WORK_DIR=$(mktemp -d)
+      trap 'rm -rf "${WORK_DIR}"' EXIT
+      local JDK_URL="https://download.oracle.com/java/${TARGET_MAJOR}/latest/jdk-${TARGET_MAJOR}_linux-x64_bin.rpm"
+      log_info "Downloading Oracle JDK ${TARGET_MAJOR} from ${JDK_URL} ..."
+      wget -q --tries=3 "${JDK_URL}" -O "${WORK_DIR}/jdk.rpm"
+      dnf install -y "${WORK_DIR}/jdk.rpm"
+      log_info "Oracle JDK ${TARGET_MAJOR} installed."
+   else
+      local PKG="temurin-${TARGET_MAJOR}-jdk"
+      if rpm -q "${PKG}" &>/dev/null; then
+         if [[ "$(active_java_major)" == "${TARGET_MAJOR}" ]]; then
+            log_info "Eclipse Temurin JDK ${TARGET_MAJOR} is already installed and already the active version."
+            exit 0
+         fi
+         log_info "Eclipse Temurin JDK ${TARGET_MAJOR} is installed — making it the active version."
+         return 0
+      fi
+      ensure_adoptium_repo
+      log_info "Installing Eclipse Temurin JDK ${TARGET_MAJOR} ..."
+      dnf install -y "${PKG}"
+      log_info "Eclipse Temurin JDK ${TARGET_MAJOR} installed."
+   fi
+}
+
+install_jdk
+
+# alternatives(8) lives in /usr/sbin which may not be in the guestcontrol PATH.
+ALTERNATIVES=/usr/sbin/alternatives
+[[ -x "${ALTERNATIVES}" ]] || ALTERNATIVES=$(command -v alternatives 2>/dev/null || true)
+
+# Find the java binary path that was registered with alternatives by the RPM,
+# rather than guessing the path ourselves (avoids version-suffix mismatches).
+# Returns empty string (never fails) so the filesystem fallback can take over.
+find_alt_java() {
+   local pattern="$1"
+   { "${ALTERNATIVES}" --query java 2>/dev/null || true; } \
+     | awk '/^Alternative:/ { print $2 }' \
+     | { grep "${pattern}" || true; } \
+     | head -1
+}
+
+if [[ "${USE_ORACLE}" == true ]]; then
+   JAVA_BIN=$(find_alt_java "/java/jdk-${TARGET_MAJOR}")
+   # Filesystem fallback if alternatives query returned nothing (e.g. first run, DB not yet updated)
+   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/java/jdk-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1)
+else
+   JAVA_BIN=$(find_alt_java "temurin-${TARGET_MAJOR}")
+   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/lib/jvm/temurin-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1)
+fi
+
+JDK_HOME="${JAVA_BIN%/bin/java}"
+
+# Make the target version the active default via alternatives.
+# Oracle JDK RPMs do not always auto-register with the alternatives system,
+# so we --install first (idempotent) and then --set.
+if [[ -x "${JAVA_BIN}" && -n "${ALTERNATIVES}" ]]; then
+   PRIORITY=$(( TARGET_MAJOR * 10000 ))
+   "${ALTERNATIVES}" --install /usr/bin/java java "${JAVA_BIN}" "${PRIORITY}" 2>/dev/null || true
+   JAVAC_BIN="${JDK_HOME}/bin/javac"
+   if [[ -x "${JAVAC_BIN}" ]]; then
+      "${ALTERNATIVES}" --install /usr/bin/javac javac "${JAVAC_BIN}" "${PRIORITY}" 2>/dev/null || true
+   fi
+   if "${ALTERNATIVES}" --set java "${JAVA_BIN}"; then
+      log_info "Active java set to ${JAVA_BIN}"
+      [[ -x "${JAVAC_BIN}" ]] && "${ALTERNATIVES}" --set javac "${JAVAC_BIN}" 2>/dev/null || true
+   else
+      log_warn "alternatives --set java ${JAVA_BIN} failed — java -version may still show the previous default."
+   fi
+else
+   log_warn "Could not locate java binary for JDK ${TARGET_MAJOR} — alternatives not updated. JAVA_BIN=${JAVA_BIN}"
+fi
+
+JAVA_HOME_VAL="${JDK_HOME}"
+
+if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
+   log_error 'Could not determine JAVA_HOME. Verify java.sh completed successfully.'
+   exit 1
+fi
+
+# Write a profile.d drop-in so every new shell session gets the correct
+# JAVA_HOME and has ${JAVA_HOME}/bin first on PATH.  Overwriting the file
+# on each run avoids duplicate lines and works for all users automatically.
+cat > /etc/profile.d/jdk.sh << EOF
+export JAVA_HOME=${JAVA_HOME_VAL}
+export PATH="\${JAVA_HOME}/bin:\${PATH}"
+EOF
+chmod 644 /etc/profile.d/jdk.sh
+log_info "JAVA_HOME set to ${JAVA_HOME_VAL} — open a new terminal for the change to take effect"
+
+export JAVA_HOME="${JAVA_HOME_VAL}"
+export PATH="${JAVA_HOME}/bin:${PATH}"
+hash -r 2>/dev/null || true
+java -version
+log_info "Java JDK ${TARGET_MAJOR} is now the active version. JAVA_HOME=${JAVA_HOME_VAL}"
