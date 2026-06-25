@@ -149,7 +149,6 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     const result = await window.electronAPI.killVmProcess(vm.name, pid)
     setKilling(null)
     if (!result.ok) {
-      if (result.error === 'No credentials saved') { withAuth(() => {}); return }
       setKillError(result.error ?? 'Kill failed')
       return
     }
@@ -342,7 +341,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                             <td className="py-1 text-right">
                               <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
                                 <button
-                                  onClick={() => setKillTarget({ pid: p.pid, name: p.name })}
+                                  onClick={() => withAuth(() => setKillTarget({ pid: p.pid, name: p.name }))}
                                   disabled={killing !== null}
                                   className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
