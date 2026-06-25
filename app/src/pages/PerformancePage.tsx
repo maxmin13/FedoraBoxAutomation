@@ -141,7 +141,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
   async function confirmKill() {
     if (!killTarget) return
-    const { pid, name } = killTarget
+    const { pid } = killTarget
     setKillTarget(null)
     window.electronAPI.logUiAction(`performance "${vm.name}": Kill PID ${pid}`)
     setKilling(pid)
@@ -149,6 +149,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     const result = await window.electronAPI.killVmProcess(vm.name, pid)
     setKilling(null)
     if (!result.ok) {
+      if (result.error === 'No credentials saved') { withAuth(() => {}); return }
       setKillError(result.error ?? 'Kill failed')
       return
     }
