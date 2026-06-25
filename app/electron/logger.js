@@ -65,4 +65,6 @@ module.exports = {
     writeHost(tag, text)
   },
   hostMark: (text) => writeHost('APP', `--- ${text} ---`),
+  // VM-side data (guestcontrol results, performance snapshots) — goes to host.log
+  vm: (text) => writeHost('VM ', text),
 }

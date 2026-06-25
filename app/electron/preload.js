@@ -78,6 +78,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Queries the VM for installed tools by running detect-installed.sh via guestcontrol
   queryVmInstalled: (vmName) => ipcRenderer.invoke('query-vm-installed', { vmName }),
+
+  // Queries the VM for a live performance snapshot (CPU%, RAM, top processes)
+  queryVmPerformance: (vmName) => ipcRenderer.invoke('query-vm-performance', { vmName }),
   // Kills any in-flight query-vm-installed process for the given VM
   cancelQueryVmInstalled: (vmName) => ipcRenderer.invoke('cancel-query-vm-installed', { vmName }),
 

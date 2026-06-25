@@ -1,9 +1,21 @@
 import { useState, useEffect } from 'react'
-import type { Vm, VmInfo, ScriptLine } from '../electron.d'
+import type { Vm, VmInfo, VmProcess, ScriptLine } from '../electron.d'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
 import WarnIcon from '../components/WarnIcon'
+import Tooltip from '../components/Tooltip'
+
+const CPU_WARN = 20   // CPU% per process — highlight above this
+const RSS_WARN = 500  // MB RSS — highlight above this
+
+interface ProcSnapshot {
+  cpuPct: number
+  ramTotalMB: number
+  ramUsedMB: number
+  ramFreeMB: number
+  processes: VmProcess[]
+}
 
 
 interface PerformancePageProps {
@@ -27,6 +39,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [diagLines,   setDiagLines]   = useState<ScriptLine[]>([])
   const [diagError,   setDiagError]   = useState<string | null>(null)
   const [credKey,     setCredKey]     = useState(0)
+
+  const [procState,   setProcState]   = useState<'idle' | 'loading' | 'ok' | 'stopped' | 'no-credentials' | 'error'>('idle')
+  const [procSnapshot, setProcSnapshot] = useState<ProcSnapshot | null>(null)
+  const [procError,   setProcError]   = useState<string | null>(null)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -55,6 +71,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       setVmPass(pass)
       setLoginUser(login)
       runDiagnostics(user, pass, login)
+      loadProcesses()
     })
   }, [vm.name, credKey])
 
@@ -62,6 +79,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
     setInfoKey((k) => k + 1)
     runDiagnostics(vmUser, vmPass, loginUser)
+    loadProcesses()
   }
 
   async function runDiagnostics(user: string, pass: string, login: string) {
@@ -118,6 +136,22 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     }
   }
 
+  async function loadProcesses() {
+    window.electronAPI.logUiAction(`performance "${vm.name}": Load processes`)
+    setProcState('loading')
+    setProcError(null)
+    const result = await window.electronAPI.queryVmPerformance(vm.name)
+    if (!result.ok) {
+      if (result.vmStopped)     { setProcState('stopped');        return }
+      if (result.noCredentials) { setProcState('no-credentials'); return }
+      setProcError(result.error ?? 'Unknown error')
+      setProcState('error')
+      return
+    }
+    setProcSnapshot(result)
+    setProcState('ok')
+  }
+
   if (loginRequired) {
     return (
       <div className="h-full overflow-y-auto">
@@ -131,20 +165,24 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 shrink-0">
-        <button
-          onClick={() => { window.electronAPI.logUiAction(`performance "${vm.name}": Back`); onBack() }}
-          className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
-        >
-          &larr; Back
-        </button>
+        <Tooltip tip="Go back to the VM list">
+          <button
+            onClick={() => { window.electronAPI.logUiAction(`performance "${vm.name}": Back`); onBack() }}
+            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
+          >
+            &larr; Back
+          </button>
+        </Tooltip>
         <h1 className="text-xl font-semibold text-zinc-100 truncate">{vm.name}</h1>
-        <button
-          onClick={() => withAuth(handleRefresh)}
-          disabled={diagState === 'running'}
-          className="ml-auto px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-        >
-          Refresh
-        </button>
+        <Tooltip tip="Re-run all checks and reload the process list">
+          <button
+            onClick={() => withAuth(handleRefresh)}
+            disabled={diagState === 'running'}
+            className="ml-auto px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            Refresh
+          </button>
+        </Tooltip>
       </div>
 
       {loadError && (
@@ -158,71 +196,138 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       )}
 
       {info && (
-        <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex gap-4">
 
-          {/* Left: Performance card */}
-          <div className="w-64 shrink-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 space-y-3 self-start">
-            <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Performance</h2>
+          {/* Left column: Performance settings + Running Processes */}
+          <div className="w-96 shrink-0 flex flex-col gap-4">
 
-            {fixError && (
-              <p className="text-red-400 text-xs">{fixError}</p>
-            )}
+            {/* Performance card */}
+            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 space-y-3 shrink-0">
+              <Tooltip tip="VirtualBox settings that affect how fast the VM runs — fix any warnings before heavy workloads">
+                <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Performance</h2>
+              </Tooltip>
 
-            <div className="space-y-2">
-              {(() => {
-                const fix = (setting: 'paravirt' | 'nicType' | 'acceleration3d' | 'cpuExecCap', isWarn: boolean) =>
-                  isWarn ? () => handleFix(setting) : undefined
-                return (
-                  <>
-                    <PerfRow
-                      label="Paravirt"
-                      value={formatParavirt(info.paravirtProvider)}
-                      status={paravirtStatus(info.paravirtProvider)}
-                      hint={paravirtHint(info.paravirtProvider)}
-                      onFix={fix('paravirt', paravirtStatus(info.paravirtProvider) === 'warn')}
-                      fixing={fixing === 'paravirt'}
-                    />
-                    <PerfRow
-                      label="NIC type"
-                      value={formatNicType(info.nicType)}
-                      status={nicTypeStatus(info.nicType)}
-                      hint={nicTypeHint(info.nicType)}
-                      onFix={fix('nicType', nicTypeStatus(info.nicType) === 'warn')}
-                      fixing={fixing === 'nicType'}
-                    />
-                    <PerfRow
-                      label="Storage"
-                      value={formatStorageCtrl(info.storageControllerType)}
-                      status={storageStatus(info.storageControllerType)}
-                      hint={storageHint(info.storageControllerType)}
-                    />
-                    <PerfRow
-                      label="3D accel"
-                      value={info.acceleration3d ? 'Enabled' : 'Disabled'}
-                      status={info.acceleration3d ? 'good' : 'warn'}
-                      hint={!info.acceleration3d ? 'Enable 3D acceleration for better graphics — requires Guest Additions to be installed' : undefined}
-                      onFix={fix('acceleration3d', !info.acceleration3d)}
-                      fixing={fixing === 'acceleration3d'}
-                    />
-                    <PerfRow
-                      label="CPU cap"
-                      value={`${info.cpuExecCap}%`}
-                      status={info.cpuExecCap >= 100 ? 'good' : 'warn'}
-                      hint={info.cpuExecCap < 100 ? 'CPU cap limits how much host CPU the VM can use — set to 100% for full performance' : undefined}
-                      onFix={fix('cpuExecCap', info.cpuExecCap < 100)}
-                      fixing={fixing === 'cpuExecCap'}
-                    />
-                  </>
-                )
-              })()}
+              {fixError && (
+                <p className="text-red-400 text-xs">{fixError}</p>
+              )}
+
+              <div className="space-y-2">
+                {(() => {
+                  const fix = (setting: 'paravirt' | 'nicType' | 'acceleration3d' | 'cpuExecCap', isWarn: boolean) =>
+                    isWarn ? () => handleFix(setting) : undefined
+                  return (
+                    <>
+                      <PerfRow
+                        label="Paravirt"
+                        labelTip="Paravirtualisation provider — KVM gives Linux guests near-native CPU and timer performance"
+                        value={formatParavirt(info.paravirtProvider)}
+                        status={paravirtStatus(info.paravirtProvider)}
+                        hint={paravirtHint(info.paravirtProvider)}
+                        onFix={fix('paravirt', paravirtStatus(info.paravirtProvider) === 'warn')}
+                        fixing={fixing === 'paravirt'}
+                      />
+                      <PerfRow
+                        label="NIC type"
+                        labelTip="Network adapter type — virtio-net is a paravirtual driver that is much faster than emulated cards"
+                        value={formatNicType(info.nicType)}
+                        status={nicTypeStatus(info.nicType)}
+                        hint={nicTypeHint(info.nicType)}
+                        onFix={fix('nicType', nicTypeStatus(info.nicType) === 'warn')}
+                        fixing={fixing === 'nicType'}
+                      />
+                      <PerfRow
+                        label="Storage"
+                        labelTip="Storage controller type — SATA (AHCI) is recommended; IDE is significantly slower under heavy I/O"
+                        value={formatStorageCtrl(info.storageControllerType)}
+                        status={storageStatus(info.storageControllerType)}
+                        hint={storageHint(info.storageControllerType)}
+                      />
+                      <PerfRow
+                        label="3D accel"
+                        labelTip="3D acceleration offloads rendering to the host GPU — improves desktop and graphical application performance"
+                        value={info.acceleration3d ? 'Enabled' : 'Disabled'}
+                        status={info.acceleration3d ? 'good' : 'warn'}
+                        hint={!info.acceleration3d ? 'Enable 3D acceleration for better graphics — requires Guest Additions to be installed' : undefined}
+                        onFix={fix('acceleration3d', !info.acceleration3d)}
+                        fixing={fixing === 'acceleration3d'}
+                      />
+                      <PerfRow
+                        label="CPU cap"
+                        labelTip="CPU execution cap — limits what percentage of a host CPU core the VM may use; 100% means no limit"
+                        value={`${info.cpuExecCap}%`}
+                        status={info.cpuExecCap >= 100 ? 'good' : 'warn'}
+                        hint={info.cpuExecCap < 100 ? 'CPU cap limits how much host CPU the VM can use — set to 100% for full performance' : undefined}
+                        onFix={fix('cpuExecCap', info.cpuExecCap < 100)}
+                        fixing={fixing === 'cpuExecCap'}
+                      />
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+
+            {/* Running Processes card */}
+            <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
+              <Tooltip tip="Top 8 processes inside the VM by CPU usage, sampled via guestcontrol — click Refresh to update">
+                <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
+              </Tooltip>
+
+              {procState === 'idle' && (
+                <p className="text-zinc-500 text-xs">Loading...</p>
+              )}
+              {procState === 'loading' && (
+                <p className="text-zinc-400 text-xs">Sampling CPU usage...</p>
+              )}
+              {procState === 'stopped' && (
+                <p className="text-zinc-500 text-xs">VM is not running.</p>
+              )}
+              {procState === 'no-credentials' && (
+                <p className="text-zinc-500 text-xs">No credentials saved — run a provisioning script first.</p>
+              )}
+              {procState === 'error' && (
+                <p className="text-red-400 text-xs font-mono break-words">{procError}</p>
+              )}
+
+              {procState === 'ok' && procSnapshot && (
+                <div className="space-y-3">
+                  <UsageBar label="CPU" used={Math.round(procSnapshot.cpuPct)} total={100} unit="%" tip="Overall CPU usage across all cores, sampled over 500 ms from /proc/stat" />
+                  <UsageBar label="RAM" used={procSnapshot.ramUsedMB} total={procSnapshot.ramTotalMB} unit="MB" tip="Physical memory usage reported by free -m inside the VM" />
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-zinc-500 border-b border-zinc-700">
+                        <th className="text-left pb-2 pr-2 font-medium"><Tooltip tip="Process name (comm field from ps)">Name</Tooltip></th>
+                        <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="CPU usage averaged over the process lifetime">CPU %</Tooltip></th>
+                        <th className="text-right pb-2 font-medium"><Tooltip tip="Resident Set Size — physical RAM currently held by this process, in MB">RSS MB</Tooltip></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {procSnapshot.processes.map((p) => {
+                        const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
+                        return (
+                          <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
+                            <td className="py-1.5 pr-2 font-medium truncate max-w-[8rem]">{p.name}</td>
+                            <td className="py-1.5 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
+                            <td className="py-1.5 text-right font-mono">{p.rssMB}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {procSnapshot.processes.some((p) => p.cpu > CPU_WARN || p.rssMB > RSS_WARN) && (
+                    <p className="text-amber-400 text-xs">
+                      Highlighted: CPU &gt; {CPU_WARN}% or RSS &gt; {RSS_WARN} MB
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right: Diagnostics card */}
+          {/* Right column: Diagnostics (full height) */}
           <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3 min-h-0">
-            <div className="flex items-center justify-between shrink-0">
-              <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Diagnostics</h2>
-            </div>
+            <Tooltip tip="Runs a guest-side check for common performance problems: Guest Additions modules, swap pressure, NIC and storage driver recommendations">
+              <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default shrink-0">Diagnostics</h2>
+            </Tooltip>
 
             {diagState === 'idle' && !vmUser && (
               <p className="text-amber-400 text-xs shrink-0">No credentials saved — open Detail to set them.</p>
@@ -252,6 +357,24 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
         </div>
       )}
+    </div>
+  )
+}
+
+// ── UsageBar ───────────────────────────────────────────────────────────────────
+
+function UsageBar({ label, used, total, unit, tip }: { label: string; used: number; total: number; unit: string; tip: string }) {
+  const pct = total > 0 ? Math.round((used / total) * 100) : 0
+  const color = pct >= 85 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-500' : 'bg-blue-500'
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-zinc-400 mb-1">
+        <Tooltip tip={tip}><span className="cursor-default">{label}</span></Tooltip>
+        <span>{used} / {total} {unit} ({pct}%)</span>
+      </div>
+      <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   )
 }
@@ -338,9 +461,10 @@ function storageHint(t: string | null): string | undefined {
 // ── PerfRow ────────────────────────────────────────────────────────────────────
 
 function PerfRow({
-  label, value, status, hint, onFix, fixing,
+  label, labelTip, value, status, hint, onFix, fixing,
 }: {
   label: string
+  labelTip?: string
   value: string
   status?: 'good' | 'warn'
   hint?: string
@@ -349,18 +473,22 @@ function PerfRow({
 }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-zinc-500 w-24 shrink-0">{label}</span>
+      <span className="text-zinc-500 w-24 shrink-0 cursor-default">
+        {labelTip ? <Tooltip tip={labelTip}>{label}</Tooltip> : label}
+      </span>
       <span className="text-zinc-300">{value}</span>
       {status === 'good' && <span className="text-green-400 text-xs">&#10003;</span>}
       {status === 'warn' && hint && <WarnIcon hint={hint} />}
       {onFix && (
-        <button
-          onClick={onFix}
-          disabled={!!fixing}
-          className="ml-auto shrink-0 px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {fixing ? 'Fixing...' : 'Fix'}
-        </button>
+        <Tooltip tip="Apply the recommended setting — the VM must be stopped first">
+          <button
+            onClick={onFix}
+            disabled={!!fixing}
+            className="ml-auto shrink-0 px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {fixing ? 'Fixing...' : 'Fix'}
+          </button>
+        </Tooltip>
       )}
     </div>
   )
@@ -406,27 +534,47 @@ function diagAction(warn: string): string | undefined {
   return undefined
 }
 
+function diagTip(text: string): string | undefined {
+  if (/^Version:/i.test(text))             return 'VirtualBox Guest Additions version installed in the VM'
+  if (/^vboxadd-service:/i.test(text))     return 'Guest Additions service — manages shared folders, clipboard sync, and display auto-resize'
+  if (/vboxguest module/i.test(text))      return 'Kernel module for Guest Additions — required for all guest integration features'
+  if (/^vCPUs online:/i.test(text))        return 'Number of virtual CPU cores allocated to this VM'
+  if (/^Load average:/i.test(text))        return '1, 5, and 15-minute averages of runnable processes — values above the vCPU count mean the CPU is saturated'
+  if (/^Total RAM:/i.test(text))           return 'Total physical memory allocated to this VM'
+  if (/^Available:/i.test(text))           return 'Physical memory available for new processes, including reclaimable page cache'
+  if (/^Interface:/i.test(text))           return 'Primary network interface name and its kernel driver'
+  if (/Paravirtual NIC/i.test(text))       return 'virtio_net bypasses hardware emulation — significantly faster than emulated NICs'
+  if (/virtio\/NVMe.*optimal/i.test(text)) return 'virtio-blk or NVMe driver — paravirtual I/O with near-native disk performance'
+  if (/SATA\/AHCI/i.test(text))           return 'SATA storage via AHCI controller — good performance for most workloads'
+  return undefined
+}
+
 function DiagReport({ sections }: { sections: DiagSection[] }) {
   if (sections.length === 0) return null
   return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1">
+    <div className="grid grid-cols-3 gap-x-6 gap-y-4 pt-1">
       {sections.map((sec) => (
         <div key={sec.title}>
           <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">{sec.title}</p>
           <div className="space-y-1 pl-1">
-            {sec.items.map((item, i) => (
-              <div key={i}>
-                <div className="flex items-start gap-1.5 text-xs">
-                  <span className={item.level === 'warn' ? 'text-amber-400 shrink-0' : 'text-green-400 shrink-0'}>
-                    {item.level === 'warn' ? '⚠' : '✓'}
-                  </span>
-                  <span className={item.level === 'warn' ? 'text-amber-300' : 'text-zinc-300'}>{item.text}</span>
+            {sec.items.map((item, i) => {
+              const tip = diagTip(item.text)
+              return (
+                <div key={i}>
+                  <div className="flex items-start gap-1.5 text-xs">
+                    <span className={item.level === 'warn' ? 'text-amber-400 shrink-0' : 'text-green-400 shrink-0'}>
+                      {item.level === 'warn' ? '⚠' : '✓'}
+                    </span>
+                    <span className={item.level === 'warn' ? 'text-amber-300' : 'text-zinc-300'}>
+                      {tip ? <Tooltip tip={tip}><span className="cursor-default">{item.text}</span></Tooltip> : item.text}
+                    </span>
+                  </div>
+                  {item.action && (
+                    <p className="text-zinc-500 text-xs pl-4 mt-0.5">→ {item.action}</p>
+                  )}
                 </div>
-                {item.action && (
-                  <p className="text-zinc-500 text-xs pl-4 mt-0.5">→ {item.action}</p>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ))}

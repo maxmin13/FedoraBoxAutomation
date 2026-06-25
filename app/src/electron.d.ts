@@ -104,6 +104,14 @@ export interface ScriptLine {
   source: 'stdout' | 'stderr'
 }
 
+export interface VmProcess {
+  pid: number
+  name: string
+  cpu: number
+  mem: number
+  rssMB: number
+}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -125,6 +133,10 @@ declare global {
       cancelQueryVmInstalled: (vmName: string) => Promise<{ ok: boolean }>
       queryVmInstalled: (vmName: string) => Promise<
         | { ok: true; installed: Record<string, boolean | string> }
+        | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }
+      >
+      queryVmPerformance: (vmName: string) => Promise<
+        | { ok: true; cpuPct: number; ramTotalMB: number; ramUsedMB: number; ramFreeMB: number; processes: VmProcess[] }
         | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }
       >
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>

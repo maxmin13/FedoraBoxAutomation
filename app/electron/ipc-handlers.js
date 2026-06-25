@@ -86,7 +86,7 @@ function execTracked(cmd, options, procs) {
 // Channels excluded from IPC logging.
 // 'read-log' returns full file content — logging it back would create a feedback loop.
 // Credential channels are excluded to keep passwords out of gui.log.
-const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action'])
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action', 'query-vm-performance'])
 
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
@@ -611,6 +611,47 @@ function registerIpcHandlers(win) {
       log.info(`[ipc][cancel-query-vm-installed] killed ${procs.length} proc(s) for "${vmName}"`)
     }
     return { ok: true }
+  })
+
+  // ── query-vm-performance ─────────────────────────────────
+  // Copies performance.sh into the guest and runs it via guestcontrol.
+  // Returns { ok: true, cpuPct, ramTotalMB, ramUsedMB, ramFreeMB, processes }
+  // Returns { ok: false, vmStopped: true } if the VM is not running.
+  // Returns { ok: false, noCredentials: true } if no credentials are saved.
+  // Returns { ok: false, error: string } if guestcontrol fails.
+  handleIpc('query-vm-performance', async (_event, { vmName }) => {
+    if (!await isVmRunning(vmName)) return { ok: false, vmStopped: true }
+    const store = await readCredsStore()
+    const entry = store[vmName]
+    if (!entry?.user || !entry?.pass) return { ok: false, noCredentials: true }
+    const { user, pass } = entry
+    const scriptSrc = path.join(ROOT, 'vm', 'tools', 'performance.sh')
+    try {
+      await execAsync(
+        `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/performance.sh --username "${user}" --password "${pass}"`,
+        { encoding: 'utf8', timeout: 15000 }
+      )
+      const { stdout } = await execAsync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/performance.sh`,
+        { encoding: 'utf8', timeout: 15000 }
+      )
+      const data = JSON.parse(stdout.trim())
+      const ramPct = data.ramTotalMB > 0 ? Math.round((data.ramUsedMB / data.ramTotalMB) * 100) : 0
+      log.vm(`[perf] "${vmName}"  CPU: ${data.cpuPct}%  RAM: ${data.ramUsedMB} / ${data.ramTotalMB} MB (${ramPct}%)  Free: ${data.ramFreeMB} MB`)
+      if (Array.isArray(data.processes) && data.processes.length > 0) {
+        log.vm(`[perf] "${vmName}"  Top processes:`)
+        data.processes.forEach((p, i) => {
+          const rank = String(i + 1).padStart(2)
+          const name = p.name.padEnd(22)
+          const cpu  = String(p.cpu.toFixed(1)).padStart(5)
+          log.vm(`[perf] "${vmName}"    ${rank}. ${name}  CPU: ${cpu}%  RSS: ${p.rssMB} MB`)
+        })
+      }
+      return { ok: true, ...data }
+    } catch (error) {
+      log.vm(`[perf] "${vmName}" failed: ${error.message}`)
+      return { ok: false, error: error.message }
+    }
   })
 
   // ── get-script-state ─────────────────────────────────────
