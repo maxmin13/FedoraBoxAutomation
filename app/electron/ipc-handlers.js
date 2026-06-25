@@ -627,13 +627,15 @@ function registerIpcHandlers(win) {
     const { user, pass } = entry
     const scriptSrc = path.join(ROOT, 'vm', 'tools', 'performance.sh')
     try {
+      log.vm(`[perf] "${vmName}"  copyto ${scriptSrc}`)
       await execAsync(
         `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/performance.sh --username "${user}" --password "${pass}"`,
         { encoding: 'utf8', timeout: 15000 }
       )
+      log.vm(`[perf] "${vmName}"  running /tmp/performance.sh`)
       const { stdout } = await execAsync(
-        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/performance.sh`,
-        { encoding: 'utf8', timeout: 15000 }
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- bash /tmp/performance.sh`,
+        { encoding: 'utf8', timeout: 20000 }
       )
       const data = JSON.parse(stdout.trim())
       const ramPct = data.ramTotalMB > 0 ? Math.round((data.ramUsedMB / data.ramTotalMB) * 100) : 0
@@ -649,8 +651,10 @@ function registerIpcHandlers(win) {
       }
       return { ok: true, ...data }
     } catch (error) {
-      log.vm(`[perf] "${vmName}" failed: ${error.message}`)
-      return { ok: false, error: error.message }
+      const vboxOut = (error.stdout || '').trim()
+      const detail  = vboxOut || error.message
+      log.vm(`[perf] "${vmName}" failed: ${detail}`)
+      return { ok: false, error: detail }
     }
   })
 
