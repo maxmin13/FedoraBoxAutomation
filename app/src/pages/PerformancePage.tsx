@@ -63,26 +63,26 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     })
   }, [vm.name, infoKey])
 
-  // On mount: load credentials then immediately run diagnostics.
-  // infoKey drives re-runs on Refresh so diagnostics mirrors it.
+  // On mount: load credentials, run processes first (fast, ~1.5 s), then diagnostics.
+  // Sequential order avoids concurrent guestcontrol sessions that cause session conflicts.
   useEffect(() => {
-    window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
+    window.electronAPI.loadVmCredentials(vm.name).then(async (saved) => {
       const user  = saved.ok && saved.user      ? saved.user      : ''
       const pass  = saved.ok && saved.pass      ? saved.pass      : ''
       const login = saved.ok && saved.loginUser ? saved.loginUser : ''
       setVmUser(user)
       setVmPass(pass)
       setLoginUser(login)
+      await loadProcesses()
       runDiagnostics(user, pass, login)
-      loadProcesses()
     })
   }, [vm.name, credKey])
 
-  function handleRefresh() {
+  async function handleRefresh() {
     window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
     setInfoKey((k) => k + 1)
+    await loadProcesses()
     runDiagnostics(vmUser, vmPass, loginUser)
-    loadProcesses()
   }
 
   async function runDiagnostics(user: string, pass: string, login: string) {
@@ -141,12 +141,12 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
   async function confirmKill() {
     if (!killTarget) return
-    const { pid } = killTarget
+    const { pid, name } = killTarget
     setKillTarget(null)
-    window.electronAPI.logUiAction(`performance "${vm.name}": Kill PID ${pid}`)
+    window.electronAPI.logUiAction(`performance "${vm.name}": Kill "${name}" PID ${pid}`)
     setKilling(pid)
     setKillError(null)
-    const result = await window.electronAPI.killVmProcess(vm.name, pid)
+    const result = await window.electronAPI.killVmProcess(vm.name, pid, name)
     setKilling(null)
     if (!result.ok) {
       setKillError(result.error ?? 'Kill failed')
@@ -214,9 +214,9 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
         </Tooltip>
       </div>
 
-      {loadError && (
+      {(loadError || killError) && (
         <div className="bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm shrink-0">
-          {loadError}
+          {loadError || killError}
         </div>
       )}
 
@@ -339,24 +339,23 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                             <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
                             <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
                             <td className="py-1 text-right">
-                              <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
-                                <button
-                                  onClick={() => withAuth(() => setKillTarget({ pid: p.pid, name: p.name }))}
-                                  disabled={killing !== null}
-                                  className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {killing === p.pid ? '...' : 'Kill'}
-                                </button>
-                              </Tooltip>
+                              {!CRITICAL_PROCS.has(p.name) && (
+                                <Tooltip tip={diagState === 'running' ? 'Wait for diagnostics to finish before killing a process' : killTip(p.name)}>
+                                  <button
+                                    onClick={() => withAuth(() => setKillTarget({ pid: p.pid, name: p.name }))}
+                                    disabled={killing !== null || diagState === 'running'}
+                                    className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {killing === p.pid ? '...' : 'Kill'}
+                                  </button>
+                                </Tooltip>
+                              )}
                             </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                  {killError && (
-                    <p className="text-red-400 text-xs">{killError}</p>
-                  )}
                 </div>
               )}
             </div>
@@ -560,6 +559,61 @@ function parseDiagReport(lines: ScriptLine[]): DiagSection[] {
   return sections
 }
 
+// ── killTip ───────────────────────────────────────────────────────────────────
+
+const PROC_DESC: Record<string, string> = {
+  'VBoxService':       'VirtualBox Guest Additions service for shared folders, clipboard sync and display resize',
+  'VBoxClient':        'VirtualBox client helper for clipboard and seamless window integration',
+  'k3s-server':        'Lightweight Kubernetes control plane and API server',
+  'k3s-agent':         'Kubernetes node agent that manages workloads assigned by the k3s server',
+  'containerd':        'Container runtime that manages container lifecycle on behalf of Kubernetes',
+  'containerd-shim':   'Container shim that keeps a container running independently of the containerd daemon',
+  'dockerd':           'Docker daemon that manages containers, images and networks',
+  'docker-proxy':      'Docker port-forwarding proxy that maps host ports into containers',
+  'systemd':           'System and service manager (PID 1)',
+  'systemd-journal':   'System log collector and storage daemon',
+  'systemd-hostnam':   'Daemon that manages the system hostname and machine identity',
+  'systemd-logind':    'Daemon that handles user login sessions and seat management',
+  'systemd-network':   'Daemon that configures network interfaces from systemd-networkd units',
+  'systemd-resolve':   'DNS cache and hostname resolver',
+  'systemd-udevd':     'Daemon that handles kernel device events and udev rules',
+  'NetworkManager':    'Daemon that manages wired and wireless network connections',
+  'sshd':              'SSH server that accepts incoming secure shell connections',
+  'firewalld':         'Firewall daemon that manages iptables and nftables rules',
+  'tuned':             'Performance tuning daemon that adjusts kernel parameters to match a workload profile',
+  'chronyd':           'NTP daemon that keeps the system clock synchronised with time servers',
+  'dbus-daemon':       'Inter-process message bus used by most desktop and system services',
+  'polkitd':           'PolicyKit daemon that handles privilege escalation requests',
+  'avahi-daemon':      'Multicast DNS daemon that enables zero-configuration service discovery on the local network',
+  'rsyslogd':          'System log daemon that collects and routes log messages',
+  'crond':             'Cron scheduler that runs periodic background tasks',
+  'atd':               'Job scheduler that runs one-off scheduled commands',
+  'fprintd':           'Fingerprint authentication daemon',
+  'bash':              'Bash shell session',
+  'sh':                'POSIX shell session',
+  'python3':           'Python 3 interpreter',
+  'python':            'Python interpreter',
+  'node':              'Node.js runtime',
+  'java':              'Java virtual machine',
+  'nginx':             'Nginx web and proxy server',
+  'httpd':             'Apache HTTP server',
+  'mysqld':            'MySQL database server',
+  'postgres':          'PostgreSQL database server',
+  'mongod':            'MongoDB database server',
+  'redis-server':      'Redis in-memory data store',
+}
+
+const CRITICAL_PROCS = new Set([
+  'systemd', 'systemd-journal', 'systemd-hostnam', 'systemd-logind',
+  'systemd-network', 'systemd-resolve', 'systemd-udevd',
+  'VBoxService', 'VBoxClient',
+  'NetworkManager', 'dbus-daemon', 'polkitd', 'firewalld', 'sshd',
+])
+
+function killTip(name: string): string {
+  return PROC_DESC[name] ?? 'Use for stuck or resource-heavy processes'
+}
+
 // ── KillModal ─────────────────────────────────────────────────────────────────
 
 function KillModal({
@@ -589,7 +643,7 @@ function KillModal({
         <p className="text-zinc-400 text-sm text-center mb-2">Kill this process?</p>
         <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-1">{processName}</p>
         <p className="text-zinc-500 text-xs text-center mb-8">
-          PID {pid} — SIGTERM will be sent. The process may take a moment to stop.
+          PID {pid} — if managed by systemd the service will be stopped; otherwise the process will be force-killed.
         </p>
         <div className="flex gap-3 justify-center">
           <button

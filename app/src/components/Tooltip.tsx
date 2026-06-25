@@ -38,7 +38,7 @@ export default function Tooltip({ tip, children }: { tip: string; children: Reac
       {show && (
         <span
           style={style}
-          className="w-56 bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs rounded px-2 py-1.5 whitespace-normal pointer-events-none shadow-lg leading-snug"
+          className="w-56 bg-zinc-700 border border-zinc-600 text-zinc-200 text-xs rounded px-2 py-1.5 whitespace-normal pointer-events-none shadow-lg leading-snug text-left"
         >
           {tip}
         </span>

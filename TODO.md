@@ -13,3 +13,9 @@
 # create a new vm, verify all the provision scripts after change most recent version
 
 # where there isn't a drop down list of version, install the latest
+
+# check if login page is displayed when kill button is klicked
+
+# when creating a new vm, do we need the navigate away go back mechanism?
+
+# check where yu print the password in the logs, hide it

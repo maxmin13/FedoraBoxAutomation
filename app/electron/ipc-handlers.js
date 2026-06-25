@@ -12,9 +12,10 @@
 // ============================================================
 
 const { ipcMain, app, dialog, shell } = require('electron')
-const { execSync, exec } = require('child_process')
+const { execSync, exec, execFile } = require('child_process')
 const { inspect, promisify } = require('util')
-const execAsync = promisify(exec)
+const execAsync     = promisify(exec)
+const execFileAsync = promisify(execFile)
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
@@ -178,6 +179,14 @@ function extractError(lines) {
  * Registers all IPC handlers. Called once from main.js after the window is created.
  * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
  */
+// Finds the JSON line in guestcontrol stdout, ignoring any VBoxManage status lines
+// that may appear before or after the script output.
+function extractPerfJson(stdout) {
+  const line = stdout.split('\n').find(l => l.trim().startsWith('{'))
+  if (!line) throw new Error('No JSON line found in output')
+  return JSON.parse(line.trim())
+}
+
 function registerIpcHandlers(win) {
 
   // ── get-downloads-path ────────────────────────────────────
@@ -627,17 +636,18 @@ function registerIpcHandlers(win) {
     const { user, pass } = entry
     const scriptSrc = path.join(ROOT, 'vm', 'tools', 'performance.sh')
     try {
-      log.vm(`[perf] "${vmName}"  copyto ${scriptSrc}`)
-      await execAsync(
-        `VBoxManage guestcontrol "${vmName}" copyto "${scriptSrc}" /tmp/performance.sh --username "${user}" --password "${pass}"`,
-        { encoding: 'utf8', timeout: 15000 }
-      )
-      log.vm(`[perf] "${vmName}"  running /tmp/performance.sh`)
-      const { stdout } = await execAsync(
-        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/performance.sh`,
-        { encoding: 'utf8', timeout: 20000 }
-      )
-      const data = JSON.parse(stdout.trim())
+      // Encode the script as base64 and pipe it through bash — avoids copyto entirely.
+      // base64 alphabet (A-Za-z0-9+/=) is safe inside bash single quotes.
+      const encoded = Buffer.from(fs.readFileSync(scriptSrc, 'utf8').replace(/\r\n/g, '\n')).toString('base64')
+      log.vm(`[perf] "${vmName}"  running via inline base64`)
+      const { stdout } = await execFileAsync('VBoxManage', [
+        'guestcontrol', vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', user, '--password', pass,
+        '--wait-stdout',
+        '--', '-c', `echo '${encoded}' | base64 -d | bash 2>&1`,
+      ], { encoding: 'utf8', timeout: 20000 })
+      const data = extractPerfJson(stdout)
       const ramPct = data.ramTotalMB > 0 ? Math.round((data.ramUsedMB / data.ramTotalMB) * 100) : 0
       log.vm(`[perf] "${vmName}"  CPU: ${data.cpuPct}%  RAM: ${data.ramUsedMB} / ${data.ramTotalMB} MB (${ramPct}%)  Free: ${data.ramFreeMB} MB`)
       if (Array.isArray(data.processes) && data.processes.length > 0) {
@@ -651,33 +661,108 @@ function registerIpcHandlers(win) {
       }
       return { ok: true, ...data }
     } catch (error) {
-      const vboxOut = (error.stdout || '').trim()
-      const detail  = vboxOut || error.message
-      log.vm(`[perf] "${vmName}" failed: ${detail}`)
+      // VBoxManage sometimes exits non-zero even when the guest command succeeded —
+      // try to recover JSON from stdout before treating it as a real failure.
+      const rawOut = error.stdout || ''
+      if (rawOut) {
+        try {
+          const data = extractPerfJson(rawOut)
+          log.vm(`[perf] "${vmName}"  exit-code false-failure — JSON recovered from stdout`)
+          return { ok: true, ...data }
+        } catch {}
+      }
+      const detail = [rawOut.trim(), (error.stderr || '').trim()].filter(Boolean).join(' | ') || error.message
+      log.vm(`[perf] "${vmName}" failed (exit ${error.code ?? '?'}): ${detail}`)
       return { ok: false, error: detail }
     }
   })
 
   // ── kill-vm-process ──────────────────────────────────────
-  // Sends SIGTERM to a process inside the VM by PID via guestcontrol.
+  // Stops a process inside the VM by PID. If the PID is owned by a systemd unit,
+  // stops the unit so systemd does not restart the process. Falls back to kill -9
+  // for processes not managed by systemd.
   // Returns { ok: true } on success.
   // Returns { ok: false, error: string } on failure.
-  handleIpc('kill-vm-process', async (_event, { vmName, pid }) => {
+  handleIpc('kill-vm-process', async (_event, { vmName, pid, procName }) => {
     if (!await isVmRunning(vmName)) return { ok: false, error: 'VM is not running' }
     const store = await readCredsStore()
     const entry = store[vmName]
     if (!entry?.user || !entry?.pass) return { ok: false, error: 'No credentials saved' }
     const { user, pass } = entry
+    const label = procName ? `"${procName}" (PID ${pid})` : `PID ${pid}`
+    // Base64-encode the script so no special characters ($, |, ;, [, \) get
+    // mangled by Windows argument quoting on the way to VBoxManage.
+    // Use pgrep to find the CURRENT PID by name — the UI's snapshot PID may be stale
+    // if the process restarted between the table refresh and the kill click.
+    const safeProc = (procName || '').replace(/[^a-zA-Z0-9_\-.:]/g, '')
+    const script = [
+      `PROC=${safeProc}`,
+      `SNAP_PID=${pid}`,
+      // Find freshest PID by name; fall back to snapshot PID if pgrep finds nothing
+      `CUR_PID=$(pgrep -x "$PROC" 2>/dev/null | head -1)`,
+      `LOOKUP_PID=${pid}`,
+      `if [ -n "$CUR_PID" ]; then LOOKUP_PID=$CUR_PID; fi`,
+      // Detect owning systemd unit from cgroup
+      `UNIT=$(cat /proc/$LOOKUP_PID/cgroup 2>/dev/null | grep -Eo '[^/]+\\.(service|socket|timer)' | head -1)`,
+      `if [ -n "$UNIT" ]; then`,
+      `  if systemctl stop "$UNIT" 2>&1; then echo "ok:systemctl:$UNIT"`,
+      `  else echo "err:systemctl:$UNIT"; fi`,
+      `elif [ -n "$CUR_PID" ]; then`,
+      `  if kill -9 "$CUR_PID" 2>&1; then echo "ok:kill9:$CUR_PID"`,
+      `  else echo "err:kill9:$CUR_PID"; fi`,
+      `else`,
+      `  if kill -9 "$SNAP_PID" 2>&1; then echo "ok:kill9:$SNAP_PID"`,
+      `  else echo "err:kill9:$SNAP_PID"; fi`,
+      `fi`,
+    ].join('\n')
+    const encoded = Buffer.from(script).toString('base64')
+    const runCmd = `echo '${encoded}' | base64 -d | bash 2>&1`
     try {
-      await execAsync(
-        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" -- -c "kill -15 ${pid}"`,
-        { encoding: 'utf8', timeout: 10000 }
-      )
-      log.vm(`[kill] "${vmName}"  sent SIGTERM to PID ${pid}`)
-      return { ok: true }
+      const { stdout } = await execFileAsync('VBoxManage', [
+        'guestcontrol', vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', user, '--password', pass,
+        '--wait-stdout',
+        '--', '-c', runCmd,
+      ], { encoding: 'utf8', timeout: 60000 })
+      const out = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      if (out.startsWith('ok:systemctl:')) {
+        log.vm(`[kill] "${vmName}"  ${label} — stopped systemd unit "${out.slice(13)}"`)
+        return { ok: true }
+      } else if (out.startsWith('ok:kill9:')) {
+        log.vm(`[kill] "${vmName}"  ${label} — not systemd-managed, sent SIGKILL`)
+        return { ok: true }
+      } else if (out.startsWith('err:systemctl:')) {
+        const unit = out.slice(14)
+        log.vm(`[kill] "${vmName}"  ${label} — systemctl stop "${unit}" failed`)
+        return { ok: false, error: `systemctl stop ${unit} failed` }
+      } else if (out.startsWith('err:kill9:')) {
+        log.vm(`[kill] "${vmName}"  ${label} — kill -9 failed (PID may have already exited)`)
+        return { ok: false, error: 'kill -9 failed — process may have already exited' }
+      } else {
+        log.vm(`[kill] "${vmName}"  ${label} — unexpected output: ${stdout.trim().slice(0, 200)}`)
+        return { ok: false, error: 'Unexpected response from guest' }
+      }
     } catch (error) {
-      log.vm(`[kill] "${vmName}"  failed to kill PID ${pid}: ${error.message}`)
-      return { ok: false, error: error.message }
+      // VBoxManage false-failure: check stdout for a valid result before giving up.
+      const rawOut = (error.stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      if (rawOut.startsWith('ok:systemctl:')) {
+        log.vm(`[kill] "${vmName}"  ${label} — stopped systemd unit "${rawOut.slice(13)}" (exit-code false-failure)`)
+        return { ok: true }
+      } else if (rawOut.startsWith('ok:kill9:')) {
+        log.vm(`[kill] "${vmName}"  ${label} — not systemd-managed, sent SIGKILL (exit-code false-failure)`)
+        return { ok: true }
+      }
+      // Log raw VBoxManage output to diagnose failures (session conflict, timeout, auth, etc.)
+      log.vm(`[kill] "${vmName}"  ${label} — VBoxManage exit=${error.code ?? '?'} killed=${!!error.killed}`)
+      if (error.stdout) log.vm(`[kill] "${vmName}"  stdout: ${error.stdout.trim().slice(0, 400)}`)
+      if (error.stderr) log.vm(`[kill] "${vmName}"  stderr: ${error.stderr.trim().slice(0, 400)}`)
+      const detail = [(error.stdout || '').trim(), (error.stderr || '').trim()].filter(Boolean).join(' | ') || error.message
+      log.vm(`[kill] "${vmName}"  failed to stop ${label}: ${detail}`)
+      const friendly = error.killed
+        ? `Could not stop ${procName || `PID ${pid}`} — the operation timed out`
+        : `Could not stop ${procName || `PID ${pid}`} — the VM may be busy (diagnostics still running?)`
+      return { ok: false, error: friendly }
     }
   })
 
