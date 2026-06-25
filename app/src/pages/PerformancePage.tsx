@@ -43,6 +43,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [procState,   setProcState]   = useState<'idle' | 'loading' | 'ok' | 'stopped' | 'no-credentials' | 'error'>('idle')
   const [procSnapshot, setProcSnapshot] = useState<ProcSnapshot | null>(null)
   const [procError,   setProcError]   = useState<string | null>(null)
+  const [killing,     setKilling]     = useState<number | null>(null)
+  const [killError,   setKillError]   = useState<string | null>(null)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -134,6 +136,19 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     } finally {
       setFixing(null)
     }
+  }
+
+  async function handleKill(pid: number) {
+    window.electronAPI.logUiAction(`performance "${vm.name}": Kill PID ${pid}`)
+    setKilling(pid)
+    setKillError(null)
+    const result = await window.electronAPI.killVmProcess(vm.name, pid)
+    setKilling(null)
+    if (!result.ok) {
+      setKillError(result.error ?? 'Kill failed')
+      return
+    }
+    setTimeout(() => loadProcesses(), 800)
   }
 
   async function loadProcesses() {
@@ -297,7 +312,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                       <tr className="text-zinc-500 border-b border-zinc-700">
                         <th className="text-left pb-2 pr-2 font-medium"><Tooltip tip="Process name (comm field from ps)">Name</Tooltip></th>
                         <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="CPU usage averaged over the process lifetime">CPU %</Tooltip></th>
-                        <th className="text-right pb-2 font-medium"><Tooltip tip="Resident Set Size — physical RAM currently held by this process, in MB">RSS MB</Tooltip></th>
+                        <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="Resident Set Size — physical RAM currently held by this process, in MB">RSS MB</Tooltip></th>
+                        <th className="pb-2 font-medium"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -305,14 +321,28 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                         const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
                         return (
                           <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
-                            <td className="py-1.5 pr-2 font-medium truncate max-w-[8rem]">{p.name}</td>
+                            <td className="py-1.5 pr-2 font-medium truncate max-w-[7rem]">{p.name}</td>
                             <td className="py-1.5 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
-                            <td className="py-1.5 text-right font-mono">{p.rssMB}</td>
+                            <td className="py-1.5 pr-2 text-right font-mono">{p.rssMB}</td>
+                            <td className="py-1.5 text-right">
+                              <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
+                                <button
+                                  onClick={() => handleKill(p.pid)}
+                                  disabled={killing !== null}
+                                  className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {killing === p.pid ? '...' : 'Kill'}
+                                </button>
+                              </Tooltip>
+                            </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
+                  {killError && (
+                    <p className="text-red-400 text-xs">{killError}</p>
+                  )}
                   {procSnapshot.processes.some((p) => p.cpu > CPU_WARN || p.rssMB > RSS_WARN) && (
                     <p className="text-amber-400 text-xs">
                       Highlighted: CPU &gt; {CPU_WARN}% or RSS &gt; {RSS_WARN} MB

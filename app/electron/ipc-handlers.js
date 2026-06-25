@@ -86,7 +86,7 @@ function execTracked(cmd, options, procs) {
 // Channels excluded from IPC logging.
 // 'read-log' returns full file content — logging it back would create a feedback loop.
 // Credential channels are excluded to keep passwords out of gui.log.
-const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action', 'query-vm-performance'])
+const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action', 'query-vm-performance', 'kill-vm-process'])
 
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
@@ -650,6 +650,29 @@ function registerIpcHandlers(win) {
       return { ok: true, ...data }
     } catch (error) {
       log.vm(`[perf] "${vmName}" failed: ${error.message}`)
+      return { ok: false, error: error.message }
+    }
+  })
+
+  // ── kill-vm-process ──────────────────────────────────────
+  // Sends SIGTERM to a process inside the VM by PID via guestcontrol.
+  // Returns { ok: true } on success.
+  // Returns { ok: false, error: string } on failure.
+  handleIpc('kill-vm-process', async (_event, { vmName, pid }) => {
+    if (!await isVmRunning(vmName)) return { ok: false, error: 'VM is not running' }
+    const store = await readCredsStore()
+    const entry = store[vmName]
+    if (!entry?.user || !entry?.pass) return { ok: false, error: 'No credentials saved' }
+    const { user, pass } = entry
+    try {
+      await execAsync(
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" -- -c "kill -15 ${pid}"`,
+        { encoding: 'utf8', timeout: 10000 }
+      )
+      log.vm(`[kill] "${vmName}"  sent SIGTERM to PID ${pid}`)
+      return { ok: true }
+    } catch (error) {
+      log.vm(`[kill] "${vmName}"  failed to kill PID ${pid}: ${error.message}`)
       return { ok: false, error: error.message }
     }
   })

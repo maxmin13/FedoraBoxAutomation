@@ -81,6 +81,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Queries the VM for a live performance snapshot (CPU%, RAM, top processes)
   queryVmPerformance: (vmName) => ipcRenderer.invoke('query-vm-performance', { vmName }),
+
+  // Sends SIGTERM to a process inside the VM by PID via guestcontrol
+  killVmProcess: (vmName, pid) => ipcRenderer.invoke('kill-vm-process', { vmName, pid }),
   // Kills any in-flight query-vm-installed process for the given VM
   cancelQueryVmInstalled: (vmName) => ipcRenderer.invoke('cancel-query-vm-installed', { vmName }),
 

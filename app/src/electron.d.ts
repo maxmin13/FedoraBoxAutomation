@@ -139,6 +139,7 @@ declare global {
         | { ok: true; cpuPct: number; ramTotalMB: number; ramUsedMB: number; ramFreeMB: number; processes: VmProcess[] }
         | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }
       >
+      killVmProcess: (vmName: string, pid: number) => Promise<{ ok: boolean; error?: string }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>
