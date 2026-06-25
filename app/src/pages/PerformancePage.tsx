@@ -45,6 +45,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [procError,   setProcError]   = useState<string | null>(null)
   const [killing,     setKilling]     = useState<number | null>(null)
   const [killError,   setKillError]   = useState<string | null>(null)
+  const [killTarget,  setKillTarget]  = useState<{ pid: number; name: string } | null>(null)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -138,8 +139,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     }
   }
 
-  async function handleKill(pid: number, name: string) {
-    if (!window.confirm(`Kill process "${name}" (PID ${pid})?`)) return
+  async function confirmKill() {
+    if (!killTarget) return
+    const { pid, name } = killTarget
+    setKillTarget(null)
     window.electronAPI.logUiAction(`performance "${vm.name}": Kill PID ${pid}`)
     setKilling(pid)
     setKillError(null)
@@ -178,6 +181,16 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
   return (
     <div className="h-full flex flex-col">
+
+      {killTarget && (
+        <KillModal
+          processName={killTarget.name}
+          pid={killTarget.pid}
+          busy={killing !== null}
+          onConfirm={confirmKill}
+          onCancel={() => setKillTarget(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 shrink-0">
@@ -328,7 +341,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                             <td className="py-1.5 text-right">
                               <Tooltip tip="Send SIGTERM to this process — it may take a moment to stop">
                                 <button
-                                  onClick={() => handleKill(p.pid, p.name)}
+                                  onClick={() => setKillTarget({ pid: p.pid, name: p.name })}
                                   disabled={killing !== null}
                                   className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -550,6 +563,58 @@ function parseDiagReport(lines: ScriptLine[]): DiagSection[] {
     }
   }
   return sections
+}
+
+// ── KillModal ─────────────────────────────────────────────────────────────────
+
+function KillModal({
+  processName, pid, busy, onConfirm, onCancel,
+}: {
+  processName: string
+  pid: number
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-zinc-400 text-sm text-center mb-2">Kill this process?</p>
+        <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-1">{processName}</p>
+        <p className="text-zinc-500 text-xs text-center mb-8">
+          PID {pid} — SIGTERM will be sent. The process may take a moment to stop.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Kill Process
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function diagAction(warn: string): string | undefined {
