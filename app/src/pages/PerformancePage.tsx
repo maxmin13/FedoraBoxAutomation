@@ -297,7 +297,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
             {/* Running Processes card */}
             <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3">
-              <Tooltip tip="Top 8 processes inside the VM by CPU usage, sampled via guestcontrol — click Refresh to update">
+              <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol — click Refresh to update">
                 <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
               </Tooltip>
 

@@ -41,7 +41,7 @@ ram_free=$(free  -m | awk 'NR==2{print $4}')
 # ── Top 15 processes by CPU ──────────────────────────────────────────────────
 procs_json=$(ps -eo pid,comm,%cpu,%mem,rss --sort=-%cpu --no-headers \
     | awk '$2 != "ps"' \
-    | head -8 \
+    | head -6 \
     | awk 'BEGIN { sep="" } $3 ~ /^[0-9]/ {
         name = $2
         gsub(/"/, "", name)
