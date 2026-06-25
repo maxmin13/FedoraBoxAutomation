@@ -634,7 +634,7 @@ function registerIpcHandlers(win) {
       )
       log.vm(`[perf] "${vmName}"  running /tmp/performance.sh`)
       const { stdout } = await execAsync(
-        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- bash /tmp/performance.sh`,
+        `VBoxManage guestcontrol "${vmName}" run --exe /bin/bash --username "${user}" --password "${pass}" --wait-stdout -- /tmp/performance.sh`,
         { encoding: 'utf8', timeout: 20000 }
       )
       const data = JSON.parse(stdout.trim())
