@@ -358,11 +358,6 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                   {killError && (
                     <p className="text-red-400 text-xs">{killError}</p>
                   )}
-                  {procSnapshot.processes.some((p) => p.cpu > CPU_WARN || p.rssMB > RSS_WARN) && (
-                    <p className="text-amber-400 text-xs">
-                      Highlighted: CPU &gt; {CPU_WARN}% or RSS &gt; {RSS_WARN} MB
-                    </p>
-                  )}
                 </div>
               )}
             </div>
