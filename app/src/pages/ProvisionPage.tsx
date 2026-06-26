@@ -56,7 +56,15 @@ const CATEGORIES: CategoryDef[] = [
           { value: '17', label: '17 — LTS · Temurin · supported until 2029' },
           { value: '11', label: '11 — LTS · Temurin · supported until 2026' },
         ]] },
-      { name: 'php.sh',    label: 'PHP',          relPath: 'php.sh',    description: 'PHP + php-common + php-cli, APC cache disabled',            argType: 'user' },
+      { name: 'php.sh', label: 'PHP', relPath: 'php.sh',
+        description: 'PHP + php-common + php-cli, APC cache disabled. Specific versions use the Remi repository.',
+        argType: 'user+custom', argPrompts: ['PHP version'], argDefaults: [''],
+        argOptions: [[
+          { value: '',    label: 'Latest (Fedora default)' },
+          { value: '8.4', label: '8.4 - supported until 2028' },
+          { value: '8.3', label: '8.3 - supported until 2027' },
+          { value: '8.2', label: '8.2 - supported until 2026' },
+        ]] },
       { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv (blank = latest stable)',
         argType: 'user+custom', argPrompts: ['Python version'], argDefaults: ['3.13.3'] },
       { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€” includes npm',
@@ -334,10 +342,9 @@ interface ProvisionPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
-  isActive?: boolean
 }
 
-export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = true }: ProvisionPageProps) {
+export default function ProvisionPage({ vm, onBack, onScriptRunning }: ProvisionPageProps) {
   const [vmUser,    setVmUser]    = useState('')
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
@@ -366,29 +373,39 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
   // When the user navigates back to this page after seeing a result banner,
   // reset to the mode selector so they start fresh. The result is still in
   // _scriptResults and comes back if they click the same script form again.
-  const prevActiveRef = useRef(isActive)
-  useEffect(() => {
-    const wasActive = prevActiveRef.current
-    prevActiveRef.current = isActive
-    if (isActive && !wasActive && pageState === 'done') {
-      setPageState('idle')
-      setIdleView('mode')
-    }
-  }, [isActive, pageState])
-
-  // On mount, sweep up any done state that was never cleared (script finished while
-  // the component was unmounted). Save to _scriptResults so handleSelectScript /
-  // handleSelectBaseSetup can show the result when the user opens that form.
-  // Running state is left alone â€” handleSelectScript calls getScriptState() itself.
+  // On mount, restore the result banner if a script finished while the component was
+  // unmounted (e.g. user navigated within VmDetailPage). onScriptDone persists the result
+  // to _scriptResults even after unmount; we use getScriptState() only to get the script
+  // name so we can look up the right key. If the backend still holds done state we save
+  // it to the map first, then consume it.
   useEffect(() => {
     window.electronAPI.getScriptState().then((state) => {
       if (!state.ok || !state.context) return
       if (state.context.vmName !== vm.name || state.context.type !== 'provision') return
-      if (!state.done) return
+      if (state.running) return
 
-      const key = srKey(vm.name, state.context.scriptName ?? null)
-      saveResult(key, state.exitCode, state.lines)
-      window.electronAPI.clearScriptState()
+      const scriptName = state.context.scriptName ?? null
+      const key = srKey(vm.name, scriptName)
+
+      if (state.done) {
+        saveResult(key, state.exitCode, state.lines)
+        window.electronAPI.clearScriptState()
+      }
+
+      const result = _scriptResults.get(key)
+      if (!result) return
+      _scriptResults.delete(key)
+
+      const matchingScript = scriptName
+        ? CATEGORIES.flatMap(c => c.scripts).find(s => s.name === scriptName) ?? null
+        : null
+      setLines(result.lines)
+      setAlreadyInstalled(result.lines.some(l => /\[INFO\s*\].*already installed/i.test(l.text)))
+      setSuccess(result.state === 'success')
+      setSelectedScript(matchingScript)
+      setRunningLabel(matchingScript?.label ?? scriptName ?? 'Script')
+      setPageState('done')
+      setShowLog(false)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -467,7 +484,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     )
 
     if (matchesThisScript && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ reconnect (running)`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' reconnect (running)`)
       setSelectedScript(script)
       setRunningLabel(script.label)
       setLines(state.lines)
@@ -496,8 +513,22 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       window.electronAPI.clearScriptState()
     }
 
+    const result = _scriptResults.get(key)
     _scriptResults.delete(key)
-    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ form`)
+
+    if (result) {
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' restore banner (${result.state})`)
+      setSelectedScript(script)
+      setRunningLabel(script.label)
+      setLines(result.lines)
+      setAlreadyInstalled(result.lines.some(l => /\[INFO\s*\].*already installed/i.test(l.text)))
+      setSuccess(result.state === 'success')
+      setPageState('done')
+      setShowLog(false)
+      return
+    }
+
+    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' form`)
     setSelectedScript(script)
     setArgValues(['', ''])
     setIdleView('script-args')
@@ -634,7 +665,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
       !state.context?.scriptName
 
     if (isBaseSetup && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ reconnect Base Setup (running)`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' reconnect Base Setup (running)`)
       setRunningLabel('Base Setup')
       setLines(state.lines)
       setIsReconnect(true)
@@ -670,7 +701,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = 
     const result = _scriptResults.get(key)
     if (result) {
       _scriptResults.delete(key)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†’ restore Base Setup banner (${result.state})`)
+      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' restore Base Setup banner (${result.state})`)
       setSelectedScript(null)
       setRunningLabel('Base Setup')
       setLines(result.lines)
