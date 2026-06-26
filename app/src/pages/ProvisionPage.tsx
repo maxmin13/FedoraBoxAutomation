@@ -60,22 +60,29 @@ const CATEGORIES: CategoryDef[] = [
         description: 'PHP + php-common + php-cli, APC cache disabled. Specific versions use the Remi repository.',
         argType: 'user+custom', argPrompts: ['PHP version'], argDefaults: [''],
         argOptions: [[
-          { value: '',    label: 'Latest (Fedora default)' },
+          { value: '',    label: 'Latest (auto-detect)' },
           { value: '8.4', label: '8.4 - supported until 2028' },
           { value: '8.3', label: '8.3 - supported until 2027' },
           { value: '8.2', label: '8.2 - supported until 2026' },
         ]] },
-      { name: 'python.sh', label: 'Python',       relPath: 'python.sh', description: 'Python from source + venv + pyenv (blank = latest stable)',
-        argType: 'user+custom', argPrompts: ['Python version'], argDefaults: ['3.13.3'] },
+      { name: 'python.sh', label: 'Python', relPath: 'python.sh',
+        description: 'Python from source + venv + pyenv. Specific versions are downloaded from python.org.',
+        argType: 'user+custom', argPrompts: ['Python version'], argDefaults: [''],
+        argOptions: [[
+          { value: '',       label: 'Latest stable (auto-detect)' },
+          { value: '3.13.3', label: '3.13.3 - current stable (until Oct 2029)' },
+          { value: '3.12.7', label: '3.12.7 - security fixes until Oct 2028' },
+          { value: '3.11.9', label: '3.11.9 - security fixes until Oct 2027' },
+        ]] },
       { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€” includes npm',
         argType: 'user+custom',
         argPrompts:  ['Node.js version'],
         argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest', label: 'Latest LTS (auto-detect)' },
-          { value: '24', label: '24 â€” Current stable Â· ships natively in Fedora 44' },
-          { value: '22', label: '22 â€” LTS Active (until Apr 2027)' },
-          { value: '20', label: '20 â€” LTS Maintenance (until Apr 2026)' },
+          { value: '24', label: '24 - Current stable - ships natively in Fedora 44' },
+          { value: '22', label: '22 - LTS Active (until Apr 2027)' },
+          { value: '20', label: '20 - LTS Maintenance (until Apr 2026)' },
         ]] },
     ],
   },
@@ -100,12 +107,12 @@ const CATEGORIES: CategoryDef[] = [
         argPrompts:  ['Tomcat version', 'HTTP port'],
         argDefaults: ['latest-10', '8080'],
         argOptions: [[
-          { value: 'latest-11', label: '11.x â€” Latest (auto-detect) Â· Java 21+' },
-          { value: 'latest-10', label: '10.x â€” Latest (auto-detect) Â· Java 11+' },
-          { value: 'latest-9',  label: '9.x  â€” Latest (auto-detect) Â· Java  8+' },
-          { value: '11.0.7',    label: '11.0.7  â€” pinned Â· Java 21+' },
-          { value: '10.1.36',   label: '10.1.36 â€” pinned Â· Java 11+' },
-          { value: '9.0.102',   label: '9.0.102 â€” pinned Â· Java  8+' },
+          { value: 'latest-11', label: '11.x - Latest (auto-detect) - Java 21+' },
+          { value: 'latest-10', label: '10.x - Latest (auto-detect) - Java 11+' },
+          { value: 'latest-9',  label: '9.x  - Latest (auto-detect) - Java  8+' },
+          { value: '11.0.7',    label: '11.0.7  - pinned - Java 21+' },
+          { value: '10.1.36',   label: '10.1.36 - pinned - Java 11+' },
+          { value: '9.0.102',   label: '9.0.102 - pinned - Java  8+' },
         ]] },
     ],
   },
@@ -379,7 +386,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   // name so we can look up the right key. If the backend still holds done state we save
   // it to the map first, then consume it.
   useEffect(() => {
-    window.electronAPI.getScriptState().then((state) => {
+    window.electronAPI.getScriptState().then(async (state) => {
       if (!state.ok || !state.context) return
       if (state.context.vmName !== vm.name || state.context.type !== 'provision') return
       if (state.running) return
@@ -389,7 +396,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
       if (state.done) {
         saveResult(key, state.exitCode, state.lines)
-        window.electronAPI.clearScriptState()
+        await window.electronAPI.clearScriptState()
       }
 
       const result = _scriptResults.get(key)
