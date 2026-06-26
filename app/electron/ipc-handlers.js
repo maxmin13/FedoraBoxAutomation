@@ -87,7 +87,24 @@ function execTracked(cmd, options, procs) {
 // Channels excluded from IPC logging.
 // 'read-log' returns full file content — logging it back would create a feedback loop.
 // Credential channels are excluded to keep passwords out of gui.log.
-const SILENT_CHANNELS = new Set(['read-log', 'check-vm-credentials', 'get-vm-hostname', 'check-vm-ready', 'log-ui-action', 'query-vm-performance', 'kill-vm-process'])
+const SILENT_CHANNELS = new Set([
+  'read-log',               // reply is full file content — would create a feedback loop
+  'log-ui-action',          // high-frequency, no useful debug value in the log
+  // All channels below receive or return passwords — kept out of gui.log
+  'check-vm-credentials',
+  'check-vm-ready',
+  'check-vm-user',
+  'get-vm-hostname',
+  'save-vm-credentials',
+  'load-vm-credentials',
+  'load-all-vm-credentials',
+  'run-provision-script',
+  'run-provision-setup',
+  'run-share-folder',
+  'run-share-logs',
+  'query-vm-performance',
+  'kill-vm-process',
+])
 
 /**
  * Wraps ipcMain.handle with logging to gui.log (all environments)
@@ -536,6 +553,7 @@ function registerIpcHandlers(win) {
   // Reads vm-state.json keyed by VM name.
   // Returns { ok, user, pass, loginUser } or { ok: false } if not found.
   handleIpc('load-vm-credentials', async (_event, vmName) => {
+    log.info(`[ipc] recv load-vm-credentials vm="${vmName}"`)
     const store = await readCredsStore()
     const entry = store[vmName]
     if (!entry) return { ok: false, reason: `no entry for VM "${vmName}" in vm-state.json` }
@@ -567,6 +585,7 @@ function registerIpcHandlers(win) {
 
   // ── save-vm-credentials ──────────────────────────────────
   handleIpc('save-vm-credentials', async (_event, { vmName, user, pass, loginUser }) => {
+    log.info(`[ipc] recv save-vm-credentials vm="${vmName}" user="${user}"`)
     const store = await readCredsStore()
     const existing = store[vmName] ?? {}
     store[vmName] = { ...existing, user, pass, loginUser: loginUser || existing.loginUser || '' }
@@ -785,6 +804,7 @@ function registerIpcHandlers(win) {
   // ── run-provision-script ─────────────────────────────────
   // Uploads and runs a single guest script via guestcontrol. Streams output to the renderer.
   handleIpc('run-provision-script', async (_event, params) => {
+    log.info(`[ipc] recv run-provision-script vm="${params.vmName}" script="${params.scriptRelPath}"`)
     const psArgs = [
       '-VmName',        params.vmName,
       '-VmUser',        params.vmUser,
@@ -802,6 +822,7 @@ function registerIpcHandlers(win) {
   // ── run-provision-setup ──────────────────────────────────
   // Runs all base setup scripts (system-prep, network, selinux, desktop, utilities). Streams output.
   handleIpc('run-provision-setup', async (_event, params) => {
+    log.info(`[ipc] recv run-provision-setup vm="${params.vmName}"`)
     const psArgs = [
       '-VmName',    params.vmName,
       '-VmUser',    params.vmUser,
@@ -820,6 +841,7 @@ function registerIpcHandlers(win) {
   // Streams output to the renderer; returns ok when the script exits 0.
   // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
   handleIpc('run-share-folder', async (_event, params) => {
+    log.info(`[ipc] recv run-share-folder vm="${params.vmName}"`)
     const psArgs = [
       '-VmName',    params.vmName,
       '-HostPath',  params.hostPath,
@@ -990,6 +1012,7 @@ function registerIpcHandlers(win) {
   // Runs share-logs.ps1 non-interactively. Streams output to the renderer.
   // On failure, errorDetail contains the last ERROR:-prefixed line from the script.
   handleIpc('run-share-logs', async (_event, params) => {
+    log.info(`[ipc] recv run-share-logs vm="${params.vmName}"`)
     const psArgs = ['-VmName', params.vmName, '-HostPath', params.hostPath, '-VmUser', params.vmUser, '-VmPass', params.vmPass, '-LoginUser', params.loginUser, '-NonInteractive']
     if (params.forceRestart) psArgs.push('-ForceRestart')
     const { exitCode, lines } = await streamScript(win, SCRIPTS.shareLogs, psArgs, { vmName: params.vmName, type: 'share-logs' })

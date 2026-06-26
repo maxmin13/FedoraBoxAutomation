@@ -83,7 +83,8 @@ function runScript(scriptPath, args, onLine, onDone) {
     ...args,
   ]
 
-  log.info('[script] spawning:', 'powershell', psArgs.join(' '))
+  const safeArgs = psArgs.map((a, i) => (psArgs[i - 1] === '-VmPass' ? '***' : a))
+  log.info('[script] spawning:', 'powershell', safeArgs.join(' '))
 
   activeChild = spawn('powershell', psArgs)
 
