@@ -38,6 +38,14 @@ Checks RAM, disk, CPU virtualisation, Hyper-V, and VirtualBox version in one cli
 image::docs/screenshots/my-vms-page.png[My VMs page, width=500]
 Lists every registered VirtualBox VM with its running state and Start / Stop / Delete buttons. The Detail and Provision buttons open a credential gate before entering the VM.
 
+.VM Detail — Overview tab (shared folders and log sync)
+image::docs/screenshots/details-overview-page.png[VM detail overview, width=500]
+Shows general info, hardware, network, log sync destination, and shared folders. Switches to the Tools tab to see what is installed.
+
+.VM Detail — Installed Tools tab
+image::docs/screenshots/details-tools-page.png[VM detail tools, width=500]
+Detects installed tools in a running VM and displays versions as chips. Multi-version tools (Java, Python, Maven) show all installed versions; Java shows only the active one.
+
 .VM Login — credential gate
 image::docs/screenshots/login-gate-page.png[VM Login gate, width=500]
 Collects root username, root password, and desktop username. Validates credentials via Guest Control before proceeding; credentials are saved to the store on success.
@@ -230,51 +238,6 @@ sudo reboot
 ----
 
 IMPORTANT: Always authenticate as `root`, not a regular user. `sudo` requires a TTY which Guest Control does not provide.
-
-== Project Structure
-
-[source]
-----
-FedoraBoxAutomation/
-├── host/                     PowerShell scripts (run on Windows)
-│   ├── common.ps1
-│   ├── virtualbox-sanity-checks.ps1
-│   ├── virtualbox-install.ps1
-│   ├── create-vm.ps1
-│   ├── provision-setup.ps1
-│   ├── provision-script.ps1
-│   ├── share-folder.ps1
-│   └── share-logs.ps1
-│
-├── vm/                       Bash scripts (run inside the Fedora VM)
-│   ├── lib/common.sh         shared logging and error helpers
-│   ├── setup/                OS configuration (SELinux, desktop, network)
-│   └── tools/                dev tool installers
-│       ├── languages/        Java, Python, PHP
-│       ├── build-tools/      Maven
-│       ├── web-servers/      Apache, Tomcat
-│       ├── databases/        MariaDB, PostgreSQL, DBeaver
-│       ├── containers/       Docker, minikube (+ kubectl), k3s
-│       ├── cloud/            AWS CLI, ECS CLI
-│       └── ides/             Eclipse, VS Code
-│
-├── app/                      Electron + React desktop GUI
-│   ├── electron/             Node.js main process
-│   │   ├── main.js
-│   │   ├── ipc-handlers.js
-│   │   ├── script-runner.js
-│   │   ├── scripts.js
-│   │   ├── logger.js
-│   │   └── preload.js
-│   └── src/                  React renderer
-│       ├── pages/
-│       └── components/
-│
-└── docs/
-    ├── ELECTRON-GUI-DESIGN.md
-    ├── DEVELOPMENT.md
-    └── TESTING.md
-----
 
 == Running the Tests
 
