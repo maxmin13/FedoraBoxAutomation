@@ -89,12 +89,15 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Build Tools', dir: 'build-tools',
     scripts: [
-      { name: 'maven.sh', label: 'Apache Maven', relPath: 'maven.sh', description: 'Apache Maven - sets M2_HOME and PATH',
+      { name: 'maven.sh', label: 'Apache Maven', relPath: 'maven.sh',
+        description: 'Apache Maven - installs to /opt/maven-<version>, multiple versions can coexist. Sets M2_HOME and PATH.',
         argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest 3.x (auto-detect)' },
-          { value: '3.9.9',   label: '3.9.9' },
+          { value: '3.9.9',   label: '3.9.9 - latest stable' },
+          { value: '3.9.6',   label: '3.9.6' },
           { value: '3.9.5',   label: '3.9.5' },
+          { value: '3.8.8',   label: '3.8.8 - last 3.8.x release' },
         ]] },
     ],
   },
