@@ -151,6 +151,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   const [toolsStatus,    setToolsStatus]    = useState<ToolsStatus>('idle')
   const [installedTools, setInstalledTools] = useState<Record<string, string | boolean>>({})
   const [missingOpen,    setMissingOpen]    = useState(false)
+  const [rightTab,       setRightTab]       = useState<'overview' | 'tools'>('overview')
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -234,7 +235,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
   const diskValue = info?.diskCapacityMB != null
     ? `${Math.round(info.diskCapacityMB / 1024)} GB (${info.diskType ?? 'dynamic'})`
-    : 'â€”'
+    : '-'
 
   return (
     <>
@@ -257,7 +258,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       {loadError && (
         <div className="shrink-0 bg-red-900 border border-red-700 rounded-lg p-3 text-red-200 text-sm">
           {/E_ACCESSDENIED/i.test(loadError) || /LockMachine|VBOX_E_VM_ERROR/i.test(loadError)
-            ? 'VM is starting up â€” info will be available shortly.'
+            ? 'VM is starting up - info will be available shortly.'
             : loadError}
         </div>
       )}
@@ -269,7 +270,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       {info && (
         <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
 
-          {/* Left column â€” read-only info */}
+          {/* Left column â€" read-only info */}
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
 
             <Section title="General">
@@ -286,170 +287,200 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
             <Section title="Network">
               <Row label="Adapter 1" value={formatNic(info.nic)} />
-              <Row label="MAC"       value={info.mac ? formatMac(info.mac) : 'â€”'} />
-            </Section>
-
-            <Section
-              title="Log sync"
-              action={
-                <button
-                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Sync Logs`); setView('share-logs') }}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
-                >
-                  Sync
-                </button>
-              }
-            >
-              <Row
-                label="Destination"
-                value={info.logSyncPath ?? 'Not configured'}
-                mono={!!info.logSyncPath}
-              />
+              <Row label="MAC"       value={info.mac ? formatMac(info.mac) : '-'} />
             </Section>
 
           </div>
 
-          {/* Right column â€” action sections */}
+          {/* Right column - tabs */}
           <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
 
-            <Section
-              title="Shared folders"
-              action={
-                <button
-                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Share Folder`); setView('share-folder') }}
-                  className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
-                >
-                  Share
-                </button>
-              }
-            >
-              {(() => {
-                const valid   = info.sharedFolders.filter((sf) =>  sf.existsOnHost)
-                const missing = info.sharedFolders.filter((sf) => !sf.existsOnHost)
-                if (info.sharedFolders.length === 0)
-                  return <p className="text-zinc-500 text-sm">None configured</p>
-                return (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <span className="text-zinc-500 text-xs">Host folder</span>
-                      <span className="text-zinc-500 text-xs">VM folder</span>
-                    </div>
-                    <div className="space-y-0">
-                      {valid.map((sf) => (
-                        <div key={sf.name} className="grid grid-cols-2 gap-3">
-                          <CopyCell value={sf.hostPath} />
-                          <CopyCell value={sf.mountPoint || 'â€”'} copyable={!!sf.mountPoint} />
-                        </div>
-                      ))}
-                    </div>
-                    {missing.length > 0 && (
-                      <div className="relative">
-                        <button
-                          onClick={() => setMissingOpen((o) => !o)}
-                          className="flex items-center gap-1 text-amber-400 text-xs hover:text-amber-300 transition-colors"
-                        >
-                          <span>{missingOpen ? 'â–¾' : 'â–¸'}</span>
-                          <span>&#9888; {missing.length} host {missing.length === 1 ? 'folder' : 'folders'} not found</span>
-                        </button>
-                        {missingOpen && (
-                          <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-zinc-800 border border-zinc-700 rounded-lg p-3 space-y-2">
-                            <div className="grid grid-cols-2 gap-3">
-                              <span className="text-zinc-500 text-xs">Host folder</span>
-                              <span className="text-zinc-500 text-xs">VM folder</span>
-                            </div>
-                            {missing.map((sf) => (
-                              <div key={sf.name} className="grid grid-cols-2 gap-3">
-                                <CopyCell value={sf.hostPath} missing />
-                                <CopyCell value={sf.mountPoint || 'â€”'} copyable={!!sf.mountPoint} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-            </Section>
+            {/* Tab bar */}
+            <div className="flex gap-1 shrink-0">
+              <button
+                onClick={() => setRightTab('overview')}
+                className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'overview' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setRightTab('tools')}
+                className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'tools' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+              >
+                Tools
+              </button>
+            </div>
 
-            <Section
-              title="Installed tools"
-              action={info.state === 'running' && (
-                <button
-                  onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
-                  disabled={toolsStatus === 'loading'}
-                  className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
-                </button>
-              )}
-            >
-              {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
-                <p className="text-zinc-500 text-sm">Checking...</p>
-              ) : toolsStatus === 'stopped' ? (
-                <p className="text-zinc-500 text-sm">VM is stopped â€” data not available</p>
-              ) : toolsStatus === 'no-credentials' ? (
-                <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
-              ) : toolsStatus === 'error' ? (
-                <p className="text-zinc-500 text-sm">Could not connect to VM</p>
-              ) : Object.keys(installedTools).length > 0 ? (() => {
-                const groups = TOOL_GROUPS
-                  .map((group) => ({
-                    category: group.category,
-                    installed: group.tools.filter((t) => installedTools[t.key]),
-                  }))
-                  .filter((group) => group.installed.length > 0)
-                return (
-                  <div className="flex gap-6">
-                    {[0, 1].map((col) => (
-                      <div key={col} className="flex-1 space-y-1">
-                        {groups.filter((_, i) => i % 2 === col).map((group) => (
-                          <div key={group.category} className="flex gap-1.5 min-w-0">
-                            <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                              {group.installed.map((tool) => (
-                                <div key={tool.key} className="flex items-start min-w-0">
-                                  <div className="min-w-0">
-                                    <span className="text-zinc-300 text-xs">{tool.label}</span>
-                                    {typeof installedTools[tool.key] === 'string' && (() => {
-                                      const raw = installedTools[tool.key] as string
-                                      const parts = raw.split(', ')
-                                      if (parts.length <= 1) {
-                                        return (
-                                          <div className="text-zinc-500 text-xs leading-tight truncate" title={raw}>
-                                            {raw}
-                                          </div>
-                                        )
-                                      }
-                                      return (
-                                        <div className="flex flex-col gap-px">
-                                          {parts.map((part) => {
-                                            const isActive = part.endsWith(' (active)')
-                                            const ver = isActive ? part.replace(' (active)', '') : part
-                                            return (
-                                              <div key={ver} className="flex items-center gap-1 text-xs leading-tight">
-                                                <span className={isActive ? 'text-zinc-300' : 'text-zinc-500'}>{ver}</span>
-                                                {isActive && <span className="text-green-500 text-[10px] leading-none">active</span>}
-                                              </div>
-                                            )
-                                          })}
-                                        </div>
-                                      )
-                                    })()}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+            {rightTab === 'overview' && (
+              <>
+              <Section
+                title="Log sync"
+                action={
+                  <button
+                    onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Sync Logs`); setView('share-logs') }}
+                    className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                  >
+                    Sync
+                  </button>
+                }
+              >
+                <Row
+                  label="Destination"
+                  value={info.logSyncPath ?? 'Not configured'}
+                  mono={!!info.logSyncPath}
+                />
+              </Section>
+              <Section
+                title="Shared folders"
+                action={
+                  <button
+                    onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Share Folder`); setView('share-folder') }}
+                    className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                  >
+                    Share
+                  </button>
+                }
+              >
+                {(() => {
+                  const valid   = info.sharedFolders.filter((sf) =>  sf.existsOnHost)
+                  const missing = info.sharedFolders.filter((sf) => !sf.existsOnHost)
+                  if (info.sharedFolders.length === 0)
+                    return <p className="text-zinc-500 text-sm">None configured</p>
+                  return (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <span className="text-zinc-500 text-xs">Host folder</span>
+                        <span className="text-zinc-500 text-xs">VM folder</span>
+                      </div>
+                      <div className="space-y-0">
+                        {valid.map((sf) => (
+                          <div key={sf.name} className="grid grid-cols-2 gap-3">
+                            <CopyCell value={sf.hostPath} />
+                            <CopyCell value={sf.mountPoint || '-'} copyable={!!sf.mountPoint} />
                           </div>
                         ))}
                       </div>
-                    ))}
-                  </div>
-                )
-              })() : (
-                <p className="text-zinc-500 text-sm">Nothing installed yet</p>
-              )}
-            </Section>
+                      {missing.length > 0 && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setMissingOpen((o) => !o)}
+                            className="flex items-center gap-1 text-amber-400 text-xs hover:text-amber-300 transition-colors"
+                          >
+                            <span>{missingOpen ? '▾' : '▸'}</span>
+                            <span>&#9888; {missing.length} host {missing.length === 1 ? 'folder' : 'folders'} not found</span>
+                          </button>
+                          {missingOpen && (
+                            <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-zinc-800 border border-zinc-700 rounded-lg p-3 space-y-2">
+                              <div className="grid grid-cols-2 gap-3">
+                                <span className="text-zinc-500 text-xs">Host folder</span>
+                                <span className="text-zinc-500 text-xs">VM folder</span>
+                              </div>
+                              {missing.map((sf) => (
+                                <div key={sf.name} className="grid grid-cols-2 gap-3">
+                                  <CopyCell value={sf.hostPath} missing />
+                                  <CopyCell value={sf.mountPoint || '-'} copyable={!!sf.mountPoint} />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </Section>
+              </>
+            )}
+
+            {rightTab === 'tools' && (
+              <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-2 pt-2 pb-1.5 shrink-0">
+                  <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Installed tools</h2>
+                  {info.state === 'running' && (
+                    <button
+                      onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
+                      disabled={toolsStatus === 'loading'}
+                      className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-2 pb-2">
+                  {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
+                    <p className="text-zinc-500 text-sm">Checking...</p>
+                  ) : toolsStatus === 'stopped' ? (
+                    <p className="text-zinc-500 text-sm">VM is stopped - data not available</p>
+                  ) : toolsStatus === 'no-credentials' ? (
+                    <p className="text-zinc-500 text-sm">Save credentials in Provision to enable this check</p>
+                  ) : toolsStatus === 'error' ? (
+                    <p className="text-zinc-500 text-sm">Could not connect to VM</p>
+                  ) : Object.keys(installedTools).length > 0 ? (() => {
+                    const groups = TOOL_GROUPS
+                      .map((group) => ({
+                        category: group.category,
+                        installed: group.tools.filter((t) => installedTools[t.key]),
+                      }))
+                      .filter((group) => group.installed.length > 0)
+                    return (
+                      <div className="flex gap-4 pt-0.5">
+                        {[0, 1].map((col) => (
+                          <div key={col} className="flex-1 min-w-0 space-y-2">
+                            {groups.filter((_, i) => i % 2 === col).map((group) => (
+                              <div key={group.category}>
+                                <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider border-b border-zinc-700 pb-0.5 mb-1">
+                                  {group.category}
+                                </div>
+                                <div className="space-y-1">
+                                  {group.installed.map((tool) => {
+                                    const val = installedTools[tool.key]
+                                    const rawVersions = typeof val === 'string' ? val.split(', ') : []
+                                    const versions = tool.key === 'java'
+                                      ? (() => {
+                                          const active = rawVersions.find(v => v.endsWith(' (active)'))
+                                          return active ? [active.replace(' (active)', '')] : rawVersions.slice(0, 1)
+                                        })()
+                                      : rawVersions
+                                    return (
+                                      <div key={tool.key} className="min-w-0">
+                                        <div className="text-zinc-300 text-xs leading-tight">{tool.label}</div>
+                                        {versions.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-0.5">
+                                            {versions.map((v) => {
+                                              const isActive = v.endsWith(' (active)')
+                                              const ver = isActive ? v.replace(' (active)', '') : v
+                                              return (
+                                                <span
+                                                  key={ver}
+                                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
+                                                    isActive
+                                                      ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
+                                                      : 'bg-zinc-900 text-zinc-500'
+                                                  }`}
+                                                >
+                                                  {ver}
+                                                  {isActive && <span className="text-green-500 text-[9px]">active</span>}
+                                                </span>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })() : (
+                    <p className="text-zinc-500 text-sm">Nothing installed yet</p>
+                  )}
+                </div>
+              </div>
+            )}
 
           </div>
 
@@ -460,7 +491,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   )
 }
 
-// â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Sub-components â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function Section({
   title,

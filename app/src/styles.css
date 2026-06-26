@@ -9,3 +9,9 @@ body {
   margin: 0;
   font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
 }
+
+/* Thin, fade-in scrollbar — visible only on hover */
+.scrollbar-thin::-webkit-scrollbar        { width: 3px; }
+.scrollbar-thin::-webkit-scrollbar-track  { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb  { background: transparent; border-radius: 2px; }
+.scrollbar-thin:hover::-webkit-scrollbar-thumb { background: #52525b; }
