@@ -65,9 +65,38 @@ tomcat_versions() {
   echo "\"${list}\""
 }
 
-maven_version() {
-  which mvn >/dev/null 2>&1 || { echo false; return; }
-  ver=$(mvn --version 2>&1 | head -1 | awk '{print $3}')
+maven_versions() {
+  local list="" active_ver="" dir ver
+  local link
+  link=$(readlink /usr/local/bin/mvn 2>/dev/null)
+  if [[ -n "${link}" ]]; then
+    active_ver="${link#/opt/maven-}"
+    active_ver="${active_ver%%/*}"
+  fi
+  while IFS= read -r dir; do
+    ver="${dir#/opt/maven-}"
+    [[ -n "${list}" ]] && list="${list}, "
+    if [[ "${ver}" == "${active_ver}" ]]; then
+      list="${list}${ver} (active)"
+    else
+      list="${list}${ver}"
+    fi
+  done < <(compgen -G "/opt/maven-*" 2>/dev/null | sort -rV)
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
+}
+
+php_version() {
+  which php >/dev/null 2>&1 || { echo false; return; }
+  ver=$(php -v 2>&1 | head -1 | awk '{print $2}')
+  [[ -z "${ver}" ]] && { echo false; return; }
+  echo "\"${ver}\""
+}
+
+node_version() {
+  which node >/dev/null 2>&1 || { echo false; return; }
+  ver=$(node --version 2>&1 | sed 's/^v//')
+  [[ -z "${ver}" ]] && { echo false; return; }
   echo "\"${ver}\""
 }
 
@@ -84,24 +113,28 @@ ansible_ok() {
     | grep -q . && echo true || echo false
 }
 
-python_version() {
-  local bin
-  bin=$(compgen -G "/usr/local/bin/python3.*" 2>/dev/null \
-        | grep -E '^/usr/local/bin/python3\.[0-9]+$' \
-        | sort -V | tail -1)
-  [[ -z "${bin}" ]] && { echo false; return; }
-  ver=$("${bin}" --version 2>&1 | awk '{print $2}')
-  echo "\"${ver}\""
+python_versions() {
+  local list="" bin ver
+  while IFS= read -r bin; do
+    ver=$("${bin}" --version 2>&1 | awk '{print $2}')
+    [[ -z "${ver}" ]] && continue
+    [[ -n "${list}" ]] && list="${list}, "
+    list="${list}${ver}"
+  done < <(compgen -G "/usr/local/bin/python3.*" 2>/dev/null \
+           | grep -E '^/usr/local/bin/python3\.[0-9]+$' \
+           | sort -rV)
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
 }
 
 cat <<JSON
 {
   "baseSetup":        $(path_ok /etc/fedorabox/.base-setup),
   "java":             $(java_versions),
-  "php":              $(cmd_ok php),
-  "python":           $(python_version),
-  "node":             $(cmd_ok node),
-  "maven":            $(maven_version),
+  "php":              $(php_version),
+  "python":           $(python_versions),
+  "node":             $(node_version),
+  "maven":            $(maven_versions),
   "httpd":            $(svc_ok httpd),
   "tomcat":           $(tomcat_versions),
   "mariadb":          $(svc_ok mariadb),

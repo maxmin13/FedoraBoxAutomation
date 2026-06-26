@@ -408,8 +408,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                             <span className="text-zinc-500 text-xs shrink-0 w-[5.5rem]">{group.category}</span>
                             <div className="flex flex-col gap-0.5 min-w-0">
                               {group.installed.map((tool) => (
-                                <div key={tool.key} className="flex items-start gap-0.5 min-w-0">
-                                  <span className="text-green-400 text-xs shrink-0 mt-px">&#10003;</span>
+                                <div key={tool.key} className="flex items-start min-w-0">
                                   <div className="min-w-0">
                                     <span className="text-zinc-300 text-xs">{tool.label}</span>
                                     {typeof installedTools[tool.key] === 'string' && (() => {
