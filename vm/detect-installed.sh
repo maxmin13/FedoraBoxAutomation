@@ -65,6 +65,26 @@ tomcat_versions() {
   echo "\"${list}\""
 }
 
+httpd_versions() {
+  local list="" dir ver active_ver=""
+  if [[ -L /opt/httpd ]]; then
+    active_ver=$(readlink /opt/httpd)
+    active_ver="${active_ver#/opt/httpd-}"
+  fi
+  while IFS= read -r dir; do
+    ver="${dir#/opt/httpd-}"
+    [[ "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+    [[ -n "${list}" ]] && list="${list}, "
+    if [[ "${ver}" == "${active_ver}" ]]; then
+      list="${list}${ver} (active)"
+    else
+      list="${list}${ver}"
+    fi
+  done < <(compgen -G "/opt/httpd-*" 2>/dev/null | sort -rV)
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
+}
+
 maven_versions() {
   local list="" active_ver="" dir ver
   local link
@@ -135,7 +155,7 @@ cat <<JSON
   "python":           $(python_versions),
   "node":             $(node_version),
   "maven":            $(maven_versions),
-  "httpd":            $(svc_ok httpd),
+  "httpd":            $(httpd_versions),
   "tomcat":           $(tomcat_versions),
   "mariadb":          $(svc_ok mariadb),
   "postgresql":       $(svc_ok postgresql),

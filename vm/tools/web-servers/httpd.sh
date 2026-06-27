@@ -1,72 +1,191 @@
 #!/bin/bash
 
 ##
-## Description: Installs Apache HTTP Server, configures sites-available and
-##              sites-enabled directories, disables cache, sets SELinux boolean
-##              httpd_read_user_content, and deploys a phpinfo.php test page.
-## Usage:       sudo ./httpd.sh <login-user>
+## Description: Installs Apache HTTP Server from source to /opt/httpd-<version>.
+##              Configures a versioned systemd service and sets HTTPD_HOME in ~/.bash_profile.
+##              Multiple versions can coexist; /opt/httpd symlinks to the latest installed.
+## Usage:       sudo ./httpd.sh <login-user> [version]
 ## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
+##              $2  [version]     Apache version (e.g. 2.4.63); omit for latest stable
 ##
 
 source /tmp/common.sh
 
 LOGIN_USER="${1:-}"
+VERSION="${2:-}"
+
 require_login_user "${LOGIN_USER}"
 HOME_DIR=$(eval echo "~${LOGIN_USER}")
 cd "${HOME_DIR}"
-
-APACHE_DOCROOT_DIR='/var/www/html'
-APACHE_INSTALL_DIR='/etc/httpd'
-APACHE_SITES_AVAILABLE_DIR='/etc/httpd/sites-available'
-APACHE_SITES_ENABLED_DIR='/etc/httpd/sites-enabled'
 
 ####
 STEP "Apache HTTP Server"
 ####
 
-if ! rpm -q httpd &>/dev/null
+# -- Resolve version ---------------------------------------------------------
+if [[ -z "${VERSION}" ]]
 then
-    log_info 'Installing Apache HTTP Server ...'
-    dnf install -y httpd
-    log_info 'Apache HTTP Server installed.'
+    log_info 'Fetching latest Apache HTTP Server version ...'
+    VERSION=$(curl -sL 'https://downloads.apache.org/httpd/' \
+        | grep -oP 'httpd-2\.\d+\.\d+\.tar\.gz' \
+        | sort -V | tail -1 \
+        | sed 's/httpd-//;s/\.tar\.gz//')
+    if [[ -z "${VERSION}" ]]
+    then
+        log_error 'Could not determine latest Apache HTTP Server version.'
+        exit 1
+    fi
+fi
+
+log_info "Apache HTTP Server version: ${VERSION}"
+
+INSTALL_DIR="/opt/httpd-${VERSION}"
+SERVICE_NAME="httpd-${VERSION}"
+TARBALL="httpd-${VERSION}.tar.gz"
+CACHE_DIR="/opt/httpd-cache"
+TARBALL_PATH="${CACHE_DIR}/${TARBALL}"
+
+# -- Idempotency check -------------------------------------------------------
+if [[ -d "${INSTALL_DIR}" ]]
+then
+    log_info "Apache HTTP Server ${VERSION} is already installed at ${INSTALL_DIR}."
+    exit 0
+fi
+
+# -- Build dependencies ------------------------------------------------------
+log_info 'Installing build dependencies ...'
+dnf install -y gcc make openssl-devel pcre2-devel expat-devel \
+    apr apr-devel apr-util apr-util-devel libxml2-devel \
+    policycoreutils-python-utils
+
+# -- Download ----------------------------------------------------------------
+mkdir -p "${CACHE_DIR}"
+if [[ ! -f "${TARBALL_PATH}" ]]
+then
+    # Try current mirror first; fall back to archive for older releases.
+    DOWNLOAD_BASE='https://downloads.apache.org/httpd'
+    if ! curl -fsLI "${DOWNLOAD_BASE}/${TARBALL}" >/dev/null 2>&1
+    then
+        DOWNLOAD_BASE='https://archive.apache.org/dist/httpd'
+    fi
+
+    log_info "Downloading Apache HTTP Server ${VERSION} ..."
+    curl -fL "${DOWNLOAD_BASE}/${TARBALL}" -o "${TARBALL_PATH}"
+
+    EXPECTED=$(curl -sL "${DOWNLOAD_BASE}/${TARBALL}.sha256" | awk '{print $1}')
+    ACTUAL=$(sha256sum "${TARBALL_PATH}" | awk '{print $1}')
+    if [[ "${EXPECTED}" != "${ACTUAL}" ]]
+    then
+        rm -f "${TARBALL_PATH}"
+        log_error "Checksum mismatch for ${TARBALL}."
+        exit 1
+    fi
+    log_info 'Checksum verified.'
 else
-    log_info 'Apache HTTP Server already installed.'
+    log_info "Using cached tarball: ${TARBALL_PATH}"
 fi
 
-mkdir -p "${APACHE_SITES_AVAILABLE_DIR}" "${APACHE_SITES_ENABLED_DIR}"
+# -- Build -------------------------------------------------------------------
+BUILD_DIR=$(mktemp -d)
+trap 'rm -rf "${BUILD_DIR}"' EXIT
 
-if ! grep -q 'sites-enabled' "${APACHE_INSTALL_DIR}/conf/httpd.conf"
+cd "${BUILD_DIR}"
+tar -xzf "${TARBALL_PATH}"
+cd "httpd-${VERSION}"
+
+log_info 'Configuring build ...'
+./configure \
+    --prefix="${INSTALL_DIR}" \
+    --enable-ssl \
+    --enable-so \
+    --with-mpm=event \
+    --enable-rewrite \
+    --enable-headers \
+    --enable-proxy \
+    --enable-proxy-http
+
+log_info 'Building ...'
+make -j"$(nproc)"
+
+log_info 'Installing ...'
+make install
+
+# -- Logs in /var/log --------------------------------------------------------
+LOG_DIR="/var/log/httpd-${VERSION}"
+mkdir -p "${LOG_DIR}"
+rm -rf "${INSTALL_DIR}/logs"
+ln -s "${LOG_DIR}" "${INSTALL_DIR}/logs"
+log_info "Logs: ${LOG_DIR}"
+
+# -- Symlink -----------------------------------------------------------------
+ln -sfn "${INSTALL_DIR}" /opt/httpd
+log_info "Symlink: /opt/httpd -> ${INSTALL_DIR}"
+
+# -- Configure ---------------------------------------------------------------
+# Set ServerName to prevent fatal FQDN warning on startup
+sed -i 's/^#ServerName.*/ServerName localhost/' "${INSTALL_DIR}/conf/httpd.conf"
+
+# -- SELinux -----------------------------------------------------------------
+# Binaries in /opt/ have no SELinux type by default; label them so systemd
+# can execute them and httpd can bind to port 80/443.
+if command -v semanage &>/dev/null
 then
-    echo "IncludeOptional ${APACHE_SITES_ENABLED_DIR}/*.conf" >> "${APACHE_INSTALL_DIR}/conf/httpd.conf"
-    log_info 'sites-enabled include added to httpd.conf.'
+    semanage fcontext -a -t httpd_exec_t        "${INSTALL_DIR}/bin/httpd"          2>/dev/null || true
+    semanage fcontext -a -t httpd_exec_t        "${INSTALL_DIR}/bin/apachectl"      2>/dev/null || true
+    semanage fcontext -a -t httpd_config_t      "${INSTALL_DIR}/conf(/.*)?"         2>/dev/null || true
+    semanage fcontext -a -t httpd_log_t         "/var/log/httpd-${VERSION}(/.*)?"   2>/dev/null || true
+    semanage fcontext -a -t httpd_sys_content_t "${INSTALL_DIR}/htdocs(/.*)?"       2>/dev/null || true
+    restorecon -Rv "${INSTALL_DIR}"
+    restorecon -Rv "${LOG_DIR}"
+    semanage port -a -t http_port_t -p tcp 80  2>/dev/null || true
+    semanage port -a -t http_port_t -p tcp 443 2>/dev/null || true
 fi
 
-if [[ -f 00-default.conf ]]
+# -- PATH in ~/.bash_profile -------------------------------------------------
+PROFILE="${HOME_DIR}/.bash_profile"
+if ! grep -q 'HTTPD_HOME' "${PROFILE}" 2>/dev/null
 then
-    mv 00-default.conf "${APACHE_SITES_ENABLED_DIR}"
+    {
+        echo ''
+        echo '# Apache HTTP Server'
+        echo 'export HTTPD_HOME=/opt/httpd'
+        echo 'export PATH="${HTTPD_HOME}/bin:${PATH}"'
+    } >> "${PROFILE}"
+    log_info 'HTTPD_HOME added to ~/.bash_profile.'
 fi
 
-rm -rf /var/www/cgi-bin /var/www/error /var/www/icons
+# -- Systemd service ---------------------------------------------------------
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-httpd -t
-setsebool -P httpd_read_user_content 1
-log_info 'SELinux httpd_read_user_content enabled.'
+cat > "${SERVICE_FILE}" <<UNIT
+[Unit]
+Description=Apache HTTP Server ${VERSION}
+After=network.target
 
-systemctl enable httpd.service
-systemctl restart httpd.service
-systemctl status httpd.service --no-pager
+[Service]
+Type=forking
+PIDFile=${INSTALL_DIR}/logs/httpd.pid
+ExecStart=${INSTALL_DIR}/bin/apachectl -k start
+ExecReload=${INSTALL_DIR}/bin/apachectl -k graceful
+ExecStop=${INSTALL_DIR}/bin/apachectl -k graceful-stop
+PrivateTmp=true
 
-if [[ -f phpinfo.php ]]
-then
-    mv phpinfo.php "${APACHE_DOCROOT_DIR}/"
-    log_info 'phpinfo.php deployed to document root.'
-fi
+[Install]
+WantedBy=multi-user.target
+UNIT
 
-log_info "Apache HTTP Server successfully installed."
-log_info "Service     : systemctl start|stop|restart|status httpd"
-log_info "Config      : ${APACHE_INSTALL_DIR}/conf/httpd.conf"
-log_info "Document root: ${APACHE_DOCROOT_DIR}"
-log_info "Sites       : ${APACHE_SITES_AVAILABLE_DIR} / ${APACHE_SITES_ENABLED_DIR}"
-log_info "Logs        : /var/log/httpd/access_log | error_log"
-log_info "Test        : curl http://localhost"
-log_info "PHP test    : http://localhost/phpinfo.php"
+log_info 'Testing configuration ...'
+"${INSTALL_DIR}/bin/httpd" -t
+
+systemctl daemon-reload
+
+log_info "Apache HTTP Server ${VERSION} successfully installed."
+log_info "Install dir  : ${INSTALL_DIR}"
+log_info "Symlink      : /opt/httpd -> ${INSTALL_DIR}"
+log_info "Config       : ${INSTALL_DIR}/conf/httpd.conf"
+log_info "Document root: ${INSTALL_DIR}/htdocs"
+log_info "Logs         : /var/log/httpd-${VERSION}/access_log | error_log"
+log_info "--- To start  : systemctl start ${SERVICE_NAME}"
+log_info "--- To stop   : systemctl stop ${SERVICE_NAME}"
+log_info "--- To enable at boot: systemctl enable ${SERVICE_NAME}"
+log_info "--- To test   : curl http://localhost"

@@ -102,6 +102,7 @@ const SILENT_CHANNELS = new Set([
   'run-provision-setup',
   'run-share-folder',
   'run-share-logs',
+  'query-vm-installed',
   'query-vm-performance',
   'kill-vm-process',
 ])
@@ -450,7 +451,9 @@ function registerIpcHandlers(win) {
       )
       return { ok: true, hostname: output.trim() }
     } catch (error) {
-      return { ok: false, error: error.message }
+      const raw = (error.stderr ?? '').toString().trim()
+      const msg = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(l => l)[0] ?? 'Could not get hostname'
+      return { ok: false, error: msg }
     }
   })
 
@@ -624,8 +627,10 @@ function registerIpcHandlers(win) {
       stdout.trim().split('\n').forEach((line) => log.hostLine(line, 'SH'))
       return { ok: true, installed: JSON.parse(stdout.trim()) }
     } catch (error) {
-      log.error(`[ipc][query-vm-installed] "${vmName}":`, error.message)
-      return { ok: false, error: error.message }
+      const raw = (error.stderr ?? '').toString().trim()
+      const msg = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(l => l)[0] ?? 'guestcontrol failed'
+      log.error(`[ipc][query-vm-installed] "${vmName}":`, msg)
+      return { ok: false, error: msg }
     } finally {
       activeQueryProcs.delete(vmName)
     }

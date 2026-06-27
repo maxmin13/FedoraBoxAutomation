@@ -1,10 +1,10 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Vm, ScriptLine } from '../electron.d'
 import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
 
@@ -41,7 +41,7 @@ interface CategoryDef {
 type PageState = 'idle' | 'running' | 'done'
 type IdleView  = 'mode' | 'full-form' | 'categories' | 'scripts' | 'script-args'
 
-// â”€â”€ Script Catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Script Catalog â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 const CATEGORIES: CategoryDef[] = [
   {
@@ -70,17 +70,17 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'user+custom', argPrompts: ['Python version'], argDefaults: [''],
         argOptions: [[
           { value: '',       label: 'Latest stable (auto-detect)' },
-          { value: '3.13.3', label: '3.13.3 - current stable (until Oct 2029)' },
+          { value: '3.13.3', label: '3.13.3 - until Oct 2029' },
           { value: '3.12.7', label: '3.12.7 - security fixes until Oct 2028' },
           { value: '3.11.9', label: '3.11.9 - security fixes until Oct 2027' },
         ]] },
-      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€” includes npm',
+      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€" includes npm',
         argType: 'user+custom',
         argPrompts:  ['Node.js version'],
         argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest', label: 'Latest LTS (auto-detect)' },
-          { value: '24', label: '24 - Current stable - ships natively in Fedora 44' },
+          { value: '24', label: '24 - ships natively in Fedora 44' },
           { value: '22', label: '22 - LTS Active (until Apr 2027)' },
           { value: '20', label: '20 - LTS Maintenance (until Apr 2026)' },
         ]] },
@@ -94,7 +94,7 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest 3.x (auto-detect)' },
-          { value: '3.9.9',   label: '3.9.9 - latest stable' },
+          { value: '3.9.9',   label: '3.9.9' },
           { value: '3.9.6',   label: '3.9.6' },
           { value: '3.9.5',   label: '3.9.5' },
           { value: '3.8.8',   label: '3.8.8 - last 3.8.x release' },
@@ -104,7 +104,15 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Web Servers', dir: 'web-servers',
     scripts: [
-      { name: 'httpd.sh',         label: 'Apache HTTP Server',  relPath: 'httpd.sh',               description: 'Apache HTTP Server',                              argType: 'user' },
+      { name: 'httpd.sh', label: 'Apache HTTP Server', relPath: 'httpd.sh',
+        description: 'Apache HTTP Server built from source to /opt/httpd-<version>. Configures a versioned systemd service; /opt/httpd symlinks to the latest installed.',
+        argType: 'user+custom', argPrompts: ['Apache version'], argDefaults: [''],
+        argOptions: [[
+          { value: '',       label: 'Latest (auto-detect)' },
+          { value: '2.4.63', label: '2.4.63' },
+          { value: '2.4.62', label: '2.4.62' },
+          { value: '2.4.58', label: '2.4.58' },
+        ]] },
       { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
         argType: 'user+custom2',
         argPrompts:  ['Tomcat version', 'HTTP port'],
@@ -133,19 +141,19 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 â€” 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 â€” 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 â€” 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 â€” 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 â€" 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 â€" 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 â€" 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 â€" 4.32 (Jun 2025)' },
         ]] },
       { name: 'eclipse-ee.sh',       label: 'Eclipse IDE (installer)', relPath: 'eclipse-ee.sh',    description: 'Eclipse IDE for Java EE via installer',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 â€” 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 â€” 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 â€” 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 â€” 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 â€" 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 â€" 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 â€" 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 â€" 4.32 (Jun 2025)' },
         ]] },
       { name: 'intellij.sh', label: 'IntelliJ IDEA CE', relPath: 'intellij.sh',
         description: 'IntelliJ IDEA Community Edition - installs to /opt/idea-IC-<version>',
@@ -162,10 +170,10 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['VS Code version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest stable (auto-detect)' },
-          { value: '1.100.0', label: '1.100.0 â€” May 2025' },
-          { value: '1.99.0',  label: '1.99.0  â€” Apr 2025' },
-          { value: '1.98.0',  label: '1.98.0  â€” Mar 2025' },
-          { value: '1.97.0',  label: '1.97.0  â€” Feb 2025' },
+          { value: '1.100.0', label: '1.100.0 â€" May 2025' },
+          { value: '1.99.0',  label: '1.99.0  â€" Apr 2025' },
+          { value: '1.98.0',  label: '1.98.0  â€" Mar 2025' },
+          { value: '1.97.0',  label: '1.97.0  â€" Feb 2025' },
         ]] },
     ],
   },
@@ -198,7 +206,7 @@ const CATEGORIES: CategoryDef[] = [
           title: 'OpenSSL is already installed on this system',
           details: [
             'System tools (curl, wget, sshd) may silently link against the new libraries',
-            'dnf update will not patch /usr/local/ssl â€” you must rebuild manually when CVEs drop',
+            'dnf update will not patch /usr/local/ssl â€" you must rebuild manually when CVEs drop',
             'The system OpenSSL still wins in the terminal unless PATH is manually adjusted',
           ],
           actionLabel: 'Install anyway',
@@ -242,7 +250,7 @@ const CATEGORIES: CategoryDef[] = [
   },
 ]
 
-// â”€â”€ Script result map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Script result map â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // Persists across React mount/unmount so the user sees the outcome when they
 // navigate back and explicitly open the script form they submitted from.
 
@@ -267,7 +275,7 @@ function saveResult(key: string, exitCode: number | null, lines: ScriptLine[]): 
   )
 }
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
@@ -295,7 +303,7 @@ function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: stri
   }
 }
 
-// â”€â”€ RestartModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ RestartModal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 interface RestartModalProps {
   vmName: string
@@ -346,7 +354,7 @@ function RestartModal({ vmName, busy, onConfirm, onCancel }: RestartModalProps) 
   )
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€ Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 interface ProvisionPageProps {
   vm: Vm
@@ -380,14 +388,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
   useEffect(() => { return () => { mountedRef.current = false } }, [])
 
-  // When the user navigates back to this page after seeing a result banner,
-  // reset to the mode selector so they start fresh. The result is still in
-  // _scriptResults and comes back if they click the same script form again.
-  // On mount, restore the result banner if a script finished while the component was
-  // unmounted (e.g. user navigated within VmDetailPage). onScriptDone persists the result
-  // to _scriptResults even after unmount; we use getScriptState() only to get the script
-  // name so we can look up the right key. If the backend still holds done state we save
-  // it to the map first, then consume it.
+  // On mount: flush any done state from the backend into _scriptResults so the
+  // banner reappears when the user clicks that script's form. Do NOT set pageState
+  // to 'done' here — the user should land on the mode selector, not the banner.
   useEffect(() => {
     window.electronAPI.getScriptState().then(async (state) => {
       if (!state.ok || !state.context) return
@@ -401,21 +404,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         saveResult(key, state.exitCode, state.lines)
         await window.electronAPI.clearScriptState()
       }
-
-      const result = _scriptResults.get(key)
-      if (!result) return
-      _scriptResults.delete(key)
-
-      const matchingScript = scriptName
-        ? CATEGORIES.flatMap(c => c.scripts).find(s => s.name === scriptName) ?? null
-        : null
-      setLines(result.lines)
-      setAlreadyInstalled(result.lines.some(l => /\[INFO\s*\].*already installed/i.test(l.text)))
-      setSuccess(result.state === 'success')
-      setSelectedScript(matchingScript)
-      setRunningLabel(matchingScript?.label ?? scriptName ?? 'Script')
-      setPageState('done')
-      setShowLog(false)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -744,7 +732,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     (val ? 'border-zinc-400' : 'border-zinc-600')
 
 
-  // â”€â”€ Login gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Login gate â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   if (loginRequired) {
     return (
       <div className="h-full overflow-y-auto">
@@ -753,7 +741,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     )
   }
 
-  // â”€â”€ Running â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Running â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   if (pageState === 'running') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
@@ -782,7 +770,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     )
   }
 
-  // â”€â”€ Done â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Done â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   if (pageState === 'done') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
@@ -908,7 +896,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     )
   }
 
-  // â”€â”€ Idle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Idle â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   return (
     <div className="h-full max-w-2xl w-full mx-auto flex flex-col">
 
@@ -925,7 +913,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         </h1>
       </div>
 
-      {/* â”€â”€ Mode (main landing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€ Mode (main landing) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {idleView === 'mode' && (
         <div className="flex flex-col gap-3">
 
@@ -953,7 +941,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         </div>
       )}
 
-      {/* â”€â”€ Sub-views (full width, back button navigates) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â"€â"€ Sub-views (full width, back button navigates) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
 
       {idleView === 'full-form' && (
         <div className="flex-1 overflow-y-auto">
@@ -973,7 +961,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                     <span className="shrink-0 w-4 text-zinc-600 text-right">{i + 1}.</span>
                     <span>
                       <span className="text-zinc-300">{step.label}</span>
-                      <span className="text-zinc-500"> â€” {step.desc}</span>
+                      <span className="text-zinc-500"> â€" {step.desc}</span>
                     </span>
                   </li>
                 ))}
@@ -997,7 +985,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   placeholder="e.g. fedorabox"
                   className={ic(hostname)}
                 />
-                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora â€” not the VirtualBox VM name.</p>
+                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora â€" not the VirtualBox VM name.</p>
               </div>
             )}
             <button
