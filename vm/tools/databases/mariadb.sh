@@ -18,7 +18,6 @@ if ! rpm -q mariadb-server &>/dev/null
 then
     log_info 'Installing MariaDB server ...'
     dnf install -y mariadb-server
-    systemctl enable mariadb
     log_info 'MariaDB successfully installed.'
 else
     log_info 'MariaDB already installed.'

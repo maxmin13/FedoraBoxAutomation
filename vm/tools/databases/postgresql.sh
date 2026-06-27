@@ -25,17 +25,9 @@ else
         postgresql-setup --initdb
     fi
 
-    systemctl enable --now postgresql.service
-    systemctl status postgresql.service --no-pager
-
-    ss -tlnp | grep 5432
-
     sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /var/lib/pgsql/data/postgresql.conf
     log_warn 'Remote connections enabled (0.0.0.0/0 md5) - dev VM only.'
     echo 'host all all 0.0.0.0/0 md5' >> /var/lib/pgsql/data/pg_hba.conf
-    systemctl restart postgresql.service
-
-    ss -tlnp | grep 5432
 
     log_info 'postgresql successfully installed.'
 fi

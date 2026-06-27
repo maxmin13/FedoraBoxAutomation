@@ -190,8 +190,7 @@ else
 	EOT
 
     systemctl daemon-reload
-    systemctl enable "${SERVICE_NAME}"
-    log_info "Service ${SERVICE_NAME} registered and enabled."
+    log_info "Service ${SERVICE_NAME} registered."
 fi
 
 log_info "Install      : ${TOMCAT_DIR}"
