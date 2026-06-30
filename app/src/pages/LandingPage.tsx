@@ -133,7 +133,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
 
   if (selectedVm) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-hidden">
         <VmDetailPage vm={selectedVm} onBack={() => { setSelectedVm(null); loadVms() }} onScriptRunning={onScriptRunning} refreshKey={vmRefreshKey} initialView={selectedVmView} isActive={isActive} />
       </div>
     )

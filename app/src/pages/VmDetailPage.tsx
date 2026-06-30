@@ -421,48 +421,44 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                       }))
                       .filter((group) => group.installed.length > 0)
                     return (
-                      <div className="flex gap-4 pt-0.5">
-                        {[0, 1].map((col) => (
-                          <div key={col} className="flex-1 min-w-0 space-y-2">
-                            {groups.filter((_, i) => i % 2 === col).map((group) => (
-                              <div key={group.category}>
-                                <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider border-b border-zinc-700 pb-0.5 mb-1">
-                                  {group.category}
-                                </div>
-                                <div className="space-y-1">
-                                  {group.installed.map((tool) => {
-                                    const val = installedTools[tool.key]
-                                    const versions = typeof val === 'string' ? val.split(', ') : []
-                                    return (
-                                      <div key={tool.key} className="min-w-0">
-                                        <div className="text-zinc-300 text-xs leading-tight">{tool.label}</div>
-                                        {versions.length > 0 && (
-                                          <div className="flex flex-wrap gap-1 mt-0.5">
-                                            {versions.map((v) => {
-                                              const isActive = v.endsWith(' (active)')
-                                              const ver = isActive ? v.replace(' (active)', '') : v
-                                              return (
-                                                <span
-                                                  key={ver}
-                                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
-                                                    isActive
-                                                      ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
-                                                      : 'bg-zinc-900 text-zinc-500'
-                                                  }`}
-                                                >
-                                                  {ver}
-                                                  {isActive && <span className="text-green-500 text-[9px]">active</span>}
-                                                </span>
-                                              )
-                                            })}
-                                          </div>
-                                        )}
+                      <div className="space-y-2 pt-0.5">
+                        {groups.map((group) => (
+                          <div key={group.category}>
+                            <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider border-b border-zinc-700 pb-0.5 mb-1">
+                              {group.category}
+                            </div>
+                            <div className="space-y-1">
+                              {group.installed.map((tool) => {
+                                const val = installedTools[tool.key]
+                                const versions = typeof val === 'string' ? val.split(', ') : []
+                                return (
+                                  <div key={tool.key} className="flex items-center gap-2 min-w-0">
+                                    <div className="text-zinc-300 text-xs w-32 shrink-0">{tool.label}</div>
+                                    {versions.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {versions.map((v) => {
+                                          const isActive = v.endsWith(' (active)')
+                                          const ver = isActive ? v.replace(' (active)', '') : v
+                                          return (
+                                            <span
+                                              key={ver}
+                                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
+                                                isActive
+                                                  ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
+                                                  : 'bg-zinc-900 text-zinc-500'
+                                              }`}
+                                            >
+                                              {ver}
+                                              {isActive && <span className="text-green-500 text-[9px]">active</span>}
+                                            </span>
+                                          )
+                                        })}
                                       </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            ))}
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
