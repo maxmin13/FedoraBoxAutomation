@@ -174,10 +174,14 @@ postgresql_version() {
   echo "\"${list}\""
 }
 
-ansible_ok() {
-  which ansible >/dev/null 2>&1 && echo true && return
-  find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
-    | grep -q . && echo true || echo false
+ansible_version() {
+  local bin
+  bin=$(which ansible 2>/dev/null \
+        || find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null | head -1)
+  [[ -z "${bin}" ]] && { echo false; return; }
+  ver=$("${bin}" --version 2>/dev/null | head -1 | awk '{print $NF}' | tr -d ']')
+  [[ -z "${ver}" ]] && { echo false; return; }
+  echo "\"${ver}\""
 }
 
 python_versions() {
@@ -228,18 +232,18 @@ cat <<JSON
     done < <(compgen -G "/opt/vscode-*" 2>/dev/null | sort -rV)
     [[ -z "${list}" ]] && echo false || echo "\"${list}\""
   ),
-  "docker":           $(cmd_ok docker),
-  "minikube":         $(cmd_ok minikube),
-  "k3s":              $(cmd_ok k3s),
-  "awsCli":           $(cmd_ok aws),
-  "ecsCli":           $(cmd_ok ecs-cli),
+  "docker":           $(which docker >/dev/null 2>&1 && docker --version 2>/dev/null | awk '{gsub(",","",$3); print "\""$3"\""}' || echo false),
+  "minikube":         $(which minikube >/dev/null 2>&1 && minikube version --short 2>/dev/null | sed 's/^v//' | awk '{print "\""$1"\""}' || echo false),
+  "k3s":              $(which k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk 'NR==1{gsub("^v","",$3); print "\""$3"\""}' || echo false),
+  "awsCli":           $(which aws >/dev/null 2>&1 && aws --version 2>/dev/null | awk '{split($1,a,"/"); print "\""a[2]"\""}' || echo false),
+  "ecsCli":           $([ -x /usr/local/bin/ecs-cli ] && /usr/local/bin/ecs-cli --version 2>/dev/null | awk '{gsub("[()]","",$3); print "\""$3"\""}' || echo false),
   "openssl":          $(openssl_version),
-  "wireshark":        $(cmd_ok tshark),
-  "git":              $(cmd_ok git),
-  "vim":              $(cmd_ok vim),
-  "chrome":           $(rpm_ok google-chrome-stable),
-  "ansible":          $(ansible_ok),
-  "claudeCode":       $(cmd_ok claude),
-  "flameshot":        $(cmd_ok flameshot)
+  "wireshark":        $(which tshark >/dev/null 2>&1 && tshark --version 2>/dev/null | awk 'NR==1{print "\""$2"\""}' || echo false),
+  "git":              $(which git >/dev/null 2>&1 && git --version 2>/dev/null | awk '{print "\""$3"\""}' || echo false),
+  "vim":              $(which vim >/dev/null 2>&1 && vim --version 2>/dev/null | awk 'NR==1{print "\""$5"\""}' || echo false),
+  "chrome":           $(rpm -q google-chrome-stable &>/dev/null && rpm -q google-chrome-stable --queryformat '"%{VERSION}"' || echo false),
+  "ansible":          $(ansible_version),
+  "claudeCode":       $(which claude >/dev/null 2>&1 && claude --version 2>/dev/null | awk '{print "\""$NF"\""}' || echo false),
+  "flameshot":        $(which flameshot >/dev/null 2>&1 && flameshot --version 2>/dev/null | awk '{print "\""$NF"\""}' || echo false)
 }
 JSON
