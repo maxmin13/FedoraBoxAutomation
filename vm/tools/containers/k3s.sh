@@ -43,7 +43,12 @@ else
     FRESH_INSTALL=true
 fi
 
-systemctl status k3s --no-pager
+systemctl status k3s --no-pager || true
+if ! systemctl is-active --quiet k3s; then
+    log_warn "k3s is installed but not currently running."
+    log_warn "If k3s exited unexpectedly, check logs with: journalctl -u k3s -n 50 --no-pager"
+    log_warn "Then start it with: systemctl start k3s"
+fi
 
 ####
 STEP "kubectl access for ${LOGIN_USER}"
@@ -83,7 +88,11 @@ if [[ "${FRESH_INSTALL}" == 'true' ]]; then
     fi
 fi
 
-log_info "k3s is running. Use kubectl (after re-login) or k3s kubectl immediately."
+if systemctl is-active --quiet k3s; then
+    log_info "k3s is running. Use kubectl (after re-login) or k3s kubectl immediately."
+else
+    log_warn "k3s is installed but not running. Start it with: systemctl start k3s"
+fi
 log_info "Start        : systemctl start k3s"
 log_info "Stop         : systemctl stop k3s"
 log_info "Status       : systemctl status k3s"

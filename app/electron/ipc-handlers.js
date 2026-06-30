@@ -670,7 +670,7 @@ function registerIpcHandlers(win) {
         '--username', user, '--password', pass,
         '--wait-stdout',
         '--', '-c', `echo '${encoded}' | base64 -d | bash 2>&1`,
-      ], { encoding: 'utf8', timeout: 20000 })
+      ], { encoding: 'utf8', timeout: 30000 })
       const data = extractPerfJson(stdout)
       const ramPct = data.ramTotalMB > 0 ? Math.round((data.ramUsedMB / data.ramTotalMB) * 100) : 0
       log.vm(`[perf] "${vmName}"  CPU: ${data.cpuPct}%  RAM: ${data.ramUsedMB} / ${data.ramTotalMB} MB (${ramPct}%)  Free: ${data.ramFreeMB} MB`)
@@ -697,7 +697,8 @@ function registerIpcHandlers(win) {
       }
       const detail = [rawOut.trim(), (error.stderr || '').trim()].filter(Boolean).join(' | ') || error.message
       log.vm(`[perf] "${vmName}" failed (exit ${error.code ?? '?'}): ${detail}`)
-      return { ok: false, error: detail }
+      if (error.killed) return { ok: false, error: 'The VM is not responding — it may be busy. Try again in a moment.' }
+      return { ok: false, error: 'Could not read performance data from the VM.' }
     }
   })
 
@@ -729,14 +730,20 @@ function registerIpcHandlers(win) {
       // Detect owning systemd unit from cgroup
       `UNIT=$(cat /proc/$LOOKUP_PID/cgroup 2>/dev/null | grep -Eo '[^/]+\\.(service|socket|timer)' | head -1)`,
       `if [ -n "$UNIT" ]; then`,
-      `  if systemctl stop "$UNIT" 2>&1; then echo "ok:systemctl:$UNIT"`,
+      `  if systemctl stop --no-block "$UNIT" 2>&1; then`,
+      `    # Give the unit 2 s to begin shutdown, then SIGKILL any cgroup members still alive`,
+      `    # (e.g. containerd-shim processes that outlive the k3s main process)`,
+      `    sleep 2`,
+      `    systemctl kill --kill-who=all --signal=SIGKILL "$UNIT" 2>/dev/null || true`,
+      `    echo "ok:systemctl:$UNIT"`,
       `  else echo "err:systemctl:$UNIT"; fi`,
       `elif [ -n "$CUR_PID" ]; then`,
       `  if kill -9 "$CUR_PID" 2>&1; then echo "ok:kill9:$CUR_PID"`,
       `  else echo "err:kill9:$CUR_PID"; fi`,
       `else`,
+      `  # pgrep found nothing — process is likely already gone; try snapshot PID as last resort`,
       `  if kill -9 "$SNAP_PID" 2>&1; then echo "ok:kill9:$SNAP_PID"`,
-      `  else echo "err:kill9:$SNAP_PID"; fi`,
+      `  else echo "ok:gone"; fi`,
       `fi`,
     ].join('\n')
     const encoded = Buffer.from(script).toString('base64')
@@ -749,12 +756,15 @@ function registerIpcHandlers(win) {
         '--wait-stdout',
         '--', '-c', runCmd,
       ], { encoding: 'utf8', timeout: 60000 })
-      const out = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      const out = (stdout || '').split('\n').map(l => l.trim()).find(l => l === 'ok:gone' || l.startsWith('ok:') || l.startsWith('err:')) || ''
       if (out.startsWith('ok:systemctl:')) {
         log.vm(`[kill] "${vmName}"  ${label} — stopped systemd unit "${out.slice(13)}"`)
         return { ok: true }
       } else if (out.startsWith('ok:kill9:')) {
         log.vm(`[kill] "${vmName}"  ${label} — not systemd-managed, sent SIGKILL`)
+        return { ok: true }
+      } else if (out === 'ok:gone') {
+        log.vm(`[kill] "${vmName}"  ${label} — process was already gone`)
         return { ok: true }
       } else if (out.startsWith('err:systemctl:')) {
         const unit = out.slice(14)
@@ -769,12 +779,15 @@ function registerIpcHandlers(win) {
       }
     } catch (error) {
       // VBoxManage false-failure: check stdout for a valid result before giving up.
-      const rawOut = (error.stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      const rawOut = (error.stdout || '').split('\n').map(l => l.trim()).find(l => l === 'ok:gone' || l.startsWith('ok:') || l.startsWith('err:')) || ''
       if (rawOut.startsWith('ok:systemctl:')) {
         log.vm(`[kill] "${vmName}"  ${label} — stopped systemd unit "${rawOut.slice(13)}" (exit-code false-failure)`)
         return { ok: true }
       } else if (rawOut.startsWith('ok:kill9:')) {
         log.vm(`[kill] "${vmName}"  ${label} — not systemd-managed, sent SIGKILL (exit-code false-failure)`)
+        return { ok: true }
+      } else if (rawOut === 'ok:gone') {
+        log.vm(`[kill] "${vmName}"  ${label} — process was already gone (exit-code false-failure)`)
         return { ok: true }
       }
       // Log raw VBoxManage output to diagnose failures (session conflict, timeout, auth, etc.)

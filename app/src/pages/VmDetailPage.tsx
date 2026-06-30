@@ -320,7 +320,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                 action={
                   <button
                     onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Sync Logs`); setView('share-logs') }}
-                    className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                    className="w-16 px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors text-center"
                   >
                     Sync
                   </button>
@@ -337,7 +337,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                 action={
                   <button
                     onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": Share Folder`); setView('share-folder') }}
-                    className="px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+                    className="w-16 px-3 py-1 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors text-center"
                   >
                     Share
                   </button>

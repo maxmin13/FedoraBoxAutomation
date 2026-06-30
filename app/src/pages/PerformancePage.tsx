@@ -152,7 +152,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       setKillError(result.error ?? 'Kill failed')
       return
     }
-    setTimeout(() => loadProcesses(), 800)
+    setTimeout(() => loadProcesses(), 3000)
   }
 
   async function loadProcesses() {
@@ -297,9 +297,22 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
             {/* Running Processes card */}
             <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-2 overflow-hidden">
-              <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol — click Refresh to update">
-                <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
-              </Tooltip>
+              <div className="flex items-center shrink-0">
+                <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol">
+                  <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
+                </Tooltip>
+                <span className="ml-auto">
+                  <Tooltip tip="Re-sample CPU and memory usage">
+                    <button
+                      onClick={() => { window.electronAPI.logUiAction(`performance "${vm.name}": Refresh processes`); loadProcesses() }}
+                      disabled={procState === 'loading' || procState === 'idle'}
+                      className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {procState === 'loading' ? '...' : 'Refresh'}
+                    </button>
+                  </Tooltip>
+                </span>
+              </div>
 
               {procState === 'idle' && (
                 <p className="text-zinc-500 text-xs">Loading...</p>
