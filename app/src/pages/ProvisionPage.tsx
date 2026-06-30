@@ -16,7 +16,7 @@ interface ArgOption {
 interface ForceConfirmDef {
   title: string        // heading shown in the amber panel
   details?: string[]  // bullet points below the heading
-  actionLabel: string // label on the confirm button ("Install anyway", "Update", â€¦)
+  actionLabel: string // label on the confirm button ("Install anyway", "Update", ...)
 }
 
 interface ScriptDef {
@@ -74,7 +74,7 @@ const CATEGORIES: CategoryDef[] = [
           { value: '3.12.7', label: '3.12.7 - security fixes until Oct 2028' },
           { value: '3.11.9', label: '3.11.9 - security fixes until Oct 2027' },
         ]] },
-      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource â€" includes npm',
+      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource - includes npm',
         argType: 'user+custom',
         argPrompts:  ['Node.js version'],
         argDefaults: ['latest'],
@@ -149,19 +149,19 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 â€" 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 â€" 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 â€" 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 â€" 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 - 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 - 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 - 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 - 4.32 (Jun 2025)' },
         ]] },
       { name: 'eclipse-ee.sh',       label: 'Eclipse Installer',      relPath: 'eclipse-ee.sh',    description: 'Downloads the Eclipse Installer (Oomph) - run it manually to choose your Eclipse flavour',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
-          { value: '2026-03', label: '2026-03 â€" 4.35 (Mar 2026)' },
-          { value: '2025-12', label: '2025-12 â€" 4.34 (Dec 2025)' },
-          { value: '2025-09', label: '2025-09 â€" 4.33 (Sep 2025)' },
-          { value: '2025-06', label: '2025-06 â€" 4.32 (Jun 2025)' },
+          { value: '2026-03', label: '2026-03 - 4.35 (Mar 2026)' },
+          { value: '2025-12', label: '2025-12 - 4.34 (Dec 2025)' },
+          { value: '2025-09', label: '2025-09 - 4.33 (Sep 2025)' },
+          { value: '2025-06', label: '2025-06 - 4.32 (Jun 2025)' },
         ]] },
       { name: 'intellij.sh', label: 'IntelliJ IDEA CE', relPath: 'intellij.sh',
         description: 'IntelliJ IDEA Community Edition - installs to /opt/idea-IC-<version>',
@@ -178,10 +178,10 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['VS Code version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest stable (auto-detect)' },
-          { value: '1.100.0', label: '1.100.0 â€" May 2025' },
-          { value: '1.99.0',  label: '1.99.0  â€" Apr 2025' },
-          { value: '1.98.0',  label: '1.98.0  â€" Mar 2025' },
-          { value: '1.97.0',  label: '1.97.0  â€" Feb 2025' },
+          { value: '1.100.0', label: '1.100.0 - May 2025' },
+          { value: '1.99.0',  label: '1.99.0  - Apr 2025' },
+          { value: '1.98.0',  label: '1.98.0  - Mar 2025' },
+          { value: '1.97.0',  label: '1.97.0  - Feb 2025' },
         ]] },
     ],
   },
@@ -214,7 +214,7 @@ const CATEGORIES: CategoryDef[] = [
           title: 'OpenSSL is already installed on this system',
           details: [
             'System tools (curl, wget, sshd) may silently link against the new libraries',
-            'dnf update will not patch /usr/local/ssl â€" you must rebuild manually when CVEs drop',
+            'dnf update will not patch /usr/local/ssl - you must rebuild manually when CVEs drop',
             'The system OpenSSL still wins in the terminal unless PATH is manually adjusted',
           ],
           actionLabel: 'Install anyway',
@@ -969,7 +969,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                     <span className="shrink-0 w-4 text-zinc-600 text-right">{i + 1}.</span>
                     <span>
                       <span className="text-zinc-300">{step.label}</span>
-                      <span className="text-zinc-500"> â€" {step.desc}</span>
+                      <span className="text-zinc-500"> - {step.desc}</span>
                     </span>
                   </li>
                 ))}
@@ -993,7 +993,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   placeholder="e.g. fedorabox"
                   className={ic(hostname)}
                 />
-                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora â€" not the VirtualBox VM name.</p>
+                <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora - not the VirtualBox VM name.</p>
               </div>
             )}
             <button
