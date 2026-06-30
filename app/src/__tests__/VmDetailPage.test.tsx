@@ -145,12 +145,12 @@ describe('VmDetailPage — Hardware section', () => {
     expect(screen.getByText('20 GB (fixed)')).toBeInTheDocument()
   })
 
-  it('shows "—" for disk when diskCapacityMB is null', async () => {
+  it('shows "-" for disk when diskCapacityMB is null', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
       ok: true, info: { ...BASE_INFO, diskCapacityMB: null },
     })
     await renderAndWait()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0)
   })
 })
 
@@ -175,12 +175,12 @@ describe('VmDetailPage — Network section', () => {
     expect(screen.getByText('08:00:27:AA:BB:CC')).toBeInTheDocument()
   })
 
-  it('shows "—" for MAC when mac is an empty string', async () => {
+  it('shows "-" for MAC when mac is an empty string', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
       ok: true, info: { ...BASE_INFO, mac: '' },
     })
     await renderAndWait()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0)
   })
 })
 
@@ -251,7 +251,7 @@ describe('VmDetailPage — Shared folders section', () => {
     expect(screen.getByText('/mnt/shared')).toBeInTheDocument()
   })
 
-  it('shows "—" for mount point when it is empty', async () => {
+  it('shows "-" for mount point when it is empty', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({
       ok: true,
       info: {
@@ -260,17 +260,23 @@ describe('VmDetailPage — Shared folders section', () => {
       },
     })
     await renderAndWait()
-    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText('-')).toBeInTheDocument()
   })
 })
 
 // ── Installed tools — Refresh button ─────────────────────────────────────────
 
 describe('VmDetailPage — Installed tools Refresh button', () => {
+  async function openToolsTab() {
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Tools' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tools' })) })
+  }
+
   it('shows "Checking..." (disabled) while queryVmInstalled is in flight', async () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockReturnValue(new Promise(() => {}))
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Checking...' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Checking...' })).toBeDisabled()
   })
@@ -279,14 +285,17 @@ describe('VmDetailPage — Installed tools Refresh button', () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled()
   })
 
-  it('does not show a Refresh button when the VM is stopped', async () => {
+  it('shows a Refresh button (enabled) when the VM is stopped', async () => {
     await renderAndWait()
+    await openToolsTab()
     await waitFor(() => expect(screen.getByText(/VM is stopped/i)).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: /refresh|checking/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled()
   })
 })
 
@@ -345,8 +354,14 @@ describe('VmDetailPage — VM not running', () => {
 // ── Installed tools section ───────────────────────────────────────────────────
 
 describe('VmDetailPage — Installed tools section', () => {
+  async function switchToToolsTab() {
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Tools' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tools' })) })
+  }
+
   it('shows "VM is stopped" message when the VM is powered off', async () => {
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await switchToToolsTab()
     await waitFor(() => expect(screen.getByText(/INSTALLED TOOLS/i)).toBeInTheDocument())
     expect(screen.getByText(/VM is stopped/i)).toBeInTheDocument()
   })
@@ -355,6 +370,7 @@ describe('VmDetailPage — Installed tools section', () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: false, noCredentials: true })
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await switchToToolsTab()
     await waitFor(() =>
       expect(screen.getByText(/Save credentials in Provision/i)).toBeInTheDocument()
     )
@@ -367,9 +383,10 @@ describe('VmDetailPage — Installed tools section', () => {
       installed: { ...ALL_FALSE, baseSetup: true, java: '21.0.3', docker: true },
     })
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await switchToToolsTab()
     await waitFor(() => expect(screen.getByText('Base Setup')).toBeInTheDocument())
     expect(screen.getByText('Java')).toBeInTheDocument()
-    expect(screen.getByText('(21.0.3)')).toBeInTheDocument()
+    expect(screen.getByText('21.0.3')).toBeInTheDocument()
     expect(screen.getByText('Docker CE')).toBeInTheDocument()
     expect(screen.queryByText('PHP')).not.toBeInTheDocument()
   })
@@ -378,6 +395,7 @@ describe('VmDetailPage — Installed tools section', () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: true, installed: ALL_FALSE })
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await switchToToolsTab()
     await waitFor(() => expect(screen.getByText('Nothing installed yet')).toBeInTheDocument())
   })
 
@@ -385,6 +403,7 @@ describe('VmDetailPage — Installed tools section', () => {
     window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
     window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({ ok: false, error: 'VERR_AUTHENTICATION_FAILURE' })
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await switchToToolsTab()
     await waitFor(() =>
       expect(screen.getByText(/Could not connect to VM/i)).toBeInTheDocument()
     )

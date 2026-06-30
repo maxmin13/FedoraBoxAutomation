@@ -443,7 +443,7 @@ describe('query-vm-installed handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: mockExec },
+      exports: { execSync: mockExecSync, exec: mockExec, execFile: vi.fn() },
     }
     mockReadFile = vi.spyOn(fs.promises, 'readFile')
     queryVmInstalledHandler = loadHandlers()('query-vm-installed')
@@ -493,7 +493,7 @@ describe('query-vm-installed handler', () => {
   it('returns { ok: false, error } when guestcontrol throws', async () => {
     mockExec
       .mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' })) // isVmRunning
-      .mockImplementationOnce((cmd, opts, cb) => cb(new Error('VERR_AUTHENTICATION_FAILURE')))            // execTracked copyto throws
+      .mockImplementationOnce((cmd, opts, cb) => cb(Object.assign(new Error('VERR_AUTHENTICATION_FAILURE'), { stderr: 'VERR_AUTHENTICATION_FAILURE' })))  // execTracked copyto throws
     mockReadFile.mockResolvedValueOnce(
       JSON.stringify({ FedoraBox: { user: 'root', pass: 'wrong' } })
     )
@@ -515,7 +515,7 @@ describe('check-vm-ready handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     checkVmReadyHandler = loadHandlers()('check-vm-ready')
   })
@@ -696,7 +696,7 @@ describe('list-vms handler', () => {
     mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: mockExec },
+      exports: { execSync: mockExecSync, exec: mockExec, execFile: vi.fn() },
     }
     listVmsHandler = loadHandlers()('list-vms')
   })
@@ -765,7 +765,7 @@ describe('start-vm handler', () => {
     mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: vi.fn(), exec: mockExec },
+      exports: { execSync: vi.fn(), exec: mockExec, execFile: vi.fn() },
     }
     startVmHandler = loadHandlers()('start-vm')
   })
@@ -822,7 +822,7 @@ describe('delete-vm handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     mockReadFile  = vi.spyOn(fs.promises, 'readFile')
     mockMkdir     = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined)
@@ -902,7 +902,7 @@ describe('get-vm-guest-logs-path handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     getVmGuestLogsPathHandler = loadHandlers()('get-vm-guest-logs-path')
   })
@@ -956,7 +956,7 @@ describe('stop-vm handler', () => {
     mockExec = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: vi.fn(), exec: mockExec },
+      exports: { execSync: vi.fn(), exec: mockExec, execFile: vi.fn() },
     }
     stopVmHandler = loadHandlers()('stop-vm')
   })
@@ -1067,7 +1067,7 @@ describe('get-vm-info handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     mockExistsSync = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     getVmInfoHandler = loadHandlers()('get-vm-info')
@@ -1512,7 +1512,7 @@ describe('get-vm-hostname handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     getVmHostnameHandler = loadHandlers()('get-vm-hostname')
   })
@@ -1537,7 +1537,7 @@ describe('get-vm-hostname handler', () => {
   })
 
   it('returns ok: false when VBoxManage throws', async () => {
-    mockExecSync.mockImplementation(() => { throw new Error('VM not found') })
+    mockExecSync.mockImplementation(() => { const e = new Error('VM not found'); e.stderr = 'VM not found'; throw e })
     const result = await getVmHostnameHandler({}, PARAMS)
     expect(result).toEqual({ ok: false, error: 'VM not found' })
   })
@@ -1556,7 +1556,7 @@ describe('check-vm-credentials handler', () => {
     mockExecSync = vi.fn()
     require.cache[cpId] = {
       id: cpId, filename: cpId, loaded: true,
-      exports: { execSync: mockExecSync, exec: vi.fn() },
+      exports: { execSync: mockExecSync, exec: vi.fn(), execFile: vi.fn() },
     }
     checkVmCredsHandler = loadHandlers()('check-vm-credentials')
   })
