@@ -154,7 +154,7 @@ const CATEGORIES: CategoryDef[] = [
           { value: '2025-09', label: '2025-09 â€" 4.33 (Sep 2025)' },
           { value: '2025-06', label: '2025-06 â€" 4.32 (Jun 2025)' },
         ]] },
-      { name: 'eclipse-ee.sh',       label: 'Eclipse IDE (installer)', relPath: 'eclipse-ee.sh',    description: 'Eclipse IDE for Java EE via installer',
+      { name: 'eclipse-ee.sh',       label: 'Eclipse Installer',      relPath: 'eclipse-ee.sh',    description: 'Downloads the Eclipse Installer (Oomph) - run it manually to choose your Eclipse flavour',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },

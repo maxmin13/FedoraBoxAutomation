@@ -434,13 +434,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                 <div className="space-y-1">
                                   {group.installed.map((tool) => {
                                     const val = installedTools[tool.key]
-                                    const rawVersions = typeof val === 'string' ? val.split(', ') : []
-                                    const versions = tool.key === 'java'
-                                      ? (() => {
-                                          const active = rawVersions.find(v => v.endsWith(' (active)'))
-                                          return active ? [active.replace(' (active)', '')] : rawVersions.slice(0, 1)
-                                        })()
-                                      : rawVersions
+                                    const versions = typeof val === 'string' ? val.split(', ') : []
                                     return (
                                       <div key={tool.key} className="min-w-0">
                                         <div className="text-zinc-300 text-xs leading-tight">{tool.label}</div>

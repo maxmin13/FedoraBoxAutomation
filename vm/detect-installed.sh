@@ -21,27 +21,49 @@ rpm_ok()     { rpm -q "$1" &>/dev/null && echo true || echo false; }
 rpm_any_ok() { for p in "$@"; do rpm -q "${p}" &>/dev/null && echo true && return; done; echo false; }
 
 java_versions() {
-  # Detect active major version from the alternatives/PATH default.
   local active_major=""
   if which java >/dev/null 2>&1; then
     active_major=$(java -version 2>&1 | awk -F'"' '/version/ {
       split($2, a, "."); print (a[1]=="1") ? a[2] : a[1]
     }')
   fi
-  # Collect installed versions from both Oracle JDK RPMs (jdk-*) and
-  # OpenJDK RPMs (java-*-openjdk-devel), newest major first.
-  local list="" ver major label
+
+  declare -A majors  # major -> display version string
+  local ver major pkg
+
+  # Oracle JDK: package jdk-21, version 21.0.3
   while IFS= read -r ver; do
     [[ -z "${ver}" ]] && continue
     major=$(echo "${ver}" | grep -Eo '^[0-9]+')
+    [[ -n "${major}" && -z "${majors[${major}]+x}" ]] && majors[${major}]="${ver}"
+  done < <(rpm -qa --queryformat '%{VERSION}\n' 'jdk-*' 2>/dev/null)
+
+  # Eclipse Temurin: package temurin-21-jdk, version may include +build suffix
+  while IFS= read -r ver; do
+    [[ -z "${ver}" ]] && continue
+    major=$(echo "${ver}" | grep -Eo '^[0-9]+')
+    [[ -n "${major}" && -z "${majors[${major}]+x}" ]] && majors[${major}]="${ver%%+*}"
+  done < <(rpm -qa --queryformat '%{VERSION}\n' 'temurin-*-jdk' 2>/dev/null)
+
+  # OpenJDK via dnf: java-21-openjdk-devel, java-17-openjdk-devel, etc.
+  while IFS= read -r pkg; do
+    [[ -z "${pkg}" ]] && continue
+    major=$(echo "${pkg}" | sed -E 's/java-([0-9]+)-.*/\1/')
+    [[ -z "${major}" ]] && continue
+    [[ -n "${majors[${major}]+x}" ]] && continue
+    ver=$(rpm -q "${pkg}" --queryformat '%{VERSION}' 2>/dev/null \
+          | grep -Eo '^[0-9]+\.[0-9]+(\.[0-9]+)?' || echo "${major}")
+    majors[${major}]="${ver}"
+  done < <(rpm -qa --queryformat '%{NAME}\n' 'java-*-openjdk-devel' 2>/dev/null)
+
+  local list="" label
+  for major in $(echo "${!majors[@]}" | tr ' ' '\n' | sort -rn); do
+    ver="${majors[${major}]}"
     label="${ver}$([[ "${major}" == "${active_major}" ]] && echo ' (active)')"
     [[ -n "${list}" ]] && list="${list}, "
     list="${list}${label}"
-  done < <(
-    { rpm -qa --queryformat '%{VERSION}\n' 'jdk-*' 2>/dev/null
-      rpm -qa --queryformat '%{VERSION}\n' 'temurin-*-jdk' 2>/dev/null
-    } | sort -rVu
-  )
+  done
+
   [[ -z "${list}" ]] && { echo false; return; }
   echo "\"${list}\""
 }
