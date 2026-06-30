@@ -234,7 +234,7 @@ cat <<JSON
   ),
   "docker":           $(which docker >/dev/null 2>&1 && docker --version 2>/dev/null | awk '{gsub(",","",$3); print "\""$3"\""}' || echo false),
   "minikube":         $(which minikube >/dev/null 2>&1 && minikube version --short 2>/dev/null | sed 's/^v//' | awk '{print "\""$1"\""}' || echo false),
-  "k3s":              $(which k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk 'NR==1{gsub("^v","",$3); print "\""$3"\""}' || echo false),
+  "k3s":              $(which k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk 'NR==1{gsub("^v","",$3); sub(/\+.*/,"",$3); print "\""$3"\""}' || echo false),
   "awsCli":           $(which aws >/dev/null 2>&1 && aws --version 2>/dev/null | awk '{split($1,a,"/"); print "\""a[2]"\""}' || echo false),
   "ecsCli":           $([ -x /usr/local/bin/ecs-cli ] && /usr/local/bin/ecs-cli --version 2>/dev/null | awk '{gsub("[()]","",$3); print "\""$3"\""}' || echo false),
   "openssl":          $(openssl_version),
