@@ -152,6 +152,8 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   const [installedTools, setInstalledTools] = useState<Record<string, string | boolean>>({})
   const [missingOpen,    setMissingOpen]    = useState(false)
   const [rightTab,       setRightTab]       = useState<'overview' | 'tools'>('overview')
+  const [toolsPage,      setToolsPage]      = useState(0)
+  const TOOLS_PAGE_SIZE = 5
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -404,7 +406,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                     {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
                   </button>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-2 pb-2">
+                <div className="flex-1 min-h-0 overflow-hidden px-2 flex flex-col">
                   {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
                     <p className="text-zinc-500 text-sm">Checking...</p>
                   ) : toolsStatus === 'stopped' ? (
@@ -420,48 +422,72 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                         installed: group.tools.filter((t) => installedTools[t.key]),
                       }))
                       .filter((group) => group.installed.length > 0)
+                    const totalPages = Math.ceil(groups.length / TOOLS_PAGE_SIZE)
+                    const page = Math.min(toolsPage, totalPages - 1)
+                    const visible = groups.slice(page * TOOLS_PAGE_SIZE, (page + 1) * TOOLS_PAGE_SIZE)
                     return (
-                      <div className="space-y-2 pt-0.5">
-                        {groups.map((group) => (
-                          <div key={group.category}>
-                            <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider border-b border-zinc-700 pb-0.5 mb-1">
-                              {group.category}
+                      <>
+                        <div className="flex-1 space-y-2 pt-0.5">
+                          {visible.map((group) => (
+                            <div key={group.category}>
+                              <div className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider border-b border-zinc-700 pb-0.5 mb-1">
+                                {group.category}
+                              </div>
+                              <div className="space-y-1">
+                                {group.installed.map((tool) => {
+                                  const val = installedTools[tool.key]
+                                  const versions = typeof val === 'string' ? val.split(', ') : []
+                                  return (
+                                    <div key={tool.key} className="flex items-center gap-2 min-w-0">
+                                      <div className="text-zinc-300 text-xs w-32 shrink-0">{tool.label}</div>
+                                      {versions.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {versions.map((v) => {
+                                            const isActive = v.endsWith(' (active)')
+                                            const ver = isActive ? v.replace(' (active)', '') : v
+                                            return (
+                                              <span
+                                                key={ver}
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
+                                                  isActive
+                                                    ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
+                                                    : 'bg-zinc-900 text-zinc-500'
+                                                }`}
+                                              >
+                                                {ver}
+                                                {isActive && <span className="text-green-500 text-[9px]">active</span>}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
-                            <div className="space-y-1">
-                              {group.installed.map((tool) => {
-                                const val = installedTools[tool.key]
-                                const versions = typeof val === 'string' ? val.split(', ') : []
-                                return (
-                                  <div key={tool.key} className="flex items-center gap-2 min-w-0">
-                                    <div className="text-zinc-300 text-xs w-32 shrink-0">{tool.label}</div>
-                                    {versions.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">
-                                        {versions.map((v) => {
-                                          const isActive = v.endsWith(' (active)')
-                                          const ver = isActive ? v.replace(' (active)', '') : v
-                                          return (
-                                            <span
-                                              key={ver}
-                                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
-                                                isActive
-                                                  ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
-                                                  : 'bg-zinc-900 text-zinc-500'
-                                              }`}
-                                            >
-                                              {ver}
-                                              {isActive && <span className="text-green-500 text-[9px]">active</span>}
-                                            </span>
-                                          )
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
+                          ))}
+                        </div>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-end gap-2 pt-1 pb-1 shrink-0">
+                            <span className="text-zinc-600 text-[10px]">{page + 1} / {totalPages}</span>
+                            <button
+                              onClick={() => setToolsPage((p) => Math.max(0, p - 1))}
+                              disabled={page === 0}
+                              className="text-zinc-500 hover:text-zinc-300 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            >
+                              ← prev
+                            </button>
+                            <button
+                              onClick={() => setToolsPage((p) => Math.min(totalPages - 1, p + 1))}
+                              disabled={page === totalPages - 1}
+                              className="text-zinc-500 hover:text-zinc-300 text-[11px] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            >
+                              next →
+                            </button>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )
                   })() : (
                     <p className="text-zinc-500 text-sm">Nothing installed yet</p>
