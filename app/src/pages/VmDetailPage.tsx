@@ -396,15 +396,13 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-2 pt-2 pb-1.5 shrink-0">
                   <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Installed tools</h2>
-                  {info.state === 'running' && (
-                    <button
-                      onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
-                      disabled={toolsStatus === 'loading'}
-                      className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
+                    disabled={toolsStatus === 'loading'}
+                    className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-2 pb-2">
                   {toolsStatus === 'idle' || toolsStatus === 'loading' ? (

@@ -207,9 +207,27 @@ cat <<JSON
   "mariadb":          $(mariadb_version),
   "postgresql":       $(postgresql_version),
   "dbeaver":          $(rpm_ok dbeaver-ce),
-  "eclipse":          $(glob_ok '/opt/eclipse*'),
+  "eclipse":          $(
+    list=""
+    while IFS= read -r dir; do
+      ver="${dir#/opt/eclipse-}"
+      [[ "${ver}" =~ ^[0-9]{4}-[0-9]{2}$ ]] || continue
+      [[ -n "${list}" ]] && list="${list}, "
+      list="${list}${ver}"
+    done < <(compgen -G "/opt/eclipse-*" 2>/dev/null | sort -rV)
+    [[ -z "${list}" ]] && echo false || echo "\"${list}\""
+  ),
   "intellij":         $(intellij_version),
-  "visualStudioCode": $(cmd_ok code),
+  "visualStudioCode": $(
+    list=""
+    while IFS= read -r dir; do
+      ver="${dir#/opt/vscode-}"
+      [[ "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+      [[ -n "${list}" ]] && list="${list}, "
+      list="${list}${ver}"
+    done < <(compgen -G "/opt/vscode-*" 2>/dev/null | sort -rV)
+    [[ -z "${list}" ]] && echo false || echo "\"${list}\""
+  ),
   "docker":           $(cmd_ok docker),
   "minikube":         $(cmd_ok minikube),
   "k3s":              $(cmd_ok k3s),
