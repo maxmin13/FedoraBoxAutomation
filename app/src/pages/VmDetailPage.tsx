@@ -253,6 +253,22 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
           &larr; Back
         </button>
         <h1 className="text-xl font-semibold text-zinc-100 truncate">{vm.name}</h1>
+        {info && (
+          <div className="ml-auto flex gap-1 shrink-0">
+            <button
+              onClick={() => setRightTab('overview')}
+              className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'overview' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setRightTab('tools')}
+              className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'tools' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
+            >
+              Tools
+            </button>
+          </div>
+        )}
       </div>
 
       {loadError && (
@@ -294,22 +310,6 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
 
           {/* Right column - tabs */}
           <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
-
-            {/* Tab bar */}
-            <div className="flex gap-1 shrink-0">
-              <button
-                onClick={() => setRightTab('overview')}
-                className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'overview' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setRightTab('tools')}
-                className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'tools' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
-              >
-                Tools
-              </button>
-            </div>
 
             {rightTab === 'overview' && (
               <>

@@ -131,7 +131,15 @@ const CATEGORIES: CategoryDef[] = [
     name: 'Databases', dir: 'databases',
     scripts: [
       { name: 'mariadb.sh',    label: 'MariaDB',     relPath: 'mariadb.sh',    description: 'MariaDB - MySQL-compatible relational database',     argType: 'none' },
-      { name: 'postgresql.sh', label: 'PostgreSQL',  relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled', argType: 'none' },
+      { name: 'postgresql.sh', label: 'PostgreSQL',  relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled',
+        argType: 'custom', argPrompts: ['Version'], argDefaults: [''],
+        argOptions: [[
+          { value: '',   label: 'Latest (Fedora repo)' },
+          { value: '17', label: '17 - PGDG' },
+          { value: '16', label: '16 - PGDG' },
+          { value: '15', label: '15 - PGDG' },
+          { value: '14', label: '14 - PGDG' },
+        ]] },
     ],
   },
   {

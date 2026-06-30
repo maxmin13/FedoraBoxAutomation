@@ -13,11 +13,12 @@ for _d in /home/*/.local/bin /opt/*/bin; do
   [ -d "$_d" ] && PATH="${PATH}:${_d}"
 done
 
-cmd_ok()  { which "$1" >/dev/null 2>&1 && echo true || echo false; }
-svc_ok()  { systemctl is-active "$1" >/dev/null 2>&1 && echo true || echo false; }
-path_ok() { [ -e "$1" ] && echo true || echo false; }
-glob_ok() { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
-rpm_ok()  { rpm -q "$1" &>/dev/null && echo true || echo false; }
+cmd_ok()     { which "$1" >/dev/null 2>&1 && echo true || echo false; }
+svc_ok()     { systemctl is-active "$1" >/dev/null 2>&1 && echo true || echo false; }
+path_ok()    { [ -e "$1" ] && echo true || echo false; }
+glob_ok()    { compgen -G "$1" >/dev/null 2>&1 && echo true || echo false; }
+rpm_ok()     { rpm -q "$1" &>/dev/null && echo true || echo false; }
+rpm_any_ok() { for p in "$@"; do rpm -q "${p}" &>/dev/null && echo true && return; done; echo false; }
 
 java_versions() {
   # Detect active major version from the alternatives/PATH default.
@@ -127,6 +128,30 @@ openssl_version() {
   echo "\"${ver}\""
 }
 
+mariadb_version() {
+  local ver=""
+  if rpm -q MariaDB-server &>/dev/null; then
+    ver=$(rpm -q MariaDB-server --queryformat '%{VERSION}')
+  elif rpm -q mariadb-server &>/dev/null; then
+    ver=$(rpm -q mariadb-server --queryformat '%{VERSION}')
+  fi
+  [[ -z "${ver}" ]] && { echo false; return; }
+  echo "\"${ver}\""
+}
+
+postgresql_version() {
+  local list="" ver pkg
+  for pkg in postgresql17-server postgresql16-server postgresql15-server postgresql14-server postgresql-server; do
+    if rpm -q "${pkg}" &>/dev/null; then
+      ver=$(rpm -q "${pkg}" --queryformat '%{VERSION}')
+      [[ -n "${list}" ]] && list="${list}, "
+      list="${list}${ver}"
+    fi
+  done
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
+}
+
 ansible_ok() {
   which ansible >/dev/null 2>&1 && echo true && return
   find /usr /opt /root /home /snap -maxdepth 6 -name 'ansible' -not -name 'ansible-*' -type f 2>/dev/null \
@@ -157,8 +182,8 @@ cat <<JSON
   "maven":            $(maven_versions),
   "httpd":            $(httpd_versions),
   "tomcat":           $(tomcat_versions),
-  "mariadb":          $(svc_ok mariadb),
-  "postgresql":       $(svc_ok postgresql),
+  "mariadb":          $(mariadb_version),
+  "postgresql":       $(postgresql_version),
   "dbeaver":          $(rpm_ok dbeaver-ce),
   "eclipse":          $(glob_ok '/opt/eclipse*'),
   "intellij":         $(intellij_version),
