@@ -46,7 +46,8 @@ app/
       LogsPage.tsx               <- viewer for gui.log and host.log (last 500 lines each)
       DocsPage.tsx               <- renders markdown docs from docs/ inside the app
       VmLoginPage.tsx            <- credential gate: shown inline before entering VM detail or provision
-      VmEditPage.tsx             <- sub-page for a selected VM: detail, provision, share folder, share logs
+      VmDetailPage.tsx           <- sub-page for a selected VM: overview, tools tab, share folder, share logs
+      PerformancePage.tsx        <- CPU/RAM/disk usage and diagnostics for a running VM
       ProvisionPage.tsx          <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx        <- shared folder management for a selected VM
       ShareLogsPage.tsx          <- guest-log sync setup for a selected VM
@@ -64,7 +65,7 @@ app/
       LandingPage.test.tsx
       LogsPage.test.tsx
       DocsPage.test.tsx
-      VmEditPage.test.tsx
+      VmDetailPage.test.tsx
       ProvisionPage.test.tsx
       ShareFolderPage.test.tsx
       ShareLogsPage.test.tsx

@@ -29,20 +29,21 @@ app/
       CreateVmPage.test.tsx
       LogsPage.test.tsx
       DocsPage.test.tsx
-      VmEditPage.test.tsx
+      VmDetailPage.test.tsx
       ProvisionPage.test.tsx
       ShareFolderPage.test.tsx
       ShareLogsPage.test.tsx
     pages/            <- one component per page
-      LandingPage.tsx    <- lists all registered VMs with start/stop controls
-      SetupPage.tsx      <- environment analysis and fix actions
-      CreateVmPage.tsx   <- form to configure and create a new Fedora VM
-      LogsPage.tsx       <- viewer for gui.log and host.log (last 500 lines each)
-      DocsPage.tsx       <- renders markdown docs from docs/ inside the app
-      VmEditPage.tsx     <- sub-page for a selected VM: detail, provision, share folder, share logs
-      ProvisionPage.tsx  <- tool-by-tool provisioning: script list, run controls, banners
+      LandingPage.tsx     <- lists all registered VMs with start/stop controls
+      SetupPage.tsx       <- environment analysis and fix actions
+      CreateVmPage.tsx    <- form to configure and create a new Fedora VM
+      LogsPage.tsx        <- viewer for gui.log and host.log (last 500 lines each)
+      DocsPage.tsx        <- renders markdown docs from docs/ inside the app
+      VmDetailPage.tsx    <- sub-page for a selected VM: overview, tools tab, share folder, share logs
+      PerformancePage.tsx <- CPU/RAM/disk usage and diagnostics for a running VM
+      ProvisionPage.tsx   <- tool-by-tool provisioning: script list, run controls, banners
       ShareFolderPage.tsx <- shared folder management for a selected VM
-      ShareLogsPage.tsx  <- guest-log sync setup for a selected VM
+      ShareLogsPage.tsx   <- guest-log sync setup for a selected VM
     components/       <- reusable UI components
   package.json
   vite.config.ts
