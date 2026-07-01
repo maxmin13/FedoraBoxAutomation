@@ -1,23 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import ProvisionPage, { clearScriptResultsCache } from '../pages/ProvisionPage'
+import ProvisionPage from '../pages/ProvisionPage'
 
 const VM = { name: 'FedoraBox', uuid: 'uuid-1', running: true }
 
 beforeEach(() => {
-  clearScriptResultsCache()
   window.electronAPI = {
-    loadVmCredentials:  vi.fn().mockResolvedValue({ ok: false }),
-    saveVmCredentials:  vi.fn().mockResolvedValue({ ok: true }),
-    checkVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
-    runProvisionScript: vi.fn().mockResolvedValue({ ok: true }),
-    runProvisionSetup:  vi.fn().mockResolvedValue({ ok: true }),
-    getVmHostname:      vi.fn().mockResolvedValue({ ok: true, hostname: 'fedorabox' }),
-    getScriptState:     vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
-    clearScriptState:   vi.fn().mockResolvedValue({ ok: true }),
-    onScriptLine:       vi.fn().mockReturnValue(() => {}),
-    onScriptDone:       vi.fn().mockReturnValue(() => {}),
-    logUiAction:        vi.fn(),
+    loadVmCredentials:    vi.fn().mockResolvedValue({ ok: false }),
+    saveVmCredentials:    vi.fn().mockResolvedValue({ ok: true }),
+    checkVmCredentials:   vi.fn().mockResolvedValue({ ok: true }),
+    runProvisionScript:   vi.fn().mockResolvedValue({ ok: true }),
+    runProvisionSetup:    vi.fn().mockResolvedValue({ ok: true }),
+    getVmHostname:        vi.fn().mockResolvedValue({ ok: true, hostname: 'fedorabox' }),
+    getScriptState:       vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
+    clearScriptState:     vi.fn().mockResolvedValue({ ok: true }),
+    saveProvisionResult:  vi.fn().mockResolvedValue({ ok: true }),
+    loadProvisionResult:  vi.fn().mockResolvedValue({ ok: false }),
+    clearProvisionResult: vi.fn().mockResolvedValue({ ok: true }),
+    onScriptLine:         vi.fn().mockReturnValue(() => {}),
+    onScriptDone:         vi.fn().mockReturnValue(() => {}),
+    logUiAction:          vi.fn(),
   } as unknown as typeof window.electronAPI
 })
 

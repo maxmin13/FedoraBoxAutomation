@@ -90,6 +90,7 @@ function execTracked(cmd, options, procs) {
 const SILENT_CHANNELS = new Set([
   'read-log',               // reply is full file content — would create a feedback loop
   'log-ui-action',          // high-frequency, no useful debug value in the log
+  'save-provision-result',  // contains full log-line arrays — too noisy to log
   // All channels below receive or return passwords — kept out of gui.log
   'check-vm-credentials',
   'check-vm-ready',
@@ -399,6 +400,10 @@ function registerIpcHandlers(win) {
         await writeCredsStore(store)
         log.info(`[ipc][delete-vm] removed credentials for "${name}"`)
       }
+
+      try {
+        await fs.promises.unlink(path.join(CREDS_DIR, `${name}-provision-result.json`))
+      } catch { /* not found is fine */ }
 
       return { ok: true }
     } catch (error) {
@@ -816,6 +821,42 @@ function registerIpcHandlers(win) {
   // so the next navigation back shows the idle form instead of the result again.
   handleIpc('clear-script-state', async () => {
     clearScriptState()
+    return { ok: true }
+  })
+
+  // ── save-provision-result ─────────────────────────────────
+  // Persists the outcome of a provision run so the result banner can be shown
+  // once when the user navigates back after the script completed while they were away.
+  handleIpc('save-provision-result', async (_event, { vmName, scriptName, label, succeeded, alreadyInstalled, error, lines }) => {
+    try {
+      await fs.promises.mkdir(CREDS_DIR, { recursive: true })
+      const filePath = path.join(CREDS_DIR, `${vmName}-provision-result.json`)
+      await fs.promises.writeFile(filePath, JSON.stringify({ scriptName, label, succeeded, alreadyInstalled, error, lines }), 'utf8')
+      return { ok: true }
+    } catch (err) {
+      log.error(`[ipc][save-provision-result] "${vmName}":`, err.message)
+      return { ok: false, error: err.message }
+    }
+  })
+
+  // ── load-provision-result ─────────────────────────────────
+  // Returns the persisted provision result for a VM, or { ok: false } if none exists.
+  handleIpc('load-provision-result', async (_event, vmName) => {
+    try {
+      const filePath = path.join(CREDS_DIR, `${vmName}-provision-result.json`)
+      const raw = await fs.promises.readFile(filePath, 'utf8')
+      return { ok: true, result: JSON.parse(raw) }
+    } catch {
+      return { ok: false }
+    }
+  })
+
+  // ── clear-provision-result ────────────────────────────────
+  // Deletes the persisted provision result for a VM (called after banner is shown).
+  handleIpc('clear-provision-result', async (_event, vmName) => {
+    try {
+      await fs.promises.unlink(path.join(CREDS_DIR, `${vmName}-provision-result.json`))
+    } catch { /* not found is fine */ }
     return { ok: true }
   })
 

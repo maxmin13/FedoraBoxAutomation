@@ -29,7 +29,7 @@ const STORAGE_CTRL_OPTIONS = [
   { value: 'NVMe',      label: 'NVMe (fastest)' },
 ]
 
-export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { onScriptRunning: (running: boolean) => void; onNavigate: (page: Page) => void; navKey: number }) {
+export default function CreateVmPage({ onScriptRunning, onNavigate, navKey, isActive = true }: { onScriptRunning: (running: boolean) => void; onNavigate: (page: Page) => void; navKey: number; isActive?: boolean }) {
   // Form fields
   const [vmName,   setVmName]   = useState('')
   const [vmFolder, setVmFolder] = useState('')
@@ -55,12 +55,22 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const [existingNames, setExistingNames] = useState<string[]>([])
   const [showLog,       setShowLog]       = useState(false)
   const resultRef = useRef<HTMLDivElement>(null)
+  // True once the user has been on the page while pageState='done', meaning they've seen the result.
+  // A navKey change only resets the form once the user has seen the result.
+  const resultSeenRef = useRef(false)
 
   useEffect(() => {
     if (pageState === 'done') {
       resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [pageState])
+
+  // Mark the result as seen whenever the page is active and showing the done state.
+  useEffect(() => {
+    if (pageState === 'done' && isActive) {
+      resultSeenRef.current = true
+    }
+  }, [pageState, isActive])
 
   useEffect(() => {
     onScriptRunning(pageState === 'running')
@@ -73,7 +83,10 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   }, [])
 
   useEffect(() => {
-    if (navKey > 0 && pageState !== 'running' && pageState !== 'done') {
+    // Skip reset while script is running. Also skip if the user hasn't seen the result yet
+    // (they were away when the script completed and deserve to see the banner on next visit).
+    if (navKey > 0 && pageState !== 'running' && (pageState !== 'done' || resultSeenRef.current)) {
+      resultSeenRef.current = false
       setPageState('idle')
       setStep(1)
       setVmName('')

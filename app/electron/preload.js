@@ -133,6 +133,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Returns an unsubscribe function so the component can clean up.
   getScriptState: () => ipcRenderer.invoke('get-script-state'),
   clearScriptState: () => ipcRenderer.invoke('clear-script-state'),
+  saveProvisionResult: (params) => ipcRenderer.invoke('save-provision-result', params),
+  loadProvisionResult: (vmName) => ipcRenderer.invoke('load-provision-result', vmName),
+  clearProvisionResult: (vmName) => ipcRenderer.invoke('clear-provision-result', vmName),
 
   onScriptLine: (callback) => {
     const handler = (_event, line) => callback(line)

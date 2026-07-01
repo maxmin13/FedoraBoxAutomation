@@ -22,6 +22,9 @@ beforeEach(() => {
     logUiAction:            vi.fn(),
     getScriptState:         vi.fn().mockResolvedValue({ ok: true, running: false, done: false, exitCode: null, lines: [], context: null }),
     clearScriptState:       vi.fn().mockResolvedValue({ ok: true }),
+    saveProvisionResult:    vi.fn().mockResolvedValue({ ok: true }),
+    loadProvisionResult:    vi.fn().mockResolvedValue({ ok: false }),
+    clearProvisionResult:   vi.fn().mockResolvedValue({ ok: true }),
     getVmGuestLogsPath:     vi.fn().mockResolvedValue({ ok: true, path: 'C:\\VMs\\FedoraBox\\guest-logs' }),
     cancelQueryVmInstalled: vi.fn(),
     queryVmInstalled:       vi.fn().mockResolvedValue({ ok: false, vmStopped: true }),
@@ -220,6 +223,8 @@ describe('delete confirmation', () => {
 describe('VM detail navigation', () => {
   beforeEach(() => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
+    // handleOpenDetail checks credentials before showing VmDetailPage
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'password' })
   })
 
   async function clickDetail() {

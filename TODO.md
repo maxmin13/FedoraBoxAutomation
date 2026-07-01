@@ -6,5 +6,3 @@
 
 # create a new vm, verify all the provision scripts after change most recent version
 
-# when creating a new vm, do we need the navigate away go back mechanism?
-
