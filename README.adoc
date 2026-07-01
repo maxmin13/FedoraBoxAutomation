@@ -30,6 +30,10 @@ The end result is a fully configured, ready-to-use Fedora VM without writing a s
 
 == Screenshots
 
+.VM Login — credential gate
+image::docs/screenshots/login-gate-page.png[VM Login gate, width=500]
+Collects root username, root password, and desktop username. Validates credentials via Guest Control before proceeding; credentials are saved to the store on success.
+
 .Setup — environment analysis with fix instructions
 image::docs/screenshots/setup-page.png[Setup page, width=500]
 Checks RAM, disk, CPU virtualisation, Hyper-V, and VirtualBox version in one click. The right panel shows fix instructions for whichever failing check is selected.
@@ -45,10 +49,6 @@ Shows general info, hardware, network, log sync destination, and shared folders.
 .VM Detail — Installed Tools tab
 image::docs/screenshots/details-tools-page.png[VM detail tools, width=500]
 Detects installed tools in a running VM and displays versions as chips. Multi-version tools (Java, Python, Maven) show all installed versions; Java shows only the active one.
-
-.VM Login — credential gate
-image::docs/screenshots/login-gate-page.png[VM Login gate, width=500]
-Collects root username, root password, and desktop username. Validates credentials via Guest Control before proceeding; credentials are saved to the store on success.
 
 .Create VM — 4-step wizard
 image::docs/screenshots/create-vm-wizard-page.png[Create VM wizard, width=500]
