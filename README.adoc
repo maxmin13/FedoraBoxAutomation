@@ -42,6 +42,10 @@ Checks RAM, disk, CPU virtualisation, Hyper-V, and VirtualBox version in one cli
 image::docs/screenshots/my-vms-page.png[My VMs page, width=500]
 Lists every registered VirtualBox VM with its running state and Start / Stop / Delete buttons. The Detail and Provision buttons open a credential gate before entering the VM.
 
+.VM Performance — live CPU, memory, and disk metrics
+image::docs/screenshots/performance-page.png[VM Performance page, width=500]
+Shows live CPU usage, memory consumption, and disk I/O for a running VM. Refreshes automatically; actionable warnings surface in the diagnostics column.
+
 .VM Detail — Overview tab (shared folders and log sync)
 image::docs/screenshots/details-overview-page.png[VM detail overview, width=500]
 Shows general info, hardware, network, log sync destination, and shared folders. Switches to the Tools tab to see what is installed.
@@ -177,6 +181,9 @@ The desktop app is built with Electron + React and runs at a fixed 1100×750 win
 | *VM Login*
 | Shown inline before entering VM detail or Provision; collects root username/password and desktop username; validates credentials via Guest Control before proceeding; credentials saved to store on success
 
+| *VM Performance*
+| Live CPU, memory, and disk I/O metrics for a running VM; refreshes automatically; diagnostics column surfaces actionable warnings
+
 | *VM detail — Provision*
 | Choose Base Setup (system-prep, hostname, SELinux, desktop, utilities) or install individual tools by category; credentials loaded automatically from the saved store; success / failure / already-installed / force-install banners after each run
 
@@ -260,7 +267,7 @@ Full setup and usage instructions are in link:docs/TESTING.md[docs/TESTING.md].
 | Windows or Linux (Node.js)
 |===
 
-Current totals: *422 Vitest tests* across 16 files.
+Current totals: *406 Vitest tests* across 16 files.
 
 == Troubleshooting
 
