@@ -372,7 +372,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showRestartModal,  setShowRestartModal]  = useState(false)
   const [forceConfirm,      setForceConfirm]      = useState(false)
   const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
-  const [isReconnect, setIsReconnect] = useState(false)
   const forceConfirmNeededRef  = useRef(false)
   const alreadyInstalledRef    = useRef(false)
   const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
@@ -503,50 +502,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setIdleView('scripts')
   }
 
-  async function handleSelectScript(script: ScriptDef) {
+  function handleSelectScript(script: ScriptDef) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select script "${script.label}"`)
-    const state = await window.electronAPI.getScriptState()
-    const isRunning =
-      state.ok && state.running &&
-      state.context?.vmName === vm.name && state.context?.type === 'provision' &&
-      state.context?.scriptName === script.name
-
-    if (isRunning) {
-      if (reconnectUnsubRef.current) {
-        reconnectUnsubRef.current.line()
-        reconnectUnsubRef.current.done()
-        reconnectUnsubRef.current = null
-      }
-      window.electronAPI.logUiAction(`provision "${vm.name}": reconnect running "${script.name}"`)
-      const found = findScriptByName(script.name)
-      setSelectedScript(script)
-      setSelectedCategory(found?.category ?? null)
-      setRunningLabel(script.label)
-      setLines(state.lines)
-      setPageState('running')
-      setShowLog(true)
-      const liveLines = [...state.lines]
-      const unsubLine = window.electronAPI.onScriptLine((line) => {
-        liveLines.push(line)
-        setLines((prev) => [...prev, line])
-      })
-      const unsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
-        const isAlreadyInstalled = liveLines.some((l) => /\[INFO\s*\].*already installed/i.test(l.text))
-        await window.electronAPI.saveProvisionResult({ vmName: vm.name, scriptName: script.name, label: script.label, succeeded: exitCode === 0, alreadyInstalled: isAlreadyInstalled, error: null, lines: liveLines })
-        await window.electronAPI.clearProvisionResult(vm.name)
-        window.electronAPI.clearScriptState()
-        setSuccess(exitCode === 0)
-        setAlreadyInstalled(isAlreadyInstalled)
-        setPageState('done')
-        setShowLog(false)
-        reconnectUnsubRef.current = null
-        unsubLine()
-        unsubDone()
-      })
-      reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
-      return
-    }
-
     setSelectedScript(script)
     setSelectedCategory(findScriptByName(script.name)?.category ?? null)
     setArgValues(['', ''])
@@ -686,49 +643,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     await window.electronAPI.restartVm(vm.name)
   }
 
-  async function handleSelectBaseSetup() {
+  function handleSelectBaseSetup() {
     window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`)
-    const state = await window.electronAPI.getScriptState()
-    const isBaseSetupRunning =
-      state.ok && state.running &&
-      state.context?.vmName === vm.name && state.context?.type === 'provision' &&
-      !state.context?.scriptName
-
-    if (isBaseSetupRunning) {
-      if (reconnectUnsubRef.current) {
-        reconnectUnsubRef.current.line()
-        reconnectUnsubRef.current.done()
-        reconnectUnsubRef.current = null
-      }
-      window.electronAPI.logUiAction(`provision "${vm.name}": reconnect running Base Setup`)
-      setSelectedScript(null)
-      setSelectedCategory(null)
-      setRunningLabel('Base Setup')
-      setLines(state.lines)
-      setIsReconnect(true)
-      setPageState('running')
-      setShowLog(true)
-      const liveLines = [...state.lines]
-      const unsubLine = window.electronAPI.onScriptLine((line) => {
-        liveLines.push(line)
-        setLines((prev) => [...prev, line])
-      })
-      const unsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
-        await window.electronAPI.saveProvisionResult({ vmName: vm.name, scriptName: null, label: 'Base Setup', succeeded: exitCode === 0, alreadyInstalled: false, error: null, lines: liveLines })
-        await window.electronAPI.clearProvisionResult(vm.name)
-        window.electronAPI.clearScriptState()
-        setSuccess(exitCode === 0)
-        setIsReconnect(false)
-        setPageState('done')
-        setShowLog(false)
-        reconnectUnsubRef.current = null
-        unsubLine()
-        unsubDone()
-      })
-      reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
-      return
-    }
-
     setIdleView('full-form')
   }
 
@@ -767,22 +683,6 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
         <div className="shrink-0 space-y-2">
-          {isReconnect && (
-            <button
-              onClick={() => {
-                window.electronAPI.logUiAction(`provision "${vm.name}": disconnect from running Base Setup`)
-                reconnectUnsubRef.current?.line()
-                reconnectUnsubRef.current?.done()
-                reconnectUnsubRef.current = null
-                setIsReconnect(false)
-                setPageState('idle')
-                setIdleView('mode')
-              }}
-              className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors"
-            >
-              &larr; Back
-            </button>
-          )}
           <p className="text-zinc-300 text-sm font-medium">Running {runningLabel}...</p>
           <ProgressBar />
         </div>
