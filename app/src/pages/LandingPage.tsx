@@ -114,17 +114,15 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   }
 
   async function handleOpenDetail(vm: Vm) {
-    if (vm.processRunning) {
-      const creds = await window.electronAPI.loadVmCredentials(vm.name)
-      if (!creds.ok || !creds.user || !creds.pass) {
-        setPendingDetailVm(vm)
-        return
-      }
-      const check = await window.electronAPI.checkVmCredentials(vm.name, creds.user, creds.pass)
-      if (!check.ok) {
-        setPendingDetailVm(vm)
-        return
-      }
+    const creds = await window.electronAPI.loadVmCredentials(vm.name)
+    if (!creds.ok || !creds.user || !creds.pass) {
+      setPendingDetailVm(vm)
+      return
+    }
+    const check = await window.electronAPI.checkVmCredentials(vm.name, creds.user, creds.pass)
+    if (!check.ok) {
+      setPendingDetailVm(vm)
+      return
     }
     setSelectedVmView('detail')
     setSelectedVm(vm)
