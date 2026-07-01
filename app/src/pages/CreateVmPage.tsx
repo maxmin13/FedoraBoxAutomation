@@ -73,7 +73,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   }, [])
 
   useEffect(() => {
-    if (navKey > 0 && pageState !== 'running') {
+    if (navKey > 0 && pageState !== 'running' && pageState !== 'done') {
       setPageState('idle')
       setStep(1)
       setVmName('')
