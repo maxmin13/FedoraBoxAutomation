@@ -568,7 +568,7 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
 
   return (
     <div className="relative flex items-center gap-2 text-sm min-w-0 group">
-      <span className="text-zinc-500 w-20 shrink-0">{label}</span>
+      <span className="text-zinc-500 w-24 shrink-0">{label}</span>
       <span className={mono ? 'text-zinc-300 font-mono text-xs truncate min-w-0' : 'text-zinc-300'}>
         {value}
       </span>
