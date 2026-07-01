@@ -149,9 +149,6 @@ declare global {
       installVirtualBox: () => Promise<{ ok: boolean }>
       getScriptState: () => Promise<{ ok: boolean; running: boolean; done: boolean; exitCode: number | null; lines: ScriptLine[]; context: { vmName: string; type: string; categoryDir: string | null; scriptName: string | null } | null }>
       clearScriptState: () => Promise<{ ok: boolean }>
-      saveProvisionResult: (params: { vmName: string; scriptName: string | null; label: string; succeeded: boolean; alreadyInstalled: boolean; error: string | null; lines: ScriptLine[] }) => Promise<{ ok: boolean }>
-      loadProvisionResult: (vmName: string) => Promise<{ ok: true; result: { scriptName: string | null; label: string; succeeded: boolean; alreadyInstalled: boolean; error: string | null; lines: ScriptLine[] } } | { ok: false }>
-      clearProvisionResult: (vmName: string) => Promise<{ ok: boolean }>
       onScriptLine: (callback: (line: ScriptLine) => void) => () => void
       onScriptDone: (callback: (exitCode: number) => void) => () => void
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>

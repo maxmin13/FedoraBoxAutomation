@@ -222,7 +222,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   if (view === 'provision') {
     return (
       <div className="h-full">
-        <ProvisionPage vm={vm} onBack={onBack} onScriptRunning={onScriptRunning} isActive={isActive} />
+        <ProvisionPage vm={vm} onBack={onBack} onScriptRunning={onScriptRunning} />
       </div>
     )
   }

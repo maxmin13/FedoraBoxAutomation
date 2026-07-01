@@ -56,7 +56,7 @@ export default function App() {
             <SetupPage onScriptRunning={handleScriptRunning} />
           </div>
           <div style={{ display: currentPage === 'create-vm' ? undefined : 'none' }} className="h-full overflow-hidden">
-            <CreateVmPage onScriptRunning={handleScriptRunning} onNavigate={handleNavigate} navKey={createVmNavKey} isActive={currentPage === 'create-vm'} />
+            <CreateVmPage onScriptRunning={handleScriptRunning} onNavigate={handleNavigate} navKey={createVmNavKey} />
           </div>
           {currentPage === 'docs' && (
             <div className="h-full overflow-hidden">
