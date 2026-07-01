@@ -198,6 +198,13 @@ python_versions() {
   echo "\"${list}\""
 }
 
+tool_version() {
+  local bin ver
+  bin=$(which "$1" 2>/dev/null) || { echo false; return; }
+  ver=$("$bin" --version 2>/dev/null | awk 'NR==1{match($0,/[0-9]+\.[0-9]+\.[0-9]+/); if(RSTART) print substr($0,RSTART,RLENGTH)}')
+  [[ -n "${ver}" ]] && echo "\"${ver}\"" || echo false
+}
+
 cat <<JSON
 {
   "baseSetup":        $(path_ok /etc/fedorabox/.base-setup),
@@ -238,12 +245,12 @@ cat <<JSON
   "awsCli":           $(which aws >/dev/null 2>&1 && aws --version 2>/dev/null | awk '{split($1,a,"/"); print "\""a[2]"\""}' || echo false),
   "ecsCli":           $([ -x /usr/local/bin/ecs-cli ] && /usr/local/bin/ecs-cli --version 2>/dev/null | awk '{gsub("[()]","",$3); print "\""$3"\""}' || echo false),
   "openssl":          $(openssl_version),
-  "wireshark":        $(which tshark >/dev/null 2>&1 && tshark --version 2>/dev/null | awk 'NR==1{print "\""$2"\""}' || echo false),
+  "wireshark":        $(tool_version tshark),
   "git":              $(which git >/dev/null 2>&1 && git --version 2>/dev/null | awk '{print "\""$3"\""}' || echo false),
   "vim":              $(which vim >/dev/null 2>&1 && vim --version 2>/dev/null | awk 'NR==1{print "\""$5"\""}' || echo false),
   "chrome":           $(rpm -q google-chrome-stable &>/dev/null && rpm -q google-chrome-stable --queryformat '"%{VERSION}"' || echo false),
   "ansible":          $(ansible_version),
-  "claudeCode":       $(which claude >/dev/null 2>&1 && claude --version 2>/dev/null | awk '{print "\""$NF"\""}' || echo false),
-  "flameshot":        $(which flameshot >/dev/null 2>&1 && flameshot --version 2>/dev/null | awk '{print "\""$NF"\""}' || echo false)
+  "claudeCode":       $(tool_version claude),
+  "flameshot":        $(tool_version flameshot)
 }
 JSON
