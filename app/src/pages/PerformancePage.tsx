@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Vm, VmInfo, VmProcess, ScriptLine } from '../electron.d'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
@@ -47,6 +47,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [killError,   setKillError]   = useState<string | null>(null)
   const [killTarget,  setKillTarget]  = useState<{ pid: number; name: string } | null>(null)
 
+  const procLoadingRef = useRef(false)
+
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
   function handleLoginSuccess() {
@@ -78,10 +80,9 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     })
   }, [vm.name, credKey])
 
-  async function handleRefresh() {
+  function handleRefresh() {
     window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
     setInfoKey((k) => k + 1)
-    await loadProcesses()
     runDiagnostics(vmUser, vmPass, loginUser)
   }
 
@@ -155,11 +156,14 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     setTimeout(() => loadProcesses(), 3000)
   }
 
-  async function loadProcesses() {
+  async function loadProcesses(silent = false) {
+    if (procLoadingRef.current) return
+    procLoadingRef.current = true
     window.electronAPI.logUiAction(`performance "${vm.name}": Load processes`)
-    setProcState('loading')
+    if (!silent) setProcState('loading')
     setProcError(null)
     const result = await window.electronAPI.queryVmPerformance(vm.name)
+    procLoadingRef.current = false
     if (!result.ok) {
       if (result.vmStopped)     { setProcState('stopped');        return }
       if (result.noCredentials) { setProcState('no-credentials'); return }
@@ -170,6 +174,11 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     setProcSnapshot(result)
     setProcState('ok')
   }
+
+  useEffect(() => {
+    const id = setInterval(() => loadProcesses(true), 5000)
+    return () => clearInterval(id)
+  }, [vm.name, credKey])
 
   if (loginRequired) {
     return (
@@ -298,20 +307,9 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
             {/* Running Processes card */}
             <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-2 overflow-hidden">
               <div className="flex items-center shrink-0">
-                <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol">
+                <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol — updates every 5 seconds">
                   <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
                 </Tooltip>
-                <span className="ml-auto">
-                  <Tooltip tip="Re-sample CPU and memory usage">
-                    <button
-                      onClick={() => { window.electronAPI.logUiAction(`performance "${vm.name}": Refresh processes`); loadProcesses() }}
-                      disabled={procState === 'loading' || procState === 'idle'}
-                      className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {procState === 'loading' ? '...' : 'Refresh'}
-                    </button>
-                  </Tooltip>
-                </span>
               </div>
 
               {procState === 'idle' && (
