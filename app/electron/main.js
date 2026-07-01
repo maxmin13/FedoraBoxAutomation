@@ -4,7 +4,7 @@
 //  and wires up all the IPC handlers.
 // ============================================================
 
-const { app, BrowserWindow, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const { registerIpcHandlers } = require('./ipc-handlers')
 const { killActiveScript, hasActiveScript } = require('./script-runner')
@@ -45,43 +45,17 @@ function createWindow() {
     },
   })
 
-  if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
-    // In development, Vite serves the renderer on localhost
-    win.loadURL('http://localhost:5173')
-  } else {
-    // In production, load the built HTML file from the dist folder
-    // __dirname is electron-gui/electron/ so we go up one level to find dist/
+  if (app.isPackaged) {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  } else {
+    win.loadURL('http://localhost:5173')
   }
 
   // Intercept the close event to warn the user if a script is running
-  win.on('close', async (event) => {
-    if (!hasActiveScript()) {
-      // No script running — allow the window to close normally
-      return
-    }
-
-    // Prevent the window from closing immediately
+  win.on('close', (event) => {
+    if (!hasActiveScript()) return
     event.preventDefault()
-
-    const response = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: ['Keep waiting', 'Force quit'],
-      defaultId: 0, // 'Keep waiting' is the default — safer choice
-      title: 'Script still running',
-      message: 'A script is still running.',
-      detail: 'Force quitting now may leave your VM in an incomplete state.',
-    })
-
-    // response.response is the index of the button the user clicked:
-    // 0 = 'Keep waiting', 1 = 'Force quit'
-    if (response.response === 1) {
-      log.warn('[main] force quit while script was running')
-      killActiveScript()
-      app.exit(0)
-    } else {
-      log.info('[main] user chose to keep waiting')
-    }
+    win.webContents.send('show-close-warning')
   })
 
   return win
@@ -105,6 +79,16 @@ app.whenReady().then(() => {
 
   // Register all ipcMain.handle() calls so the renderer can talk to main
   registerIpcHandlers(win)
+
+  ipcMain.handle('close-warning-response', (_event, forceQuit) => {
+    if (forceQuit) {
+      log.warn('[main] force quit while script was running')
+      killActiveScript()
+      app.exit(0)
+    } else {
+      log.info('[main] user chose to keep waiting')
+    }
+  })
 })
 
 // On Windows and Linux, closing all windows quits the app

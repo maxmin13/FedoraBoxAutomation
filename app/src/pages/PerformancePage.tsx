@@ -47,7 +47,9 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [killError,   setKillError]   = useState<string | null>(null)
   const [killTarget,  setKillTarget]  = useState<{ pid: number; name: string } | null>(null)
 
-  const procLoadingRef = useRef(false)
+  const procLoadingRef   = useRef(false)
+  const diagUnsubLineRef = useRef<(() => void) | null>(null)
+  const diagUnsubDoneRef = useRef<(() => void) | null>(null)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -78,6 +80,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       await loadProcesses()
       runDiagnostics(user, pass, login)
     })
+    return () => {
+      diagUnsubLineRef.current?.(); diagUnsubLineRef.current = null
+      diagUnsubDoneRef.current?.(); diagUnsubDoneRef.current = null
+    }
   }, [vm.name, credKey])
 
   function handleRefresh() {
@@ -88,6 +94,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
   async function runDiagnostics(user: string, pass: string, login: string) {
     if (!user || !pass) return
+
+    diagUnsubLineRef.current?.(); diagUnsubLineRef.current = null
+    diagUnsubDoneRef.current?.(); diagUnsubDoneRef.current = null
+
     setDiagLines([])
     setDiagError(null)
     setDiagState('running')
@@ -97,11 +107,15 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       setDiagLines((prev) => [...prev, line])
     })
     const unsubDone = window.electronAPI.onScriptDone(() => {
+      diagUnsubLineRef.current = null
+      diagUnsubDoneRef.current = null
       setDiagState('done')
       onScriptRunning?.(false)
       unsubLine()
       unsubDone()
     })
+    diagUnsubLineRef.current = unsubLine
+    diagUnsubDoneRef.current = unsubDone
 
     try {
       const result = await window.electronAPI.runProvisionScript({
@@ -114,6 +128,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       })
       if (!result.ok) setDiagError('Performance check failed — see output below')
     } catch (e) {
+      diagUnsubLineRef.current = null
+      diagUnsubDoneRef.current = null
       setDiagError(e instanceof Error ? e.message : 'Failed to run diagnostics')
       setDiagState('done')
       onScriptRunning?.(false)

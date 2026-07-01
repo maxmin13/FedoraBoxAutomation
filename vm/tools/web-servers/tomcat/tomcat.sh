@@ -118,6 +118,18 @@ if ss -tlnp | grep -q ":${TOMCAT_PORT} "; then
     log_error "Port ${TOMCAT_PORT} is already in use by another process."
     log_error "Pick a different port or stop the process occupying it."
     ss -tlnp | grep ":${TOMCAT_PORT} "
+    _pid=$(ss -tlnp | grep ":${TOMCAT_PORT} " | grep -oP 'pid=\K[0-9]+' | head -1)
+    if [[ -n "${_pid}" ]]; then
+        log_info "Process ${_pid} binary:  $(ls -la /proc/${_pid}/exe 2>/dev/null || echo 'unknown')"
+        log_info "Process ${_pid} command: $(tr '\0' ' ' < /proc/${_pid}/cmdline 2>/dev/null || echo 'unknown')"
+        log_info "Process ${_pid} workdir: $(ls -la /proc/${_pid}/cwd 2>/dev/null || echo 'unknown')"
+        _svc=$(systemctl status "${_pid}" 2>/dev/null | grep -oP '(?<=● )[\w@.-]+\.service' | head -1 || true)
+        if [[ -n "${_svc}" ]]; then
+            log_info "Process ${_pid} service: ${_svc} (stop with: systemctl stop ${_svc})"
+        else
+            log_info "To free the port: kill ${_pid}"
+        fi
+    fi
     exit 1
 fi
 

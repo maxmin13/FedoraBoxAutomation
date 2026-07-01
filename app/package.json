@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
-    "start": "npm run build && cross-env NODE_ENV=production electron .",
     "dist": "npm run build && electron-builder --win --x64",
     "dist:zip": "node scripts/dist-zip.js",
     "preview": "vite preview",
@@ -23,7 +22,6 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.0",
     "concurrently": "^8.2.0",
-    "cross-env": "^10.1.0",
     "electron": "^31.0.0",
     "electron-builder": "^25.0.0",
     "jsdom": "^25.0.0",

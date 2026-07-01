@@ -193,10 +193,6 @@ function extractError(lines) {
   return lines.filter(l => l.text.trim()).at(-1)?.text.trim() ?? null
 }
 
-/**
- * Registers all IPC handlers. Called once from main.js after the window is created.
- * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
- */
 // Finds the JSON line in guestcontrol stdout, ignoring any VBoxManage status lines
 // that may appear before or after the script output.
 function extractPerfJson(stdout) {
@@ -205,6 +201,10 @@ function extractPerfJson(stdout) {
   return JSON.parse(line.trim())
 }
 
+/**
+ * Registers all IPC handlers. Called once from main.js after the window is created.
+ * @param {Electron.BrowserWindow} win - The main window, used to push streaming events
+ */
 function registerIpcHandlers(win) {
 
   // ── get-downloads-path ────────────────────────────────────
@@ -869,6 +869,7 @@ function registerIpcHandlers(win) {
       '-LoginUser', params.loginUser,
       '-NonInteractive',
     ]
+    if (params.forceRestart) psArgs.push('-ForceRestart')
     const { exitCode, lines } = await streamScript(win, SCRIPTS.shareFolder, psArgs, { vmName: params.vmName, type: 'share-folder' })
     if (exitCode === 0) return { ok: true }
     return { ok: false, errorDetail: extractError(lines) }

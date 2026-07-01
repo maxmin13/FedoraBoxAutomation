@@ -4,7 +4,8 @@ import LogPanel from '../components/LogPanel'
 import ProgressBar from '../components/ProgressBar'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
-// â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+
+// -- Types
 
 type ArgType = 'none' | 'user' | 'custom' | 'user+custom' | 'user+custom2' | 'custom2'
 
@@ -14,9 +15,9 @@ interface ArgOption {
 }
 
 interface ForceConfirmDef {
-  title: string        // heading shown in the amber panel
-  details?: string[]  // bullet points below the heading
-  actionLabel: string // label on the confirm button ("Install anyway", "Update", ...)
+  title: string
+  details?: string[]
+  actionLabel: string
 }
 
 interface ScriptDef {
@@ -28,8 +29,8 @@ interface ScriptDef {
   argType: ArgType
   argPrompts?: string[]
   argDefaults?: string[]
-  argOptions?: ArgOption[][]   // per-position; if set, renders a <select> instead of <input>
-  forceConfirmDef?: ForceConfirmDef  // if set, script can emit "Use 'Install anyway'" to trigger confirmation
+  argOptions?: ArgOption[][]   // per-position; renders a <select> instead of <input>
+  forceConfirmDef?: ForceConfirmDef
 }
 
 interface CategoryDef {
@@ -41,7 +42,7 @@ interface CategoryDef {
 type PageState = 'idle' | 'running' | 'done'
 type IdleView  = 'mode' | 'full-form' | 'categories' | 'scripts' | 'script-args'
 
-// â"€â"€ Script Catalog â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// -- Script catalog
 
 const CATEGORIES: CategoryDef[] = [
   {
@@ -74,15 +75,14 @@ const CATEGORIES: CategoryDef[] = [
           { value: '3.12.7', label: '3.12.7 - security fixes until Oct 2028' },
           { value: '3.11.9', label: '3.11.9 - security fixes until Oct 2027' },
         ]] },
-      { name: 'node.sh',   label: 'Node.js',      relPath: 'node.sh',   description: 'Node.js LTS via NodeSource - includes npm',
-        argType: 'user+custom',
-        argPrompts:  ['Node.js version'],
-        argDefaults: ['latest'],
+      { name: 'node.sh', label: 'Node.js', relPath: 'node.sh',
+        description: 'Node.js LTS via NodeSource - includes npm',
+        argType: 'user+custom', argPrompts: ['Node.js version'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest', label: 'Latest LTS (auto-detect)' },
-          { value: '24', label: '24 - ships natively in Fedora 44' },
-          { value: '22', label: '22 - LTS Active (until Apr 2027)' },
-          { value: '20', label: '20 - LTS Maintenance (until Apr 2026)' },
+          { value: '24',     label: '24 - ships natively in Fedora 44' },
+          { value: '22',     label: '22 - LTS Active (until Apr 2027)' },
+          { value: '20',     label: '20 - LTS Maintenance (until Apr 2026)' },
         ]] },
     ],
   },
@@ -93,11 +93,11 @@ const CATEGORIES: CategoryDef[] = [
         description: 'Apache Maven - installs to /opt/maven-<version>, multiple versions can coexist. Sets M2_HOME and PATH.',
         argType: 'custom', argPrompts: ['Maven version'], argDefaults: ['latest'],
         argOptions: [[
-          { value: 'latest',  label: 'Latest 3.x (auto-detect)' },
-          { value: '3.9.9',   label: '3.9.9' },
-          { value: '3.9.6',   label: '3.9.6' },
-          { value: '3.9.5',   label: '3.9.5' },
-          { value: '3.8.8',   label: '3.8.8 - last 3.8.x release' },
+          { value: 'latest', label: 'Latest 3.x (auto-detect)' },
+          { value: '3.9.9',  label: '3.9.9' },
+          { value: '3.9.6',  label: '3.9.6' },
+          { value: '3.9.5',  label: '3.9.5' },
+          { value: '3.8.8',  label: '3.8.8 - last 3.8.x release' },
         ]] },
     ],
   },
@@ -113,10 +113,9 @@ const CATEGORIES: CategoryDef[] = [
           { value: '2.4.62', label: '2.4.62' },
           { value: '2.4.58', label: '2.4.58' },
         ]] },
-      { name: 'tomcat.sh',        label: 'Apache Tomcat',       relPath: 'tomcat/tomcat.sh',        description: 'Apache Tomcat - multi-instance by port, requires Java',
-        argType: 'user+custom2',
-        argPrompts:  ['Tomcat version', 'HTTP port'],
-        argDefaults: ['latest-10', '8080'],
+      { name: 'tomcat.sh', label: 'Apache Tomcat', relPath: 'tomcat/tomcat.sh',
+        description: 'Apache Tomcat - multi-instance by port, requires Java',
+        argType: 'user+custom2', argPrompts: ['Tomcat version', 'HTTP port'], argDefaults: ['latest-10', '8080'],
         argOptions: [[
           { value: 'latest-11', label: '11.x - Latest (auto-detect) - Java 21+' },
           { value: 'latest-10', label: '10.x - Latest (auto-detect) - Java 11+' },
@@ -130,8 +129,10 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Databases', dir: 'databases',
     scripts: [
-      { name: 'mariadb.sh',    label: 'MariaDB',     relPath: 'mariadb.sh',    description: 'MariaDB - MySQL-compatible relational database',     argType: 'none' },
-      { name: 'postgresql.sh', label: 'PostgreSQL',  relPath: 'postgresql.sh', description: 'PostgreSQL + pgAdmin 4, remote connections enabled',
+      { name: 'mariadb.sh',    label: 'MariaDB',    relPath: 'mariadb.sh',    argType: 'none',
+        description: 'MariaDB - MySQL-compatible relational database' },
+      { name: 'postgresql.sh', label: 'PostgreSQL', relPath: 'postgresql.sh',
+        description: 'PostgreSQL + pgAdmin 4, remote connections enabled',
         argType: 'custom', argPrompts: ['Version'], argDefaults: [''],
         argOptions: [[
           { value: '',   label: 'Latest (Fedora repo)' },
@@ -145,7 +146,8 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'IDEs', dir: 'ides',
     scripts: [
-      { name: 'eclipse.sh',          label: 'Eclipse IDE',          relPath: 'eclipse.sh',          description: 'Eclipse IDE for Java EE',
+      { name: 'eclipse.sh', label: 'Eclipse IDE', relPath: 'eclipse.sh',
+        description: 'Eclipse IDE for Java EE',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
@@ -154,7 +156,8 @@ const CATEGORIES: CategoryDef[] = [
           { value: '2025-09', label: '2025-09 - 4.33 (Sep 2025)' },
           { value: '2025-06', label: '2025-06 - 4.32 (Jun 2025)' },
         ]] },
-      { name: 'eclipse-ee.sh',       label: 'Eclipse Installer',      relPath: 'eclipse-ee.sh',    description: 'Downloads the Eclipse Installer (Oomph) - run it manually to choose your Eclipse flavour',
+      { name: 'eclipse-ee.sh', label: 'Eclipse Installer', relPath: 'eclipse-ee.sh',
+        description: 'Downloads the Eclipse Installer (Oomph) - run it manually to choose your Eclipse flavour',
         argType: 'custom', argPrompts: ['Eclipse release'], argDefaults: ['latest'],
         argOptions: [[
           { value: 'latest',  label: 'Latest (auto-detect)' },
@@ -188,28 +191,33 @@ const CATEGORIES: CategoryDef[] = [
   {
     name: 'Containers', dir: 'containers',
     scripts: [
-      { name: 'docker.sh',   label: 'Docker CE',  relPath: 'docker.sh',   description: 'Docker CE - adds login user to docker group', argType: 'user' },
-      { name: 'minikube.sh', label: 'Minikube',   relPath: 'minikube.sh', description: 'minikube + kubectl + metrics-server addon',   argType: 'user' },
-      { name: 'k3s.sh',      label: 'k3s',        relPath: 'k3s.sh',      description: 'k3s - lightweight real Kubernetes cluster',   argType: 'user' },
+      { name: 'docker.sh',   label: 'Docker CE', relPath: 'docker.sh',   argType: 'user',
+        description: 'Docker CE - adds login user to docker group' },
+      { name: 'minikube.sh', label: 'Minikube',  relPath: 'minikube.sh', argType: 'user',
+        description: 'minikube + kubectl + metrics-server addon' },
+      { name: 'k3s.sh',      label: 'k3s',       relPath: 'k3s.sh',      argType: 'user',
+        description: 'k3s - lightweight real Kubernetes cluster' },
     ],
   },
   {
     name: 'Cloud', dir: 'cloud',
     scripts: [
-      { name: 'aws-cli.sh', label: 'AWS CLI', relPath: 'aws-cli.sh', description: 'AWS CLI v2 - creates ~/.aws config directory', argType: 'user',
+      { name: 'aws-cli.sh', label: 'AWS CLI', relPath: 'aws-cli.sh', argType: 'user',
+        description: 'AWS CLI v2 - creates ~/.aws config directory',
         forceConfirmDef: {
           title: 'AWS CLI is already installed',
           details: ['The existing installation will be updated to the latest version.'],
           actionLabel: 'Update',
-        },
-      },
-      { name: 'ecs-cli.sh', label: 'Amazon ECS CLI',   relPath: 'ecs-cli.sh', description: 'Amazon ECS CLI for managing ECS clusters',    argType: 'none' },
+        } },
+      { name: 'ecs-cli.sh', label: 'Amazon ECS CLI', relPath: 'ecs-cli.sh', argType: 'none',
+        description: 'Amazon ECS CLI for managing ECS clusters' },
     ],
   },
   {
     name: 'Security', dir: 'security',
     scripts: [
-      { name: 'openssl.sh', label: 'OpenSSL 3.3.2', relPath: 'openssl.sh', description: 'OpenSSL 3.3.2 built from source to /usr/local/ssl; adds /usr/local/ssl/bin to PATH in ~/.bash_profile', argType: 'user',
+      { name: 'openssl.sh', label: 'OpenSSL 3.3.2', relPath: 'openssl.sh', argType: 'user',
+        description: 'OpenSSL 3.3.2 built from source to /usr/local/ssl; adds /usr/local/ssl/bin to PATH in ~/.bash_profile',
         forceConfirmDef: {
           title: 'OpenSSL is already installed on this system',
           details: [
@@ -218,77 +226,61 @@ const CATEGORIES: CategoryDef[] = [
             'The system OpenSSL still wins in the terminal unless PATH is manually adjusted',
           ],
           actionLabel: 'Install anyway',
-        },
-      },
+        } },
     ],
   },
   {
     name: 'Version Control', dir: 'version-control',
     scripts: [
-      { name: 'git.sh', label: 'Git', relPath: 'git.sh', description: 'Git version control', argType: 'none' },
+      { name: 'git.sh', label: 'Git', relPath: 'git.sh', argType: 'none',
+        description: 'Git version control' },
     ],
   },
   {
     name: 'Editors', dir: 'editors',
     scripts: [
-      { name: 'vim.sh', label: 'Vim', relPath: 'vim.sh', description: 'Vim + Pathogen + Syntastic linting (ShellCheck, pylint, jshint)', argType: 'user' },
+      { name: 'vim.sh', label: 'Vim', relPath: 'vim.sh', argType: 'user',
+        description: 'Vim + Pathogen + Syntastic linting (ShellCheck, pylint, jshint)' },
     ],
   },
   {
     name: 'Desktop', dir: 'desktop',
     scripts: [
-      { name: 'flameshot.sh', label: 'Flameshot',     relPath: 'flameshot.sh',  description: 'Flameshot screenshot tool - binds Print Screen to flameshot gui', argType: 'user' },
-      { name: 'dbeaver.sh',  label: 'DBeaver CE',    relPath: 'dbeaver.sh',   scriptPath: 'tools/databases/dbeaver.sh',   description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL',  argType: 'none' },
-      { name: 'chrome.sh',   label: 'Google Chrome', relPath: 'chrome.sh',    scriptPath: 'tools/browsers/chrome.sh',     description: 'Google Chrome stable',                             argType: 'none' },
-      { name: 'wireshark.sh',label: 'Wireshark',     relPath: 'wireshark.sh', scriptPath: 'tools/network/wireshark.sh',   description: 'Wireshark - network packet analyser',              argType: 'user' },
+      { name: 'flameshot.sh', label: 'Flameshot',     relPath: 'flameshot.sh', argType: 'user',
+        description: 'Flameshot screenshot tool - binds Print Screen to flameshot gui' },
+      { name: 'dbeaver.sh',   label: 'DBeaver CE',    relPath: 'dbeaver.sh',   argType: 'none',
+        scriptPath: 'tools/databases/dbeaver.sh',
+        description: 'DBeaver CE - GUI client for MariaDB, PostgreSQL' },
+      { name: 'chrome.sh',    label: 'Google Chrome', relPath: 'chrome.sh',    argType: 'none',
+        scriptPath: 'tools/browsers/chrome.sh',
+        description: 'Google Chrome stable' },
+      { name: 'wireshark.sh', label: 'Wireshark',     relPath: 'wireshark.sh', argType: 'user',
+        scriptPath: 'tools/network/wireshark.sh',
+        description: 'Wireshark - network packet analyser' },
     ],
   },
   {
     name: 'Automation', dir: 'automation',
     scripts: [
-      { name: 'ansible.sh', label: 'Ansible', relPath: 'ansible.sh', description: 'Ansible automation and configuration management', argType: 'none' },
+      { name: 'ansible.sh', label: 'Ansible', relPath: 'ansible.sh', argType: 'none',
+        description: 'Ansible automation and configuration management' },
     ],
   },
   {
     name: 'AI Tools', dir: 'ai',
     scripts: [
-      { name: 'claude-code.sh', label: 'Claude Code', relPath: 'claude-code.sh',
-        description: 'Anthropic Claude Code CLI - AI coding assistant (requires Node.js 18+)', argType: 'user' },
+      { name: 'claude-code.sh', label: 'Claude Code', relPath: 'claude-code.sh', argType: 'user',
+        description: 'Anthropic Claude Code CLI - AI coding assistant (requires Node.js 18+)' },
     ],
   },
 ]
 
-// â"€â"€ Script result map â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-// Persists across React mount/unmount so the user sees the outcome when they
-// navigate back and explicitly open the script form they submitted from.
-
-interface ScriptResult {
-  state: 'success' | 'error'
-  lines: ScriptLine[]
-  error?: string
-}
-const _scriptResults = new Map<string, ScriptResult>()
-
-export function clearScriptResultsCache() { _scriptResults.clear() }
-
-function srKey(vmName: string, scriptName: string | null): string {
-  return `${vmName}::${scriptName ?? '__base-setup__'}`
-}
-
-function saveResult(key: string, exitCode: number | null, lines: ScriptLine[]): void {
-  const errMsg = [...lines].reverse().find(l => l.text.startsWith('ERROR: '))?.text.replace(/^ERROR:\s*/, '')
-  _scriptResults.set(key, exitCode === 0
-    ? { state: 'success', lines }
-    : { state: 'error', lines, error: errMsg ?? `Script failed (exit ${exitCode ?? '?'})` }
-  )
-}
-
-// â"€â"€ Helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// -- Helpers
 
 function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: string): string {
   switch (script.argType) {
-    case 'none': return ''
-    case 'user': return loginUser
+    case 'none':       return ''
+    case 'user':       return loginUser
     case 'custom': {
       const v = argValues[0]?.trim()
       return v || script.argDefaults?.[0] || ''
@@ -311,7 +303,54 @@ function buildScriptArgs(script: ScriptDef, argValues: string[], loginUser: stri
   }
 }
 
-// â"€â"€ RestartModal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+function inputCls(val: string) {
+  return (
+    'w-full px-2.5 py-1.5 bg-zinc-700 border rounded text-zinc-100 text-sm ' +
+    'focus:outline-none focus:border-blue-500 ' +
+    (val ? 'border-zinc-400' : 'border-zinc-600')
+  )
+}
+
+// -- ArgField
+
+interface ArgFieldProps {
+  label: string
+  value: string
+  defaultValue: string
+  options?: ArgOption[]
+  onChange: (v: string) => void
+}
+
+function ArgField({ label, value, defaultValue, options, onChange }: ArgFieldProps) {
+  const effective = value || defaultValue
+  return (
+    <div>
+      <label className="block text-zinc-400 text-xs mb-1">{label}</label>
+      {options?.length ? (
+        <select
+          value={effective}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputCls(effective) + ' cursor-pointer'}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={defaultValue}
+          autoComplete="off"
+          className={inputCls(value)}
+        />
+      )}
+    </div>
+  )
+}
+
+// -- RestartModal
 
 interface RestartModalProps {
   vmName: string
@@ -362,7 +401,7 @@ function RestartModal({ vmName, busy, onConfirm, onCancel }: RestartModalProps) 
   )
 }
 
-// â"€â"€ Component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// -- Component
 
 interface ProvisionPageProps {
   vm: Vm
@@ -374,6 +413,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [vmUser,    setVmUser]    = useState('')
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
+  const [credKey,   setCredKey]   = useState(0)
 
   const [pageState,    setPageState]    = useState<PageState>('idle')
   const [idleView,     setIdleView]     = useState<IdleView>('mode')
@@ -383,183 +423,84 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [showLog,      setShowLog]      = useState(false)
   const [runningLabel, setRunningLabel] = useState('')
 
-  const [restarting,        setRestarting]        = useState(false)
-  const [restarted,         setRestarted]         = useState(false)
-  const [showRestartModal,  setShowRestartModal]  = useState(false)
-  const [forceConfirm,      setForceConfirm]      = useState(false)
-  const [alreadyInstalled,  setAlreadyInstalled]  = useState(false)
-  const [isReconnect, setIsReconnect] = useState(false)
-  const forceConfirmNeededRef  = useRef(false)
-  const alreadyInstalledRef    = useRef(false)
-  const reconnectUnsubRef      = useRef<{ line: () => void; done: () => void } | null>(null)
-  const mountedRef             = useRef(true)
-
-  useEffect(() => { return () => { mountedRef.current = false } }, [])
-
-  // On mount: flush any done state from the backend into _scriptResults so the
-  // banner reappears when the user clicks that script's form. Do NOT set pageState
-  // to 'done' here — the user should land on the mode selector, not the banner.
-  useEffect(() => {
-    window.electronAPI.getScriptState().then(async (state) => {
-      if (!state.ok || !state.context) return
-      if (state.context.vmName !== vm.name || state.context.type !== 'provision') return
-      if (state.running) return
-
-      const scriptName = state.context.scriptName ?? null
-      const key = srKey(vm.name, scriptName)
-
-      if (state.done) {
-        saveResult(key, state.exitCode, state.lines)
-        await window.electronAPI.clearScriptState()
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const [selectedCategory, setSelectedCategory] = useState<CategoryDef | null>(null)
   const [selectedScript,   setSelectedScript]   = useState<ScriptDef   | null>(null)
   const [argValues,        setArgValues]        = useState(['', ''])
+
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
-  const [credKey,          setCredKey]          = useState(0)
+  const [restarting,       setRestarting]       = useState(false)
+  const [restarted,        setRestarted]        = useState(false)
+  const [showRestartModal, setShowRestartModal] = useState(false)
+  const [forceConfirm,     setForceConfirm]     = useState(false)
+  const [alreadyInstalled, setAlreadyInstalled] = useState(false)
 
+  const forceConfirmNeededRef = useRef(false)
+  const alreadyInstalledRef   = useRef(false)
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
   function handleLoginSuccess() {
-    setCredKey(k => k + 1)
+    setCredKey((k) => k + 1)
     onLoginSuccess()
   }
+
+  useEffect(() => {
+    window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
+      if (saved.ok) {
+        if (saved.user)      setVmUser(saved.user)
+        if (saved.pass)      setVmPass(saved.pass)
+        if (saved.loginUser) setLoginUser(saved.loginUser)
+      }
+    })
+  }, [vm.name, credKey])
 
   useEffect(() => {
     if (!changeHostname || !vmUser || !vmPass || hostname) return
     window.electronAPI.getVmHostname(vm.name, vmUser, vmPass).then((result) => {
       if (result.ok && result.hostname) setHostname(result.hostname)
     })
+  // vmUser/vmPass/hostname intentionally omitted: fetch once when the checkbox is ticked
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changeHostname])
-
-  useEffect(() => {
-    window.electronAPI.loadVmCredentials(vm.name).then((saved) => {
-      if (saved.ok) {
-        if (saved.user)       setVmUser(saved.user)
-        if (saved.pass)       setVmPass(saved.pass)
-        if (saved.loginUser)  setLoginUser(saved.loginUser)
-      }
-    })
-  }, [vm.name, credKey])
 
   useEffect(() => {
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
-  useEffect(() => {
-    window.electronAPI.logUiAction(
-      `provision "${vm.name}": [dbg] pageState=${pageState} idleView=${idleView} reconnect=${reconnectUnsubRef.current !== null}`
-    )
-  }, [pageState, idleView])
-
-  useEffect(() => {
-    if (pageState !== 'done') return
-    if (selectedScript)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for "${selectedScript.name}"`)
-    else if (runningLabel === 'Base Setup')
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] banner shown for Base Setup`)
-  }, [pageState, selectedScript?.name, runningLabel])
-
-
-  function handleSelectCategory(cat: typeof CATEGORIES[number]) {
+  function handleSelectCategory(cat: CategoryDef) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select category "${cat.name}"`)
     setSelectedCategory(cat)
     setIdleView('scripts')
   }
 
-  async function handleSelectScript(script: ScriptDef) {
+  function handleSelectScript(script: ScriptDef) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select script "${script.label}"`)
-    const key = srKey(vm.name, script.name)
-    const state = await window.electronAPI.getScriptState()
-    const matchesThisScript =
-      state.ok &&
-      (state.running || state.done) &&
-      state.context?.vmName === vm.name &&
-      state.context?.type === 'provision' &&
-      state.context?.scriptName === script.name
-
-    window.electronAPI.logUiAction(
-      `provision "${vm.name}": [dbg] script=${script.name} running=${state.running} done=${state.done} ` +
-      `matches=${matchesThisScript} mapEntry=${_scriptResults.get(key)?.state ?? 'none'}`
-    )
-
-    if (matchesThisScript && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' reconnect (running)`)
-      setSelectedScript(script)
-      setRunningLabel(script.label)
-      setLines(state.lines)
-      setPageState('running')
-      setShowLog(true)
-      const liveLines = [...state.lines]
-      const unsubLine = window.electronAPI.onScriptLine((line) => {
-        liveLines.push(line)
-        setLines((prev) => [...prev, line])
-      })
-      const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-        saveResult(key, exitCode, liveLines)
-        setSuccess(exitCode === 0)
-        window.electronAPI.clearScriptState()
-        setPageState('done')
-        setShowLog(false)
-        unsubLine()
-        unsubDone()
-      })
-      return
-    }
-
-    // Script finished between mount and now (state still held by main process)
-    if (matchesThisScript && state.done) {
-      saveResult(key, state.exitCode, state.lines)
-      window.electronAPI.clearScriptState()
-    }
-
-    const result = _scriptResults.get(key)
-    _scriptResults.delete(key)
-
-    if (result) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' restore banner (${result.state})`)
-      setSelectedScript(script)
-      setRunningLabel(script.label)
-      setLines(result.lines)
-      setAlreadyInstalled(result.lines.some(l => /\[INFO\s*\].*already installed/i.test(l.text)))
-      setSuccess(result.state === 'success')
-      setPageState('done')
-      setShowLog(false)
-      return
-    }
-
-    window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' form`)
     setSelectedScript(script)
     setArgValues(['', ''])
     setIdleView('script-args')
   }
 
+  function handleSelectBaseSetup() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`)
+    setIdleView('full-form')
+  }
+
   function handleNavBack() {
     window.electronAPI.logUiAction(`provision "${vm.name}": Back (from ${idleView})`)
     switch (idleView) {
-      case 'mode':        onBack();                   break
-      case 'full-form':   setIdleView('mode');        break
-      case 'categories':  setIdleView('mode');        break
-      case 'scripts':     setIdleView('categories');  break
-      case 'script-args':
-        setIdleView('scripts')
-        break
+      case 'mode':        return onBack()
+      case 'full-form':   return setIdleView('mode')
+      case 'categories':  return setIdleView('mode')
+      case 'scripts':     return setIdleView('categories')
+      case 'script-args': return setIdleView('scripts')
     }
   }
 
   async function startRun(
     runFn: () => Promise<{ ok: boolean; error?: string; errorDetail?: string }>,
-    trackAlreadyInstalled = true,
-    runScriptName: string | null = selectedScript?.name ?? null
+    trackAlreadyInstalled = true
   ) {
-    const runKey = srKey(vm.name, runScriptName)
-    _scriptResults.delete(runKey)
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -568,24 +509,15 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     forceConfirmNeededRef.current = false
     alreadyInstalledRef.current   = false
 
-    const capturedLines: ScriptLine[] = []
     const unsubLine = window.electronAPI.onScriptLine((line) => {
-      capturedLines.push(line)
       setLines((prev) => [...prev, line])
-      if (/Use 'Install anyway'/i.test(line.text)) {
-        forceConfirmNeededRef.current = true
-      }
-      if (trackAlreadyInstalled && /\[INFO\s*\].*already installed/i.test(line.text)) {
-        alreadyInstalledRef.current = true
-      }
+      if (/Use 'Install anyway'/i.test(line.text))                                     forceConfirmNeededRef.current = true
+      if (trackAlreadyInstalled && /\[INFO\s*\].*already installed/i.test(line.text))  alreadyInstalledRef.current   = true
     })
     const unsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
       if (exitCode === 0 && loginUser) {
         await window.electronAPI.saveVmCredentials(vm.name, vmUser, vmPass, loginUser)
       }
-      // Always persist result so navigate-away + return can show it.
-      saveResult(runKey, exitCode, [...capturedLines])
-      if (mountedRef.current) window.electronAPI.clearScriptState()
       if (forceConfirmNeededRef.current && selectedScript?.forceConfirmDef) {
         setForceConfirm(true)
         setSuccess(false)
@@ -608,9 +540,8 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       const result = await runFn()
       if (!result.ok && result.errorDetail) setError(result.errorDetail)
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err)
-      setError(errMsg)
-      _scriptResults.set(runKey, { state: 'error', lines: [...capturedLines], error: errMsg })
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
       setSuccess(false)
       setPageState('done')
       setShowLog(false)
@@ -633,9 +564,24 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         loginUser,
         scriptRelPath: selectedScript.scriptPath ?? `tools/${selectedCategory.dir}/${selectedScript.relPath}`,
         scriptArgs,
-        categoryDir: selectedCategory.dir,
-        scriptName:  selectedScript.name,
+        categoryDir:   selectedCategory.dir,
+        scriptName:    selectedScript.name,
       })
+    )
+  }
+
+  async function handleRunFull() {
+    window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
+    setSelectedScript(null)
+    setRunningLabel('Base Setup')
+    await startRun(() =>
+      window.electronAPI.runProvisionSetup({
+        vmName:   vm.name,
+        vmUser,
+        vmPass,
+        loginUser,
+        hostname: changeHostname ? hostname.trim() : '',
+      }), false
     )
   }
 
@@ -645,102 +591,17 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     setLines([])
     setShowLog(true)
     setRestarting(true)
-
-    const unsubLine = window.electronAPI.onScriptLine((line) => {
-      setLines((prev) => [...prev, line])
-    })
+    const unsubLine = window.electronAPI.onScriptLine((line) => setLines((prev) => [...prev, line]))
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
       setRestarting(false)
       if (exitCode === 0) setRestarted(true)
       unsubLine()
       unsubDone()
     })
-
     await window.electronAPI.restartVm(vm.name)
   }
 
-  async function handleSelectBaseSetup() {
-    window.electronAPI.logUiAction(`provision "${vm.name}": select Base Setup`)
-    const key = srKey(vm.name, null)
-    const state = await window.electronAPI.getScriptState()
-    const isBaseSetup =
-      state.ok &&
-      (state.running || state.done) &&
-      state.context?.vmName === vm.name &&
-      state.context?.type === 'provision' &&
-      !state.context?.scriptName
-
-    if (isBaseSetup && state.running) {
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' reconnect Base Setup (running)`)
-      setRunningLabel('Base Setup')
-      setLines(state.lines)
-      setIsReconnect(true)
-      setPageState('running')
-      setShowLog(true)
-      const liveLines = [...state.lines]
-      const unsubLine = window.electronAPI.onScriptLine((line) => {
-        liveLines.push(line)
-        setLines((prev) => [...prev, line])
-      })
-      const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-        saveResult(key, exitCode, liveLines)
-        setSelectedScript(null)
-        setSuccess(exitCode === 0)
-        setIsReconnect(false)
-        window.electronAPI.clearScriptState()
-        setPageState('done')
-        setShowLog(false)
-        reconnectUnsubRef.current = null
-        unsubLine()
-        unsubDone()
-      })
-      reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
-      return
-    }
-
-    // Script finished between mount and now
-    if (isBaseSetup && state.done) {
-      saveResult(key, state.exitCode, state.lines)
-      window.electronAPI.clearScriptState()
-    }
-
-    const result = _scriptResults.get(key)
-    if (result) {
-      _scriptResults.delete(key)
-      window.electronAPI.logUiAction(`provision "${vm.name}": [dbg] â†' restore Base Setup banner (${result.state})`)
-      setSelectedScript(null)
-      setRunningLabel('Base Setup')
-      setLines(result.lines)
-      setSuccess(result.state === 'success')
-      setPageState('done')
-      return
-    }
-
-    setIdleView('full-form')
-  }
-
-  async function handleRunFull() {
-    window.electronAPI.logUiAction(`provision "${vm.name}": run Base Setup`)
-    setSelectedScript(null)
-    setRunningLabel('Base Setup')
-    await startRun(() =>
-      window.electronAPI.runProvisionSetup({
-        vmName: vm.name,
-        vmUser,
-        vmPass,
-        loginUser,
-        hostname: changeHostname ? hostname.trim() : '',
-      }), false, null
-    )
-  }
-
-  const ic = (val: string) =>
-    'w-full px-2.5 py-1.5 bg-zinc-700 border rounded text-zinc-100 text-sm ' +
-    'focus:outline-none focus:border-blue-500 ' +
-    (val ? 'border-zinc-400' : 'border-zinc-600')
-
-
-  // â"€â"€ Login gate â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // -- Login gate
   if (loginRequired) {
     return (
       <div className="h-full overflow-y-auto">
@@ -749,36 +610,20 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     )
   }
 
-  // â"€â"€ Running â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // -- Running
   if (pageState === 'running') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
         <div className="shrink-0 space-y-2">
-          {isReconnect && (
-            <button
-              onClick={() => {
-                window.electronAPI.logUiAction(`provision "${vm.name}": disconnect from running Base Setup`)
-                reconnectUnsubRef.current?.line()
-                reconnectUnsubRef.current?.done()
-                reconnectUnsubRef.current = null
-                setIsReconnect(false)
-                setPageState('idle')
-                setIdleView('mode')
-              }}
-              className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors"
-            >
-              &larr; Back
-            </button>
-          )}
           <p className="text-zinc-300 text-sm font-medium">Running {runningLabel}...</p>
           <ProgressBar />
         </div>
-        <LogPanel lines={lines} showLog={pageState === 'running' || showLog} onToggle={() => setShowLog((v) => !v)} />
+        <LogPanel lines={lines} showLog={true} onToggle={() => setShowLog((v) => !v)} />
       </div>
     )
   }
 
-  // â"€â"€ Done â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // -- Done
   if (pageState === 'done') {
     return (
       <div className="h-full max-w-2xl w-full mx-auto flex flex-col gap-4">
@@ -861,54 +706,51 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
 
         <div className="mt-auto flex justify-between shrink-0">
           <div className="flex gap-2">
-          {success === false && (
-          <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Try again`); withAuth(() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript()) }}
-            className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-          >
-            Try again
-          </button>
-          )}
-          <button
-            onClick={async () => {
-              window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
-              _scriptResults.delete(srKey(vm.name, runningLabel === 'Base Setup' ? null : selectedScript?.name ?? null))
-              if (!success) {
-                const saved = await window.electronAPI.loadVmCredentials(vm.name)
-                if (saved.ok) {
-                  if (saved.user)  setVmUser(saved.user)
-                  if (saved.pass)  setVmPass(saved.pass)
-                  setLoginUser(saved.loginUser ?? '')
-                } else {
-                  setLoginUser('')
+            {success === false && (
+              <button
+                onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Try again`); withAuth(() => runningLabel === 'Base Setup' ? handleRunFull() : handleRunScript()) }}
+                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+              >
+                Try again
+              </button>
+            )}
+            <button
+              onClick={async () => {
+                window.electronAPI.logUiAction(`provision "${vm.name}": Run another`)
+                if (!success) {
+                  const saved = await window.electronAPI.loadVmCredentials(vm.name)
+                  if (saved.ok) {
+                    if (saved.user) setVmUser(saved.user)
+                    if (saved.pass) setVmPass(saved.pass)
+                    setLoginUser(saved.loginUser ?? '')
+                  } else {
+                    setLoginUser('')
+                  }
                 }
-              }
-              setAlreadyInstalled(false)
-              setPageState('idle')
-              setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
-            }}
-            className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-          >
-            Run another
-          </button>
+                setAlreadyInstalled(false)
+                setPageState('idle')
+                setIdleView(runningLabel === 'Base Setup' ? 'mode' : 'categories')
+              }}
+              className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+            >
+              Run another
+            </button>
           </div>
           <button
-            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); _scriptResults.delete(srKey(vm.name, runningLabel === 'Base Setup' ? null : selectedScript?.name ?? null)); onBack() }}
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Back to My VMs`); onBack() }}
             className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
           >
             &larr; My VMs
           </button>
         </div>
-
       </div>
     )
   }
 
-  // â"€â"€ Idle â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+  // -- Idle
   return (
     <div className="h-full max-w-2xl w-full mx-auto flex flex-col">
 
-      {/* Header */}
       <div className="flex items-center gap-3 mb-4 shrink-0">
         <button
           onClick={handleNavBack}
@@ -921,35 +763,28 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         </h1>
       </div>
 
-      {/* â"€â"€ Mode (main landing) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {idleView === 'mode' && (
-        <div className="flex flex-col gap-3">
-
-          {/* Mode buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={handleSelectBaseSetup}
-              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
-            >
-              <p className="text-zinc-100 font-semibold text-sm mb-1">Base Setup</p>
-              <p className="text-zinc-400 text-xs leading-relaxed">
-                Foundation setup: system prep, hostname, SELinux, desktop config, and utilities.
-              </p>
-            </button>
-            <button
-              onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": select By Category`); setIdleView('categories') }}
-              className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
-            >
-              <p className="text-zinc-100 font-semibold text-sm mb-1">By Category</p>
-              <p className="text-zinc-400 text-xs leading-relaxed">
-                Browse {CATEGORIES.length} categories and install individual tools: languages, databases, IDEs, containers, and more.
-              </p>
-            </button>
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={handleSelectBaseSetup}
+            className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
+          >
+            <p className="text-zinc-100 font-semibold text-sm mb-1">Base Setup</p>
+            <p className="text-zinc-400 text-xs leading-relaxed">
+              Foundation setup: system prep, hostname, SELinux, desktop config, and utilities.
+            </p>
+          </button>
+          <button
+            onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": select By Category`); setIdleView('categories') }}
+            className="bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg p-5 text-left transition-colors"
+          >
+            <p className="text-zinc-100 font-semibold text-sm mb-1">By Category</p>
+            <p className="text-zinc-400 text-xs leading-relaxed">
+              Browse {CATEGORIES.length} categories and install individual tools: languages, databases, IDEs, containers, and more.
+            </p>
+          </button>
         </div>
       )}
-
-      {/* â"€â"€ Sub-views (full width, back button navigates) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
 
       {idleView === 'full-form' && (
         <div className="flex-1 overflow-y-auto">
@@ -991,7 +826,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
                   value={hostname}
                   onChange={(e) => setHostname(e.target.value)}
                   placeholder="e.g. fedorabox"
-                  className={ic(hostname)}
+                  className={inputCls(hostname)}
                 />
                 <p className="text-zinc-500 text-xs mt-1">The hostname set inside Fedora - not the VirtualBox VM name.</p>
               </div>
@@ -1050,98 +885,48 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         </div>
       )}
 
-      {idleView === 'script-args' && selectedScript && (() => {
-        return (
-          <div className="flex-1 overflow-y-auto">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
-
-              <div>
-                <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
-                <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
-              </div>
-
-              {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (() => {
-                const opts   = selectedScript.argOptions?.[0]
-                const curVal = argValues[0]
-                const defVal = selectedScript.argDefaults?.[0] ?? ''
-                return (
-                  <div>
-                    <label className="block text-zinc-400 text-xs mb-1">
-                      {selectedScript.argPrompts?.[0] ?? 'Argument'}
-                    </label>
-                    {opts?.length ? (
-                      <select
-                        value={curVal || defVal}
-                        onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                        className={ic(curVal || defVal) + ' cursor-pointer'}
-                      >
-                        {opts.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={curVal}
-                        onChange={(e) => setArgValues([e.target.value, argValues[1]])}
-                        placeholder={defVal}
-                        autoComplete="off"
-                        className={ic(curVal)}
-                      />
-                    )}
-                  </div>
-                )
-              })()}
-
-              {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
-                <div className="space-y-3">
-                  {([0, 1] as const).map((i) => {
-                    const opts      = selectedScript.argOptions?.[i]
-                    const curVal    = argValues[i]
-                    const defVal    = selectedScript.argDefaults?.[i] ?? ''
-                    const label     = selectedScript.argPrompts?.[i] ?? `Argument ${i + 1}`
-                    const handleChange = (val: string) =>
-                      setArgValues(i === 0 ? [val, argValues[1]] : [argValues[0], val])
-                    return (
-                      <div key={i}>
-                        <label className="block text-zinc-400 text-xs mb-1">{label}</label>
-                        {opts?.length ? (
-                          <select
-                            value={curVal || defVal}
-                            onChange={(e) => handleChange(e.target.value)}
-                            className={ic(curVal || defVal) + ' cursor-pointer'}
-                          >
-                            {opts.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={curVal}
-                            onChange={(e) => handleChange(e.target.value)}
-                            placeholder={defVal}
-                            autoComplete="off"
-                            className={ic(curVal)}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              <button
-                onClick={() => withAuth(() => handleRunScript())}
-                className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
-              >
-                Run {selectedScript.label}
-              </button>
-
+      {idleView === 'script-args' && selectedScript && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-5 space-y-4">
+            <div>
+              <p className="text-zinc-100 font-semibold text-sm">{selectedScript.label}</p>
+              <p className="text-zinc-400 text-xs mt-0.5">{selectedScript.description}</p>
             </div>
+
+            {(selectedScript.argType === 'custom' || selectedScript.argType === 'user+custom') && (
+              <ArgField
+                label={selectedScript.argPrompts?.[0] ?? 'Argument'}
+                value={argValues[0]}
+                defaultValue={selectedScript.argDefaults?.[0] ?? ''}
+                options={selectedScript.argOptions?.[0]}
+                onChange={(v) => setArgValues([v, argValues[1]])}
+              />
+            )}
+
+            {(selectedScript.argType === 'user+custom2' || selectedScript.argType === 'custom2') && (
+              <div className="space-y-3">
+                {([0, 1] as const).map((i) => (
+                  <ArgField
+                    key={i}
+                    label={selectedScript.argPrompts?.[i] ?? `Argument ${i + 1}`}
+                    value={argValues[i]}
+                    defaultValue={selectedScript.argDefaults?.[i] ?? ''}
+                    options={selectedScript.argOptions?.[i]}
+                    onChange={(v) => setArgValues(i === 0 ? [v, argValues[1]] : [argValues[0], v])}
+                  />
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => withAuth(() => handleRunScript())}
+              className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors"
+            >
+              Run {selectedScript.label}
+            </button>
           </div>
-        )
-      })()}
+        </div>
+      )}
 
     </div>
   )

@@ -37,39 +37,6 @@ export default function ShareLogsPage({ vm, onBack, onScriptRunning }: ShareLogs
     onScriptRunning(pageState === 'running')
   }, [pageState, onScriptRunning])
 
-  useEffect(() => {
-    window.electronAPI.getScriptState().then((state) => {
-      if (
-        state.context?.type !== 'share-logs' ||
-        state.context?.vmName !== vm.name
-      ) return
-
-      if (state.running) {
-        setLines(state.lines)
-        setPageState('running')
-        setShowLog(true)
-
-        const unsubLine = window.electronAPI.onScriptLine((line) =>
-          setLines((prev) => [...prev, line])
-        )
-        const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
-          setSuccess(exitCode === 0)
-          setPageState('done')
-          setShowLog(false)
-          unsubLine()
-          unsubDone()
-          window.electronAPI.clearScriptState()
-        })
-      } else if (state.done) {
-        setLines(state.lines)
-        setSuccess(state.exitCode === 0)
-        setPageState('done')
-        setShowLog(false)
-        window.electronAPI.clearScriptState()
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     window.electronAPI.getVmGuestLogsPath(vm.name).then((result) => {

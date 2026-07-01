@@ -70,7 +70,6 @@ vm/
 cd app
 npm install   # downloads all dependencies into app/node_modules/
 npm run dev   # starts Vite + Electron (development mode)
-npm start     # builds React then launches Electron (production mode)
 ```
 
 A desktop window opens. No browser needed — Electron has Chromium built in.

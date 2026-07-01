@@ -220,6 +220,7 @@ describe('delete confirmation', () => {
 describe('VM detail navigation', () => {
   beforeEach(() => {
     window.electronAPI.listVms = vi.fn().mockResolvedValue({ ok: true, vms: [STOPPED_VM] })
+    window.electronAPI.loadVmCredentials = vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'password' })
   })
 
   async function clickDetail() {

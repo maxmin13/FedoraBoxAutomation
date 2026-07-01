@@ -244,7 +244,7 @@ function Invoke-GuestScript {
 
     if ($exitCode -ne 0 -and $Label) {
         Write-Host ""
-        Write-Host "ERROR: $Label failed - expand script output for details"
+        Write-Host "$Label failed - see output above"
     }
 
     return $exitCode

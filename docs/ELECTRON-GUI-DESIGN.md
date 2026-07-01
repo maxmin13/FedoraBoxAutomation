@@ -127,7 +127,6 @@ All commands run from the `app/` directory.
 | Command | What it does |
 |---------|-------------|
 | `npm run dev` | Starts Vite dev server + Electron with hot reload. DevTools open automatically. |
-| `npm start` | Production build (`vite build`) then launches Electron with `NODE_ENV=production`. |
 | `npm test` | Runs all Vitest suites once (Electron node + React jsdom). |
 | `npm run test:watch` | Same but re-runs on file change — useful during development. |
 

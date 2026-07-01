@@ -179,6 +179,10 @@ echo "log-sync.timer installed and started."
     $tmpFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "log-sync-setup.sh")
     [System.IO.File]::WriteAllText($tmpFile, ($setupScript -replace "`r`n", "`n"), [System.Text.UTF8Encoding]::new($false))
 
+    $script:vmName = $VmName
+    $script:vmUser = $vmUser
+    $script:vmPass = $vmPass
+
     Write-Host "  Waiting for Guest Additions..." -ForegroundColor Cyan
     if (-not (Wait-GuestReady -VmName $VmName -User $vmUser -Pass $vmPass)) {
         $ErrorActionPreference = 'SilentlyContinue'
@@ -191,19 +195,12 @@ echo "log-sync.timer installed and started."
     }
     Write-Host "  Guest Additions ready." -ForegroundColor Green
 
-    Write-Host "  Uploading setup script..." -ForegroundColor Cyan
-    $ErrorActionPreference = 'SilentlyContinue'
-    & $script:vbox guestcontrol $VmName copyto $tmpFile "/tmp/log-sync-setup.sh" --username $vmUser --password $vmPass 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Failed to upload setup script to VM." }
-    $ErrorActionPreference = 'Stop'
-
-    Write-Host "  Running setup script..." -ForegroundColor Cyan
-    $ErrorActionPreference = 'SilentlyContinue'
-    $result   = & $script:vbox guestcontrol $VmName run --exe /bin/bash --username $vmUser --password $vmPass --wait-stdout --wait-stderr -- /tmp/log-sync-setup.sh 2>&1
-    $exitCode = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop'
-
-    if ($exitCode -ne 0) { throw "Setup script failed (exit $exitCode): $result" }
+    $exitCode = Invoke-GuestScript -LocalPath $tmpFile -Label "log-sync-setup"
+    if ($exitCode -ne 0) {
+        $errLine = $script:lastGuestOutput | Where-Object { $_ -match '^\s*ERROR:' } | Select-Object -Last 1
+        if (-not $errLine) { $errLine = $script:lastGuestOutput | Where-Object { $_.Trim() } | Select-Object -Last 1 }
+        throw "Setup script failed (exit $exitCode): $errLine"
+    }
 
     Remove-Item $tmpFile -ErrorAction SilentlyContinue
 

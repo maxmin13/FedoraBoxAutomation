@@ -29,6 +29,7 @@ export interface ShareFolderParams {
   vmUser: string
   vmPass: string
   loginUser: string
+  forceRestart?: boolean
 }
 
 export interface ShareLogsParams {
@@ -149,6 +150,8 @@ declare global {
       installVirtualBox: () => Promise<{ ok: boolean }>
       getScriptState: () => Promise<{ ok: boolean; running: boolean; done: boolean; exitCode: number | null; lines: ScriptLine[]; context: { vmName: string; type: string; categoryDir: string | null; scriptName: string | null } | null }>
       clearScriptState: () => Promise<{ ok: boolean }>
+      onCloseWarning: (callback: () => void) => () => void
+      respondToCloseWarning: (forceQuit: boolean) => Promise<void>
       onScriptLine: (callback: (line: ScriptLine) => void) => () => void
       onScriptDone: (callback: (exitCode: number) => void) => () => void
       readDoc: (filename: string) => Promise<{ ok: boolean; content: string; error?: string }>

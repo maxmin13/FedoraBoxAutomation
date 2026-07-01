@@ -134,6 +134,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getScriptState: () => ipcRenderer.invoke('get-script-state'),
   clearScriptState: () => ipcRenderer.invoke('clear-script-state'),
 
+  onCloseWarning: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('show-close-warning', handler)
+    return () => ipcRenderer.removeListener('show-close-warning', handler)
+  },
+
+  respondToCloseWarning: (forceQuit) => ipcRenderer.invoke('close-warning-response', forceQuit),
+
   onScriptLine: (callback) => {
     const handler = (_event, line) => callback(line)
     ipcRenderer.on('script-line', handler)

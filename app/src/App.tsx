@@ -20,6 +20,11 @@ export default function App() {
   const [landingNavKey,  setLandingNavKey]  = useState(0)
   const [scriptRunning, setScriptRunning] = useState(false)
   const [scriptPage, setScriptPage] = useState<Page | null>(null)
+  const [showCloseWarning, setShowCloseWarning] = useState(false)
+
+  useEffect(() => {
+    return window.electronAPI.onCloseWarning(() => setShowCloseWarning(true))
+  }, [])
 
   const currentPageRef = useRef(currentPage)
   useEffect(() => { currentPageRef.current = currentPage }, [currentPage])
@@ -42,6 +47,31 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen">
+
+      {showCloseWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl space-y-4">
+            <h2 className="text-zinc-100 font-semibold">Script still running</h2>
+            <p className="text-zinc-300 text-sm">
+              A script is still running. Force quitting now may leave your VM in an incomplete state.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowCloseWarning(false); window.electronAPI.respondToCloseWarning(false) }}
+                className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors"
+              >
+                Keep waiting
+              </button>
+              <button
+                onClick={() => window.electronAPI.respondToCloseWarning(true)}
+                className="px-4 py-2 text-sm bg-red-700 hover:bg-red-600 text-white font-medium rounded transition-colors"
+              >
+                Force quit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Navigation bar — always visible at the top */}
       <NavBar currentPage={currentPage} onNavigate={handleNavigate} />
 
