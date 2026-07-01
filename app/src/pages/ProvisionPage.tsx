@@ -392,36 +392,31 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         state.ok && state.running &&
         state.context?.vmName === vm.name && state.context?.type === 'provision'
       ) {
+        // A provision script is running — listen silently for completion.
+        // Don't show the progress bar; the user navigated here fresh and expects the form.
         const scriptName = state.context.scriptName ?? null
         const found = findScriptByName(scriptName)
         const label = found?.script.label ?? (scriptName ?? 'Base Setup')
-        setSelectedScript(found?.script ?? null)
-        setSelectedCategory(found?.category ?? null)
-        setRunningLabel(label)
-        setLines(state.lines)
-        setIsReconnect(true)
-        setPageState('running')
-        setShowLog(true)
-        const liveLines = [...state.lines]
-        const unsubLine = window.electronAPI.onScriptLine((line) => {
-          liveLines.push(line)
-          setLines((prev) => [...prev, line])
-        })
-        const unsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
-          const isAlreadyInstalled = liveLines.some((l) => /\[INFO\s*\].*already installed/i.test(l.text))
-          await window.electronAPI.saveProvisionResult({ vmName: vm.name, scriptName, label, succeeded: exitCode === 0, alreadyInstalled: isAlreadyInstalled, error: null, lines: liveLines })
+        const bgLines: ScriptLine[] = [...state.lines]
+        const bgUnsubLine = window.electronAPI.onScriptLine((line) => { bgLines.push(line) })
+        const bgUnsubDone = window.electronAPI.onScriptDone(async (exitCode) => {
+          const isAlreadyInstalled = bgLines.some((l) => /\[INFO\s*\].*already installed/i.test(l.text))
+          await window.electronAPI.saveProvisionResult({ vmName: vm.name, scriptName, label, succeeded: exitCode === 0, alreadyInstalled: isAlreadyInstalled, error: null, lines: bgLines })
           await window.electronAPI.clearProvisionResult(vm.name)
           window.electronAPI.clearScriptState()
+          const found2 = findScriptByName(scriptName)
+          setSelectedScript(found2?.script ?? null)
+          setSelectedCategory(found2?.category ?? null)
+          setRunningLabel(label)
+          setLines(bgLines)
           setSuccess(exitCode === 0)
           setAlreadyInstalled(isAlreadyInstalled)
-          setIsReconnect(false)
           setPageState('done')
-          setShowLog(false)
           reconnectUnsubRef.current = null
-          unsubLine()
-          unsubDone()
+          bgUnsubLine()
+          bgUnsubDone()
         })
-        reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
+        reconnectUnsubRef.current = { line: bgUnsubLine, done: bgUnsubDone }
         return
       }
 
@@ -517,6 +512,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       state.context?.scriptName === script.name
 
     if (isRunning) {
+      if (reconnectUnsubRef.current) {
+        reconnectUnsubRef.current.line()
+        reconnectUnsubRef.current.done()
+        reconnectUnsubRef.current = null
+      }
       window.electronAPI.logUiAction(`provision "${vm.name}": reconnect running "${script.name}"`)
       const found = findScriptByName(script.name)
       setSelectedScript(script)
@@ -539,9 +539,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
         setAlreadyInstalled(isAlreadyInstalled)
         setPageState('done')
         setShowLog(false)
+        reconnectUnsubRef.current = null
         unsubLine()
         unsubDone()
       })
+      reconnectUnsubRef.current = { line: unsubLine, done: unsubDone }
       return
     }
 
@@ -569,6 +571,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     trackAlreadyInstalled = true,
     runScriptName: string | null = selectedScript?.name ?? null
   ) {
+    if (reconnectUnsubRef.current) return  // a provision script is already running for this VM
     setPageState('running')
     setLines([])
     setSuccess(null)
@@ -692,6 +695,11 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
       !state.context?.scriptName
 
     if (isBaseSetupRunning) {
+      if (reconnectUnsubRef.current) {
+        reconnectUnsubRef.current.line()
+        reconnectUnsubRef.current.done()
+        reconnectUnsubRef.current = null
+      }
       window.electronAPI.logUiAction(`provision "${vm.name}": reconnect running Base Setup`)
       setSelectedScript(null)
       setSelectedCategory(null)
