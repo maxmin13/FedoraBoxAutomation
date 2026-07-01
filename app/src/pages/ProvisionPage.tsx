@@ -352,9 +352,10 @@ interface ProvisionPageProps {
   vm: Vm
   onBack: () => void
   onScriptRunning: (running: boolean) => void
+  isActive?: boolean
 }
 
-export default function ProvisionPage({ vm, onBack, onScriptRunning }: ProvisionPageProps) {
+export default function ProvisionPage({ vm, onBack, onScriptRunning, isActive = true }: ProvisionPageProps) {
   const [vmUser,    setVmUser]    = useState('')
   const [vmPass,    setVmPass]    = useState('')
   const [loginUser, setLoginUser] = useState('')
@@ -481,6 +482,16 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
 
+  // When the page becomes visible again (user navigated back via NavBar), hide the progress bar
+  // and show the form instead. The startRun onScriptDone listener is still active and will
+  // transition to the done banner when the script finishes.
+  useEffect(() => {
+    if (isActive && pageState === 'running') {
+      setPageState('idle')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive])
+
   useEffect(() => {
     window.electronAPI.logUiAction(
       `provision "${vm.name}": [dbg] pageState=${pageState} idleView=${idleView} reconnect=${reconnectUnsubRef.current !== null}`
@@ -528,7 +539,9 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     trackAlreadyInstalled = true,
     runScriptName: string | null = selectedScript?.name ?? null
   ) {
-    if (reconnectUnsubRef.current) return  // a provision script is already running for this VM
+    if (reconnectUnsubRef.current) return
+    const runState = await window.electronAPI.getScriptState()
+    if (runState.ok && runState.running && runState.context?.vmName === vm.name && runState.context?.type === 'provision') return
     setPageState('running')
     setLines([])
     setSuccess(null)
