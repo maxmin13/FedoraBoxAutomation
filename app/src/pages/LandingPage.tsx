@@ -30,8 +30,9 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   // VM currently open in the detail view (null = show grid)
   const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
   const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
-  const [perfVm,         setPerfVm]         = useState<Vm | null>(null)
-  const [pendingPerfVm,  setPendingPerfVm]  = useState<Vm | null>(null)
+  const [perfVm,          setPerfVm]          = useState<Vm | null>(null)
+  const [pendingPerfVm,   setPendingPerfVm]   = useState<Vm | null>(null)
+  const [pendingDetailVm, setPendingDetailVm] = useState<Vm | null>(null)
 
   // Incremented each time we want VmDetailPage to re-fetch its info
   const [vmRefreshKey, setVmRefreshKey] = useState(0)
@@ -42,6 +43,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     setSelectedVm(null)
     setPerfVm(null)
     setPendingPerfVm(null)
+    setPendingDetailVm(null)
   }, [navKey])
 
   // Load VMs on mount and whenever this page becomes active, but not while
@@ -109,6 +111,35 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
       return
     }
     setPerfVm(vm)
+  }
+
+  async function handleOpenDetail(vm: Vm) {
+    if (vm.processRunning) {
+      const creds = await window.electronAPI.loadVmCredentials(vm.name)
+      if (!creds.ok || !creds.user || !creds.pass) {
+        setPendingDetailVm(vm)
+        return
+      }
+      const check = await window.electronAPI.checkVmCredentials(vm.name, creds.user, creds.pass)
+      if (!check.ok) {
+        setPendingDetailVm(vm)
+        return
+      }
+    }
+    setSelectedVmView('detail')
+    setSelectedVm(vm)
+  }
+
+  if (pendingDetailVm) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <VmLoginPage
+          initialVmName={pendingDetailVm.name}
+          onBack={() => setPendingDetailVm(null)}
+          onNext={() => { setSelectedVmView('detail'); setSelectedVm(pendingDetailVm); setPendingDetailVm(null) }}
+        />
+      </div>
+    )
   }
 
   if (pendingPerfVm) {
@@ -195,7 +226,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
               key={vm.uuid}
               vm={vm}
               onRefresh={loadVms}
-              onEdit={() => { setSelectedVmView('detail'); setSelectedVm(vm) }}
+              onEdit={() => handleOpenDetail(vm)}
               onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
               onPerformance={() => handleOpenPerf(vm)}
             />

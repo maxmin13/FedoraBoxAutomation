@@ -8,4 +8,3 @@
 
 # when creating a new vm, do we need the navigate away go back mechanism?
 
-# sync and share button same size
