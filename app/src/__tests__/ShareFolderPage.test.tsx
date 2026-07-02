@@ -85,7 +85,7 @@ describe('credential pre-fill', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() =>
       expect(window.electronAPI.runShareFolder).toHaveBeenCalledWith(
         expect.objectContaining({ vmUser: 'root', vmPass: 'mypass', loginUser: 'alice' })
@@ -103,7 +103,7 @@ describe('running state', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Setting up shared folder...')).toBeInTheDocument()
     })
@@ -115,7 +115,7 @@ describe('running state', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Set up shared folder' })).not.toBeInTheDocument()
     })
@@ -134,7 +134,7 @@ describe('success state', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Shared folder set up successfully.')).toBeInTheDocument()
     })
@@ -165,7 +165,7 @@ describe('failure state', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(screen.getByText('Setup failed.')).toBeInTheDocument()
     })
@@ -225,7 +225,7 @@ describe('onScriptRunning callback', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await act(async () => {})
     expect(onScriptRunning).toHaveBeenCalledWith(true)
   })
@@ -238,7 +238,7 @@ describe('onScriptRunning callback', () => {
     await fillForm()
     fireEvent.click(screen.getByRole('button', { name: 'Set up shared folder' }))
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Force restart' }))
     await waitFor(() => {
       expect(onScriptRunning).toHaveBeenCalledWith(false)
     })
