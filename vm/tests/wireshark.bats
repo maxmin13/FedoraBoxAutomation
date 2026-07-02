@@ -31,6 +31,13 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     # Default: Wireshark installed, user already in wireshark group
@@ -55,7 +62,7 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 when Wireshark is already installed" {

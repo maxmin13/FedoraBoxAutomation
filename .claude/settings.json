@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-tree *)",
+      "Bash(gh release view *)",
+      "Bash(gh release list*)"
+    ]
+  }
+}

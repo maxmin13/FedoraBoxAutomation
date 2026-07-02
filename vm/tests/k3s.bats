@@ -31,14 +31,28 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     _stub systemctl 0
     _stub timeout   0
     _stub chmod     0
 
-    # Default: k3s already installed
-    _stub k3s 0
+    # k3s.sh checks the absolute path /usr/local/bin/k3s directly (not PATH),
+    # so a PATH-based stub has no effect. Back up any real install and replace
+    # it with a stand-in for the default "already installed" state.
+    [[ -f /usr/local/bin/k3s ]] && mv /usr/local/bin/k3s "$TEST_TMPDIR/k3s.bin.bak"
+    cat > /usr/local/bin/k3s << 'K3SSTUB'
+#!/bin/bash
+echo "k3s version v1.30.0 (abcdef1 go1.21.0)"
+K3SSTUB
+    chmod +x /usr/local/bin/k3s
 
     cat > "$TEST_TMPDIR/bin/curl" << 'CURLSTUB'
 #!/bin/bash
@@ -67,6 +81,11 @@ teardown() {
     else
         rm -f /tmp/common.sh
     fi
+    if [[ -f "$TEST_TMPDIR/k3s.bin.bak" ]]; then
+        mv "$TEST_TMPDIR/k3s.bin.bak" /usr/local/bin/k3s
+    else
+        rm -f /usr/local/bin/k3s
+    fi
     if [[ -f "$TEST_TMPDIR/bash_profile.bak" ]]; then
         mv "$TEST_TMPDIR/bash_profile.bak" /root/.bash_profile
     else
@@ -84,7 +103,7 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 when k3s is already installed" {
@@ -98,7 +117,7 @@ teardown() {
 }
 
 @test "downloads k3s install script when k3s is not present" {
-    _stub k3s 1   # k3s --version fails → not installed
+    rm -f /usr/local/bin/k3s
     run bash "$SCRIPT" root
     grep -q "^curl " "$CALLS_FILE"
 }

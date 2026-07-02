@@ -6,6 +6,10 @@
 #   bats vm/tests/httpd.bats
 
 SCRIPT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/tools/web-servers/httpd.sh"
+VERSION='2.4.65'
+INSTALL_DIR="/opt/httpd-${VERSION}"
+CACHE_DIR='/opt/httpd-cache'
+SERVICE_FILE="/etc/systemd/system/httpd-${VERSION}.service"
 
 _stub() {
     local name="$1" exit_code="${2:-0}"
@@ -31,21 +35,73 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
-    # Default: httpd already installed
-    _stub rpm       0
-    _stub dnf       0
-    _stub httpd     0
-    _stub setsebool 0
+    _stub dnf 0
+
+    # HEAD check for the primary mirror always succeeds by default.
+    _stub curl 0
+
+    # httpd.sh does a real source build: `cd "$BUILD_DIR" && tar -xzf ...`,
+    # `cd httpd-<version>` and runs `./configure --prefix=<dir> ...` (a
+    # relative-path script inside the extracted tree, not a PATH command),
+    # then `make -j"$(nproc)"` and `make install`. The tar stub extracts a
+    # fake source tree with a `configure` stub that records --prefix; the
+    # make stub, when called with "install", uses that recorded prefix to
+    # populate a fake install (conf/httpd.conf, bin/httpd, bin/apachectl) —
+    # everything `make install` would normally produce.
+    cat > "$TEST_TMPDIR/bin/tar" << TARSTUB
+#!/bin/bash
+printf "tar %s\n" "\$*" >> "${CALLS_FILE}"
+mkdir -p "httpd-${VERSION}"
+cat > "httpd-${VERSION}/configure" << 'CONFIGURESTUB'
+#!/bin/bash
+for a in "\$@"; do
+    case "\$a" in
+        --prefix=*) echo "\${a#--prefix=}" > "${TEST_TMPDIR}/prefix" ;;
+    esac
+done
+exit 0
+CONFIGURESTUB
+chmod +x "httpd-${VERSION}/configure"
+exit 0
+TARSTUB
+    chmod +x "$TEST_TMPDIR/bin/tar"
+
+    cat > "$TEST_TMPDIR/bin/make" << MAKESTUB
+#!/bin/bash
+printf "make %s\n" "\$*" >> "${CALLS_FILE}"
+if [[ "\$*" == *install* ]]; then
+    prefix=\$(cat "${TEST_TMPDIR}/prefix" 2>/dev/null)
+    if [[ -n "\${prefix}" ]]; then
+        mkdir -p "\${prefix}/conf" "\${prefix}/bin" "\${prefix}/htdocs"
+        echo '#ServerName www.example.com:80' > "\${prefix}/conf/httpd.conf"
+        printf '#!/bin/bash\necho "Server version: Apache/${VERSION}"\nexit 0\n' > "\${prefix}/bin/httpd"
+        chmod +x "\${prefix}/bin/httpd"
+        printf '#!/bin/bash\nexit 0\n' > "\${prefix}/bin/apachectl"
+        chmod +x "\${prefix}/bin/apachectl"
+    fi
+fi
+exit 0
+MAKESTUB
+    chmod +x "$TEST_TMPDIR/bin/make"
+
     _stub systemctl 0
 
-    # httpd.sh reads and writes /etc/httpd/conf/httpd.conf
-    mkdir -p /etc/httpd/conf
-    [[ -f /etc/httpd/conf/httpd.conf ]] && \
-        cp /etc/httpd/conf/httpd.conf "$TEST_TMPDIR/httpd.conf.bak"
-    # Provide a minimal config that does not already include sites-enabled
-    echo '# httpd config' > /etc/httpd/conf/httpd.conf
+    # Default: tarball already cached, so the download/checksum path is
+    # skipped and the build proceeds straight from the cache.
+    mkdir -p "${CACHE_DIR}"
+    touch "${CACHE_DIR}/httpd-${VERSION}.tar.gz"
+
+    [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
+    touch /root/.bash_profile
 }
 
 teardown() {
@@ -54,43 +110,110 @@ teardown() {
     else
         rm -f /tmp/common.sh
     fi
-    if [[ -f "$TEST_TMPDIR/httpd.conf.bak" ]]; then
-        mv "$TEST_TMPDIR/httpd.conf.bak" /etc/httpd/conf/httpd.conf
+    if [[ -f "$TEST_TMPDIR/bash_profile.bak" ]]; then
+        mv "$TEST_TMPDIR/bash_profile.bak" /root/.bash_profile
     else
-        rm -f /etc/httpd/conf/httpd.conf
+        rm -f /root/.bash_profile
     fi
+    rm -rf "${INSTALL_DIR}" "${CACHE_DIR}" /opt/httpd
+    rm -f "${SERVICE_FILE}"
     rm -rf "$TEST_TMPDIR"
 }
 
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
-@test "exits 0 when Apache is already installed" {
-    run bash "$SCRIPT" root
+@test "exits 0 when this Apache version is already installed" {
+    mkdir -p "${INSTALL_DIR}"
+    run bash "$SCRIPT" root "${VERSION}"
     [ "$status" -eq 0 ]
+    [[ "$output" == *"already installed"* ]]
 }
 
-@test "skips dnf install when Apache is already installed" {
-    run bash "$SCRIPT" root
-    ! grep -q "^dnf install -y httpd" "$CALLS_FILE"
+@test "does not rebuild when already installed" {
+    mkdir -p "${INSTALL_DIR}"
+    run bash "$SCRIPT" root "${VERSION}"
+    ! grep -q "^make " "$CALLS_FILE"
+    ! grep -q "^tar " "$CALLS_FILE"
 }
 
-@test "installs httpd when not present" {
-    _stub rpm 1   # exit 1 = package not found
-    run bash "$SCRIPT" root
-    grep -q "^dnf install -y httpd" "$CALLS_FILE"
+@test "builds and installs Apache from the cached source tarball" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [ -x "${INSTALL_DIR}/bin/httpd" ]
+    grep -q "^make .*install" "$CALLS_FILE"
 }
 
-@test "enables and restarts the httpd service" {
-    run bash "$SCRIPT" root
-    grep -q "^systemctl enable httpd.service"  "$CALLS_FILE"
-    grep -q "^systemctl restart httpd.service" "$CALLS_FILE"
+@test "downloads the source tarball when not cached" {
+    rm -f "${CACHE_DIR}/httpd-${VERSION}.tar.gz"
+    cat > "$TEST_TMPDIR/bin/curl" << CURLSTUB
+#!/bin/bash
+printf "curl %s\n" "\$*" >> "${CALLS_FILE}"
+args=("\$@")
+for ((i=0; i<\${#args[@]}; i++)); do
+    if [[ "\${args[i]}" == "-o" ]]; then
+        echo 'fake-tarball-content' > "\${args[i+1]}"
+    fi
+done
+if [[ "\$*" == *.sha256* ]]; then
+    sha256sum <<< 'fake-tarball-content' | awk '{print \$1}'
+fi
+exit 0
+CURLSTUB
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [ -f "${CACHE_DIR}/httpd-${VERSION}.tar.gz" ]
 }
 
-@test "adds the sites-enabled include to httpd.conf" {
-    run bash "$SCRIPT" root
-    grep -q 'sites-enabled' /etc/httpd/conf/httpd.conf
+@test "exits 1 when the downloaded tarball fails checksum verification" {
+    rm -f "${CACHE_DIR}/httpd-${VERSION}.tar.gz"
+    cat > "$TEST_TMPDIR/bin/curl" << CURLSTUB
+#!/bin/bash
+printf "curl %s\n" "\$*" >> "${CALLS_FILE}"
+args=("\$@")
+for ((i=0; i<\${#args[@]}; i++)); do
+    if [[ "\${args[i]}" == "-o" ]]; then
+        echo 'fake-tarball-content' > "\${args[i+1]}"
+    fi
+done
+if [[ "\$*" == *.sha256* ]]; then
+    echo 'deadbeef0000000000000000000000000000000000000000000000000badc0de'
+fi
+exit 0
+CURLSTUB
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Checksum mismatch"* ]]
+}
+
+@test "sets ServerName in httpd.conf after install" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    grep -q 'ServerName localhost' "${INSTALL_DIR}/conf/httpd.conf"
+}
+
+@test "symlinks /opt/httpd to the versioned install dir" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [[ "$(readlink /opt/httpd)" == "${INSTALL_DIR}" ]]
+}
+
+@test "writes a per-version systemd service file" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [ -f "${SERVICE_FILE}" ]
+    grep -q "ExecStart=${INSTALL_DIR}/bin/apachectl -k start" "${SERVICE_FILE}"
+}
+
+@test "adds HTTPD_HOME to the login user's .bash_profile" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    grep -q 'HTTPD_HOME' /root/.bash_profile
 }

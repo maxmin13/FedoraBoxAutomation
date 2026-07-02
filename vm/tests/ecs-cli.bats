@@ -33,10 +33,18 @@ log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
 STUB
 
-    # Default: ECS CLI already installed
-    _stub ecs-cli 0
     _stub curl    0
     _stub chmod   0
+
+    # ecs-cli.sh checks the absolute path /usr/local/bin/ecs-cli directly (not
+    # PATH), so a PATH-based stub has no effect. Back up any real install and
+    # replace it with a stand-in for the default "already installed" state.
+    [[ -f /usr/local/bin/ecs-cli ]] && mv /usr/local/bin/ecs-cli "$TEST_TMPDIR/ecs-cli.bin.bak"
+    cat > /usr/local/bin/ecs-cli << 'ECSSTUB'
+#!/bin/bash
+echo "ecs-cli version 1.21.0 (abcdef1)"
+ECSSTUB
+    chmod +x /usr/local/bin/ecs-cli
 }
 
 teardown() {
@@ -44,6 +52,11 @@ teardown() {
         mv "$TEST_TMPDIR/common.sh.bak" /tmp/common.sh
     else
         rm -f /tmp/common.sh
+    fi
+    if [[ -f "$TEST_TMPDIR/ecs-cli.bin.bak" ]]; then
+        mv "$TEST_TMPDIR/ecs-cli.bin.bak" /usr/local/bin/ecs-cli
+    else
+        rm -f /usr/local/bin/ecs-cli
     fi
     rm -rf "$TEST_TMPDIR"
 }
@@ -59,13 +72,13 @@ teardown() {
 }
 
 @test "downloads the ECS CLI binary when not installed" {
-    _stub ecs-cli 1   # exit 1 = not found
+    rm -f /usr/local/bin/ecs-cli
     run bash "$SCRIPT"
     grep -q "^curl " "$CALLS_FILE"
 }
 
 @test "makes the binary executable after downloading" {
-    _stub ecs-cli 1
+    rm -f /usr/local/bin/ecs-cli
     run bash "$SCRIPT"
     grep -q "^chmod " "$CALLS_FILE"
 }

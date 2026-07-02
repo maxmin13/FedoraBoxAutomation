@@ -31,6 +31,13 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     # Default: Docker already installed, user already in docker group
@@ -56,7 +63,7 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 when Docker is already installed" {
@@ -75,11 +82,23 @@ teardown() {
     grep -q "^dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "$CALLS_FILE"
 }
 
-@test "starts and enables Docker service when installing" {
-    _stub docker 1
+@test "prints systemctl instructions after installing" {
+    # "docker version" (daemon check) fails pre-install; "docker --version"
+    # (client banner) succeeds once dnf install "installs" the stub package.
+    cat > "$TEST_TMPDIR/bin/docker" << 'DOCKERSTUB'
+#!/bin/bash
+printf "docker %s\n" "$*" >> "PLACEHOLDER"
+if [[ "$1" == "version" ]]; then
+    exit 1
+fi
+echo "Docker version 24.0.0, build abcdef"
+exit 0
+DOCKERSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/docker"
+    chmod +x "$TEST_TMPDIR/bin/docker"
+
     run bash "$SCRIPT" testuser
-    grep -q "^systemctl start docker"  "$CALLS_FILE"
-    grep -q "^systemctl enable docker" "$CALLS_FILE"
+    [[ "$output" == *"systemctl start|stop|restart|status docker"* ]]
 }
 
 @test "adds user to docker group when not already a member" {

@@ -52,7 +52,9 @@ STUB
     _stub mkdir 0
 
     # unzip stub: logs the call and creates ${WORK_DIR}/aws/install so the
-    # script can proceed to run the installer.
+    # script can proceed to run the installer. Uses the real mkdir/chmod via
+    # absolute path — the PATH-stubbed `mkdir` below (for the ~/.aws test)
+    # would otherwise swallow this directory creation too.
     cat > "$TEST_TMPDIR/bin/unzip" <<UNZIPSCRIPT
 #!/bin/bash
 printf "unzip %s\n" "\$*" >> "$CALLS_FILE"
@@ -60,9 +62,9 @@ while [[ \$# -gt 0 ]]; do
     if [[ "\$1" == "-d" ]]; then DEST="\$2"; break; fi
     shift
 done
-mkdir -p "\${DEST}/aws"
+/bin/mkdir -p "\${DEST}/aws"
 printf '#!/bin/bash\nprintf "aws_install %%s\\n" "\$*" >> $CALLS_FILE\nexit 0\n' > "\${DEST}/aws/install"
-chmod +x "\${DEST}/aws/install"
+/bin/chmod +x "\${DEST}/aws/install"
 exit 0
 UNZIPSCRIPT
     chmod +x "$TEST_TMPDIR/bin/unzip"
@@ -84,14 +86,14 @@ teardown() {
 }
 
 @test "exits 1 and emits 'Install anyway' message when already installed without --force" {
-    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
+    /bin/mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
     run bash "$SCRIPT" testuser
     [ "$status" -eq 1 ]
     [[ "$output" == *"Use 'Install anyway'"* ]]
 }
 
 @test "does not download when already installed without --force" {
-    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
+    /bin/mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
     run bash "$SCRIPT" testuser
     ! grep -q "^curl " "$CALLS_FILE"
 }
@@ -108,7 +110,7 @@ teardown() {
 }
 
 @test "passes --update to the installer when --force and already installed" {
-    mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
+    /bin/mkdir -p "$FEDORA_BOX_AWS_INSTALL_DIR"
     run bash "$SCRIPT" testuser --force
     [ "$status" -eq 0 ]
     grep -q "aws_install --update" "$CALLS_FILE"
@@ -116,8 +118,9 @@ teardown() {
 
 @test "does not pass --update when performing a fresh install" {
     run bash "$SCRIPT" testuser
-    # installer is called but without --update
-    grep -q "^aws_install$" "$CALLS_FILE"
+    # installer is called but without --update (the call-log stub always
+    # appends a trailing space before its "$*", even when args are empty)
+    grep -q "^aws_install $" "$CALLS_FILE"
 }
 
 @test "creates the ~/.aws directory for the login user" {

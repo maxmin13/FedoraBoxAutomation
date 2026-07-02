@@ -54,12 +54,12 @@ teardown() {
 }
 
 @test "exits 0 when Eclipse Enterprise installer is already present" {
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     [ "$status" -eq 0 ]
 }
 
 @test "skips wget when Eclipse Enterprise installer is already present" {
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     ! grep -q "^wget " "$CALLS_FILE"
 }
 
@@ -67,13 +67,13 @@ teardown() {
     # Directory exists but eclipse-inst is not executable — incomplete download
     rm -f /opt/eclipse-installer/eclipse-inst
     touch /opt/eclipse-installer/eclipse-inst   # file exists, not executable
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "calls wget when the installer is not present" {
     rm -rf /opt/eclipse-installer
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 

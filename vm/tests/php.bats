@@ -31,13 +31,32 @@ log_info()  { _log INFO  "$@"; }
 log_warn()  { _log WARN  "$@"; }
 log_error() { _log ERROR "$@"; }
 STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
+require_login_user() {
+    local user="${1:-}"
+    if [[ -z "${user}" ]]; then
+        log_error 'Desktop username is required as the first argument.'
+        exit 1
+    fi
+}
 STUB
 
     # Default: PHP already installed
     _stub rpm 0
     _stub dnf 0
-    _stub php 0
     _stub sed 0
+
+    # php.sh detects the active version via `php -v` output, not rpm -q, so
+    # the stub must emit a version line for the "already installed" default.
+    cat > "$TEST_TMPDIR/bin/php" << 'PHPSTUB'
+#!/bin/bash
+if [[ "$1" == "-v" ]]; then
+    echo "PHP 8.3.6 (cli) (built: Apr  1 2026 00:00:00) (NTS)"
+fi
+printf "php %s\n" "$*" >> "PLACEHOLDER"
+exit 0
+PHPSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/php"
+    chmod +x "$TEST_TMPDIR/bin/php"
 
     # php.sh writes to /etc/php.ini — back it up and provide a clean copy
     [[ -f /etc/php.ini ]] && cp /etc/php.ini "$TEST_TMPDIR/php.ini.bak"
@@ -61,7 +80,7 @@ teardown() {
 @test "exits 1 when no login-user argument is provided" {
     run bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"login user not found"* ]]
+    [[ "$output" == *"Desktop username is required"* ]]
 }
 
 @test "exits 0 when PHP is already installed" {
@@ -75,7 +94,15 @@ teardown() {
 }
 
 @test "installs PHP packages when not present" {
-    _stub rpm 1   # exit 1 = package not found
+    # php -v with no output on stdout simulates PHP not being installed.
+    cat > "$TEST_TMPDIR/bin/php" << 'PHPSTUB'
+#!/bin/bash
+printf "php %s\n" "$*" >> "PLACEHOLDER"
+exit 0
+PHPSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/php"
+    chmod +x "$TEST_TMPDIR/bin/php"
+
     run bash "$SCRIPT" testuser
     grep -q "^dnf install -y php php-common php-cli" "$CALLS_FILE"
 }

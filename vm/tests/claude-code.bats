@@ -136,13 +136,40 @@ NODESTUB
 @test "installs VS Code extension when code is on PATH" {
     _stub code 0
 
+    # The default `su` stub is a no-op that never runs its -c argument, so it
+    # would never actually invoke our `code` stub. Override it here (only —
+    # not as the shared default) to execute -c, now that `code` is our own
+    # controlled stub rather than whatever a real `su` might find on PATH.
+    cat > "$TEST_TMPDIR/bin/su" << 'SUSTUB'
+#!/bin/bash
+printf "su %s\n" "$*" >> "PLACEHOLDER"
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    if [[ "${args[i]}" == "-c" ]]; then
+        eval "${args[i+1]}"
+        exit $?
+    fi
+done
+exit 0
+SUSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/su"
+    chmod +x "$TEST_TMPDIR/bin/su"
+
     run bash "$SCRIPT" root
     grep -q "^code " "$CALLS_FILE"
     [[ "$output" == *"Claude Code extension"* ]]
 }
 
 @test "skips VS Code extension when code is not on PATH" {
-    # No code stub — not present in TEST_TMPDIR/bin
+    # No code stub — not present in TEST_TMPDIR/bin. On a dev machine with a
+    # Windows VS Code install, WSL interop appends its bin dir to PATH, so
+    # strip any dir that resolves a real `code` to genuinely simulate absence.
+    local dir filtered_path=""
+    while IFS= read -r dir; do
+        [[ -x "${dir}/code" ]] && continue
+        filtered_path="${filtered_path:+${filtered_path}:}${dir}"
+    done < <(printf '%s' "$PATH" | tr ':' '\n')
+    PATH="${filtered_path}"
 
     run bash "$SCRIPT" root
     ! grep -q "^code " "$CALLS_FILE"

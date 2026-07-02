@@ -64,9 +64,8 @@ teardown() {
     grep -q "^dnf install -y mariadb-server" "$CALLS_FILE"
 }
 
-@test "enables and starts the mariadb service when installing" {
+@test "prints systemctl instructions after installing" {
     _stub rpm 1
     run bash "$SCRIPT"
-    grep -q "^systemctl enable mariadb" "$CALLS_FILE"
-    grep -q "^systemctl start mariadb"  "$CALLS_FILE"
+    [[ "$output" == *"systemctl start|stop|restart|status mariadb"* ]]
 }

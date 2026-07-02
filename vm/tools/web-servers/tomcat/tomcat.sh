@@ -73,7 +73,7 @@ if [[ -z "${JAVA_HOME:-}" ]]; then
     if [[ -z "${DETECTED_JAVA_HOME}" || ! -x "${DETECTED_JAVA_HOME}/bin/java" ]]; then
         _profile=$(eval echo "~${LOGIN_USER}")/.bash_profile
         DETECTED_JAVA_HOME="$(grep '^export JAVA_HOME=' "${_profile}" 2>/dev/null \
-            | tail -1 | cut -d= -f2)"
+            | tail -1 | cut -d= -f2 || true)"
         [[ -n "${DETECTED_JAVA_HOME}" ]] && \
             log_warn "JAVA_HOME sourced from ${_profile}: ${DETECTED_JAVA_HOME}."
     fi

@@ -14,6 +14,18 @@ _stub() {
     chmod +x "$TEST_TMPDIR/bin/$name"
 }
 
+# Writes a fake `java` on PATH that reports the given version for `-version`.
+_stub_java_version() {
+    local version="$1"
+    cat > "$TEST_TMPDIR/bin/java" << JAVASTUB
+#!/bin/bash
+printf "java %s\n" "\$*" >> "${CALLS_FILE}"
+echo 'openjdk version "${version}" 2024-01-01'
+exit 0
+JAVASTUB
+    chmod +x "$TEST_TMPDIR/bin/java"
+}
+
 setup() {
     TEST_TMPDIR="$(mktemp -d)"
     export CALLS_FILE="$TEST_TMPDIR/calls.log"
@@ -40,34 +52,25 @@ require_login_user() {
 }
 STUB
 
-    _stub dnf          0
-    _stub wget         0
+    _stub wget 0
+
+    # Default: no RPM is installed (rpm -q fails for everything) so tests
+    # that don't care about the "already installed" branch get the install path.
+    _stub rpm 1
+    _stub dnf 0
+
+    # alternatives: no existing registration by default ("--query java" finds
+    # nothing), matching a first-run box — the script then falls back to the
+    # compgen filesystem glob to locate JAVA_BIN. --install/--set just log.
     _stub alternatives 0
-    _stub python3      0
 
-    # Set up a fake JDK so java.home detection resolves to a valid directory.
-    mkdir -p "${TEST_TMPDIR}/fakejdk/bin"
-    printf '#!/bin/bash\necho "openjdk 21"\nexit 0\n' > "${TEST_TMPDIR}/fakejdk/bin/java"
-    chmod +x "${TEST_TMPDIR}/fakejdk/bin/java"
+    # Default java: not installed (not found on PATH at all).
+    # Individual tests override with _stub_java_version as needed.
 
-    # java stub: exits 0 for --version (Java "already installed"),
-    # emits java.home for -XshowSettings so JAVA_HOME detection succeeds.
-    cat > "$TEST_TMPDIR/bin/java" << JAVASTUB
-#!/bin/bash
-printf "java %s\n" "\$*" >> "${CALLS_FILE}"
-if [[ "\$*" == *"XshowSettings"* ]]; then
-    printf "    java.home = ${TEST_TMPDIR}/fakejdk\n"
-fi
-echo "openjdk 21 2023-09-19"
-exit 0
-JAVASTUB
-    chmod +x "$TEST_TMPDIR/bin/java"
-
-    _stub readlink 0
-
-    # java.sh appends JAVA_HOME to ~/.bash_profile — back it up
     [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
     touch /root/.bash_profile
+
+    rm -rf /usr/java /usr/lib/jvm/temurin-* /etc/yum.repos.d/adoptium.repo /etc/profile.d/jdk.sh
 }
 
 teardown() {
@@ -81,6 +84,7 @@ teardown() {
     else
         rm -f /root/.bash_profile
     fi
+    rm -rf /usr/java /usr/lib/jvm/temurin-* /etc/yum.repos.d/adoptium.repo /etc/profile.d/jdk.sh
     rm -rf "$TEST_TMPDIR"
 }
 
@@ -90,58 +94,101 @@ teardown() {
     [[ "$output" == *"Desktop username is required"* ]]
 }
 
-@test "exits 0 when Java is already installed" {
-    run bash "$SCRIPT" root
-    [ "$status" -eq 0 ]
-}
+@test "exits 0 when the requested Oracle JDK is already installed and active" {
+    cat > "$TEST_TMPDIR/bin/rpm" << 'RPMSTUB'
+#!/bin/bash
+printf "rpm %s\n" "$*" >> "PLACEHOLDER"
+[[ "$*" == *"jdk-21"* ]] && exit 0
+exit 1
+RPMSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/rpm"
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+    _stub_java_version "21.0.1"
 
-@test "skips download when Java is already installed" {
-    run bash "$SCRIPT" root
+    run bash "$SCRIPT" root 21
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already installed and already the active version"* ]]
     ! grep -q "^wget " "$CALLS_FILE"
 }
 
-@test "downloads and installs Oracle JDK when Java is not present" {
-    _stub java 1   # exit 1 = java not found
+@test "downloads and installs Oracle JDK for major version 21+" {
+    mkdir -p /usr/java/jdk-21.0.1/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
+    chmod +x /usr/java/jdk-21.0.1/bin/java
+
     run bash "$SCRIPT" root 21
-    grep -q "^wget " "$CALLS_FILE"
-}
-
-@test "adds JAVA_HOME to .bash_profile when not already present" {
-    run bash "$SCRIPT" root
-    grep -q 'JAVA_HOME' /root/.bash_profile
-}
-
-@test "writes a valid JAVA_HOME path (not /usr) to .bash_profile" {
-    run bash "$SCRIPT" root
-    # The written path must not be the bogus /usr fallback
-    ! grep -q 'JAVA_HOME=/usr$' /root/.bash_profile
-    grep -q "JAVA_HOME=${TEST_TMPDIR}/fakejdk" /root/.bash_profile
-}
-
-@test "skips adding JAVA_HOME when it is already in .bash_profile" {
-    echo 'export JAVA_HOME=/usr/lib/jvm/java' >> /root/.bash_profile
-    run bash "$SCRIPT" root
-    # Only one JAVA_HOME line should exist (no duplicate)
-    [ "$(grep -c 'JAVA_HOME' /root/.bash_profile)" -eq 1 ]
-}
-
-@test "finds JAVA_HOME via filesystem search when java is not on PATH" {
-    # Remove java from PATH so XshowSettings path is skipped
-    rm "$TEST_TMPDIR/bin/java"
-    # fakejdk is already at $TEST_TMPDIR/fakejdk — but it is not in /usr/java/* or
-    # /usr/lib/jvm/* so the glob won't find it.  Symlink it into a known search path.
-    mkdir -p /usr/java
-    ln -sfn "${TEST_TMPDIR}/fakejdk" /usr/java/jdk-test-stub
-    run bash "$SCRIPT" root
-    rm -f /usr/java/jdk-test-stub
     [ "$status" -eq 0 ]
-    grep -q "JAVA_HOME" /root/.bash_profile
+    grep -q "^wget " "$CALLS_FILE"
+    grep -q "^dnf install" "$CALLS_FILE"
+}
+
+@test "uses Eclipse Temurin for versions below 21" {
+    mkdir -p /usr/lib/jvm/temurin-17-jdk/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/lib/jvm/temurin-17-jdk/bin/java
+    chmod +x /usr/lib/jvm/temurin-17-jdk/bin/java
+
+    run bash "$SCRIPT" root 17
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Eclipse Temurin"* ]]
+    grep -q "^dnf install -y temurin-17-jdk" "$CALLS_FILE"
+    ! grep -q "^wget " "$CALLS_FILE"
+}
+
+@test "adds the Adoptium repo before installing Temurin when missing" {
+    mkdir -p /usr/lib/jvm/temurin-17-jdk/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/lib/jvm/temurin-17-jdk/bin/java
+    chmod +x /usr/lib/jvm/temurin-17-jdk/bin/java
+
+    run bash "$SCRIPT" root 17
+    [ "$status" -eq 0 ]
+    [ -f /etc/yum.repos.d/adoptium.repo ]
+}
+
+@test "resolves the latest GA major version via the Foojay API when none is given" {
+    cat > "$TEST_TMPDIR/bin/curl" << CURLSTUB
+#!/bin/bash
+printf "curl %s\n" "\$*" >> "${CALLS_FILE}"
+echo '{"result":[{"major_version":17},{"major_version":21}]}'
+exit 0
+CURLSTUB
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    mkdir -p /usr/java/jdk-21.0.1/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
+    chmod +x /usr/java/jdk-21.0.1/bin/java
+
+    run bash "$SCRIPT" root
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Latest GA JDK major version: 21"* ]]
+}
+
+@test "exits 1 when the Foojay API returns no usable version" {
+    cat > "$TEST_TMPDIR/bin/curl" << CURLSTUB
+#!/bin/bash
+printf "curl %s\n" "\$*" >> "${CALLS_FILE}"
+exit 0
+CURLSTUB
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    run bash "$SCRIPT" root
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Could not determine latest JDK version"* ]]
+}
+
+@test "writes JAVA_HOME to /etc/profile.d/jdk.sh after a successful install" {
+    mkdir -p /usr/java/jdk-21.0.1/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
+    chmod +x /usr/java/jdk-21.0.1/bin/java
+
+    run bash "$SCRIPT" root 21
+    [ "$status" -eq 0 ]
+    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /etc/profile.d/jdk.sh
 }
 
 @test "exits 1 when JAVA_HOME cannot be determined" {
-    # Remove java from PATH and make readlink return nothing → all detection paths fail
-    rm "$TEST_TMPDIR/bin/java"
-    run bash "$SCRIPT" root
+    # Nothing on the filesystem matches the expected JDK glob, and
+    # `alternatives --query java` (stubbed) reports nothing either.
+    run bash "$SCRIPT" root 21
     [ "$status" -eq 1 ]
     [[ "$output" == *"Could not determine JAVA_HOME"* ]]
 }

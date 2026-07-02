@@ -35,6 +35,7 @@ STUB
 
     _stub wget 0
     _stub tar  0
+    _stub java 0
 
     # Default: Eclipse already installed — create the sentinel executable
     mkdir -p /opt/eclipse-2026-03
@@ -54,12 +55,12 @@ teardown() {
 }
 
 @test "exits 0 when Eclipse is already installed" {
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     [ "$status" -eq 0 ]
 }
 
 @test "skips wget when Eclipse is already installed" {
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     ! grep -q "^wget " "$CALLS_FILE"
 }
 
@@ -67,13 +68,13 @@ teardown() {
     # Directory exists but binary is not executable — incomplete install
     rm -f /opt/eclipse-2026-03/eclipse
     touch /opt/eclipse-2026-03/eclipse   # file exists, not executable
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "calls wget when Eclipse is not installed" {
     rm -rf /opt/eclipse-2026-03
-    run bash "$SCRIPT"
+    run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 

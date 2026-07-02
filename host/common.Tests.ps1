@@ -63,12 +63,12 @@ Describe 'Get-VBoxErrMsg' {
 
     It 'maps "execution service is not ready" to the Guest Additions not ready message' {
         $result = Get-VBoxErrMsg -Output @('execution service is not ready')
-        $result | Should -BeLike '*Guest Additions are not ready*'
+        $result | Should -BeLike '*Guest Additions may not be installed or not yet started*'
     }
 
     It 'maps "not installed or not ready" to the Guest Additions not ready message' {
         $result = Get-VBoxErrMsg -Output @('Guest Additions not installed or not ready')
-        $result | Should -BeLike '*Guest Additions are not ready*'
+        $result | Should -BeLike '*Guest Additions may not be installed or not yet started*'
     }
 
     It 'maps empty output to the VM-not-responding message' {

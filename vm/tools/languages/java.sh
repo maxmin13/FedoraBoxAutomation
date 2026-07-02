@@ -127,10 +127,10 @@ find_alt_java() {
 if [[ "${USE_ORACLE}" == true ]]; then
    JAVA_BIN=$(find_alt_java "/java/jdk-${TARGET_MAJOR}")
    # Filesystem fallback if alternatives query returned nothing (e.g. first run, DB not yet updated)
-   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/java/jdk-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1)
+   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/java/jdk-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1 || true)
 else
    JAVA_BIN=$(find_alt_java "temurin-${TARGET_MAJOR}")
-   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/lib/jvm/temurin-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1)
+   [[ -z "${JAVA_BIN}" ]] && JAVA_BIN=$(compgen -G "/usr/lib/jvm/temurin-${TARGET_MAJOR}*/bin/java" 2>/dev/null | sort -V | tail -1 || true)
 fi
 
 JDK_HOME="${JAVA_BIN%/bin/java}"

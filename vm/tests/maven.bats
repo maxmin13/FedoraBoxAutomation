@@ -34,7 +34,31 @@ STEP()      { echo; _log STEP "===[ $* ]==="; echo; }
 STUB
 
     _stub wget 0
-    _stub tar  0
+
+    # maven.sh does `mv "${WORK_DIR}/apache-maven-${VERSION}" "${INSTALL_DIR}"`
+    # right after extracting, so the tar stub must actually create that
+    # directory (parsed from -xf/-C args) or the mv — and everything after
+    # it, including the symlink — aborts under errexit.
+    cat > "$TEST_TMPDIR/bin/tar" << 'TARSTUB'
+#!/bin/bash
+printf "tar %s\n" "$*" >> "PLACEHOLDER"
+tgz="" dir="" args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[i]}" in
+        -xf) tgz="${args[i+1]}" ;;
+        -C)  dir="${args[i+1]}" ;;
+    esac
+done
+if [[ -n "${tgz}" && -n "${dir}" ]]; then
+    name="$(basename "${tgz}" | sed 's/-bin\.tar\.gz$//')"
+    mkdir -p "${dir}/${name}/bin"
+    printf '#!/bin/bash\necho "Apache Maven"\n' > "${dir}/${name}/bin/mvn"
+    chmod +x "${dir}/${name}/bin/mvn"
+fi
+exit 0
+TARSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/tar"
+    chmod +x "$TEST_TMPDIR/bin/tar"
 
     # curl stub: returns a fake Apache directory listing so MVN_VERSION resolves
     # to 3.9.9 without hitting the network.

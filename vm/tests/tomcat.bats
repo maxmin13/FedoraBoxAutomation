@@ -41,13 +41,55 @@ require_login_user() {
 STUB
 
     _stub wget       0
-    _stub tar        0
     _stub chown      0
     _stub systemctl  0
     _stub readlink   0
 
     # Default: ss reports no listeners (port is free)
     _stub ss 0
+
+    # No version arg is passed by these tests, so TOMCAT_VERSION defaults to
+    # "latest-10" and tomcat.sh resolves it via curl before anything else
+    # (including the Java check). Stub a fake Apache directory listing so it
+    # deterministically resolves to 10.1.33, matching this file's fixed paths.
+    cat > "$TEST_TMPDIR/bin/curl" << 'CURLSTUB'
+#!/bin/bash
+printf "curl %s\n" "$*" >> "PLACEHOLDER"
+echo '<a href="v10.1.33/">v10.1.33/</a>'
+exit 0
+CURLSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/curl"
+    chmod +x "$TEST_TMPDIR/bin/curl"
+
+    # tomcat.sh does `mv "/opt/apache-tomcat-${VERSION}" "${TOMCAT_DIR}"` right
+    # after extracting, then sed's conf/server.xml — so the tar stub must
+    # create that directory (parsed from -xf/--directory) with a realistic
+    # server.xml, or everything after extraction aborts under errexit.
+    cat > "$TEST_TMPDIR/bin/tar" << 'TARSTUB'
+#!/bin/bash
+printf "tar %s\n" "$*" >> "PLACEHOLDER"
+tgz="" dir="" args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+    case "${args[i]}" in
+        -xf) tgz="${args[i+1]}" ;;
+        --directory) dir="${args[i+1]}" ;;
+    esac
+done
+if [[ -n "${tgz}" && -n "${dir}" ]]; then
+    name="$(basename "${tgz}" .tar.gz)"
+    mkdir -p "${dir}/${name}/conf" "${dir}/${name}/bin" "${dir}/${name}/logs"
+    cat > "${dir}/${name}/conf/server.xml" << 'XML'
+<Server port="8005" shutdown="SHUTDOWN">
+  <Service name="Catalina">
+    <Connector port="8080" protocol="HTTP/1.1" />
+  </Service>
+</Server>
+XML
+fi
+exit 0
+TARSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/tar"
+    chmod +x "$TEST_TMPDIR/bin/tar"
 
     # Provide a fake Java installation so the JAVA_HOME validity check passes.
     # The binary lives at $JAVA_HOME/bin/java (not on PATH) — the script only
@@ -122,7 +164,7 @@ teardown() {
     mkdir -p /opt/apache-tomcat-10.1.33-8080
     run bash "$SCRIPT" root
     [ "$status" -eq 1 ]
-    [[ "$output" == *"already exists"* ]]
+    [[ "$output" == *"already installed on port"* ]]
 }
 
 @test "exits 1 when the port is already in use" {

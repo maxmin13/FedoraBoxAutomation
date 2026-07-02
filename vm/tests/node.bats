@@ -41,9 +41,23 @@ require_login_user() {
 STUB
 
     _stub dnf  0
-    _stub curl 0
     _stub rpm  0
     _stub npm  0
+
+    # curl stub: when resolving "latest" (no version arg), node.sh fetches
+    # nodejs.org's index.json and pipes it through python3 to extract the LTS
+    # major (22 here). Other URLs (e.g. the NodeSource setup script, piped to
+    # `bash -`) just need a harmless, logged no-op response.
+    cat > "$TEST_TMPDIR/bin/curl" << 'CURLSTUB'
+#!/bin/bash
+printf "curl %s\n" "$*" >> "PLACEHOLDER"
+if [[ "$*" == *"nodejs.org/dist/index.json"* ]]; then
+    echo '[{"version":"v22.3.0","lts":"Krypton"}]'
+fi
+exit 0
+CURLSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/curl"
+    chmod +x "$TEST_TMPDIR/bin/curl"
 
     # Default node stub: reports v22.3.0 so the "already installed" path is taken.
     cat > "$TEST_TMPDIR/bin/node" << NODESTUB
@@ -71,17 +85,17 @@ teardown() {
 }
 
 @test "exits 0 when Node.js 22.x is already installed" {
-    run bash "$SCRIPT" root
+    run bash "$SCRIPT" root 22
     [ "$status" -eq 0 ]
 }
 
 @test "does not call curl when the correct Node.js version is already installed" {
-    run bash "$SCRIPT" root
+    run bash "$SCRIPT" root 22
     ! grep -q "^curl " "$CALLS_FILE"
 }
 
 @test "does not call dnf install when the correct Node.js version is already installed" {
-    run bash "$SCRIPT" root
+    run bash "$SCRIPT" root 22
     ! grep -q "^dnf install" "$CALLS_FILE"
 }
 
