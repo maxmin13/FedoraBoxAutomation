@@ -55,6 +55,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const [existingNames, setExistingNames] = useState<string[]>([])
   const [showLog,       setShowLog]       = useState(false)
   const resultRef = useRef<HTMLDivElement>(null)
+  const runKeyRef = useRef(0)
 
   useEffect(() => {
     if (pageState === 'done') {
@@ -73,7 +74,8 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   }, [])
 
   useEffect(() => {
-    if (navKey > 0 && pageState !== 'running') {
+    if (navKey > 0) {
+      runKeyRef.current += 1
       setPageState('idle')
       setStep(1)
       setVmName('')
@@ -108,6 +110,8 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
   const step2Valid = !ramError && !cpusError && !diskError && !vramError && !cpuCapError
 
   async function handleCreate() {
+    runKeyRef.current += 1
+    const myKey = runKeyRef.current
     window.electronAPI.logUiAction(`create-vm: Create VM "${trimmedName}"`)
     setPageState('running')
     setLogLines([])
@@ -140,6 +144,7 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
 
     const result = await window.electronAPI.createVm(params)
     unsub()
+    if (runKeyRef.current !== myKey) return
     setSuccess(result.ok)
     setPageState('done')
     setShowLog(false)
