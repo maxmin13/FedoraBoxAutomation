@@ -27,6 +27,8 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   // Error message to show if VBoxManage is not available
   const [error, setError] = useState<string | null>(null)
 
+  const [page, setPage] = useState(0)
+
   // VM currently open in the detail view (null = show grid)
   const [selectedVm,     setSelectedVm]     = useState<Vm | null>(null)
   const [selectedVmView, setSelectedVmView] = useState<'detail' | 'provision'>('detail')
@@ -44,6 +46,7 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
     setPerfVm(null)
     setPendingPerfVm(null)
     setPendingDetailVm(null)
+    setPage(0)
   }, [navKey])
 
   // Load VMs on mount and whenever this page becomes active, but not while
@@ -169,10 +172,10 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-    <div className="max-w-4xl mx-auto">
+    <div className="h-full flex flex-col overflow-hidden">
+    <div className="max-w-4xl mx-auto w-full flex flex-col flex-1 min-h-0">
       {/* Page header */}
-      <div className="mb-6">
+      <div className="mb-6 shrink-0">
         <h1 className="text-2xl font-semibold text-zinc-100">My VMs</h1>
       </div>
 
@@ -217,20 +220,46 @@ export default function LandingPage({ onNavigate, onScriptRunning, isActive, cre
       )}
 
       {/* VM grid — stays mounted during refresh so card-level error state is preserved */}
-      {vms.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {vms.map((vm) => (
-            <VmCard
-              key={vm.uuid}
-              vm={vm}
-              onRefresh={loadVms}
-              onEdit={() => handleOpenDetail(vm)}
-              onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
-              onPerformance={() => handleOpenPerf(vm)}
-            />
-          ))}
-        </div>
-      )}
+      {vms.length > 0 && (() => {
+        const PAGE_SIZE = 6
+        const totalPages = Math.ceil(vms.length / PAGE_SIZE)
+        const pageVms = vms.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+        return (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {pageVms.map((vm) => (
+                <VmCard
+                  key={vm.uuid}
+                  vm={vm}
+                  onRefresh={loadVms}
+                  onEdit={() => handleOpenDetail(vm)}
+                  onProvision={() => { setSelectedVmView('provision'); setSelectedVm(vm) }}
+                  onPerformance={() => handleOpenPerf(vm)}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 text-sm text-zinc-400">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1 border border-zinc-600 hover:border-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  &larr; Prev
+                </button>
+                <span>{page + 1} / {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page === totalPages - 1}
+                  className="px-3 py-1 border border-zinc-600 hover:border-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
     </div>
   )
