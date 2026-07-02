@@ -430,6 +430,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   const [changeHostname,   setChangeHostname]   = useState(false)
   const [hostname,         setHostname]         = useState('')
   const [restarting,       setRestarting]       = useState(false)
+  const [waitingForGa,    setWaitingForGa]    = useState(false)
   const [restarted,        setRestarted]        = useState(false)
   const [showRestartModal, setShowRestartModal] = useState(false)
   const [forceConfirm,     setForceConfirm]     = useState(false)
@@ -467,6 +468,12 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
   useEffect(() => {
     onScriptRunning(pageState === 'running' || restarting)
   }, [pageState, restarting, onScriptRunning])
+
+  useEffect(() => {
+    if (!waitingForGa || !vm.running) return
+    setWaitingForGa(false)
+    setRestarted(true)
+  }, [vm.running, waitingForGa])
 
   function handleSelectCategory(cat: CategoryDef) {
     window.electronAPI.logUiAction(`provision "${vm.name}": select category "${cat.name}"`)
@@ -594,7 +601,7 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
     const unsubLine = window.electronAPI.onScriptLine((line) => setLines((prev) => [...prev, line]))
     const unsubDone = window.electronAPI.onScriptDone((exitCode) => {
       setRestarting(false)
-      if (exitCode === 0) setRestarted(true)
+      if (exitCode === 0) setWaitingForGa(true)
       unsubLine()
       unsubDone()
     })
@@ -644,13 +651,12 @@ export default function ProvisionPage({ vm, onBack, onScriptRunning }: Provision
             )}
             {runningLabel === 'Base Setup' && (
               <div className="mt-3">
-                <p className="text-green-300 text-sm mb-2">Reboot the VM to apply desktop changes.</p>
                 <button
                   onClick={() => { window.electronAPI.logUiAction(`provision "${vm.name}": Restart VM`); setShowRestartModal(true) }}
-                  disabled={restarting || restarted}
+                  disabled={restarting || waitingForGa || restarted}
                   className="px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
                 >
-                  {restarting ? 'Rebooting...' : restarted ? 'VM Restarted' : 'Restart VM'}
+                  {restarting || waitingForGa ? 'Rebooting...' : restarted ? 'VM Restarted' : 'Restart VM'}
                 </button>
               </div>
             )}
