@@ -73,7 +73,7 @@ export default function App() {
         </div>
       )}
       {/* Navigation bar — always visible at the top */}
-      <NavBar currentPage={currentPage} onNavigate={handleNavigate} />
+      <NavBar currentPage={currentPage} onNavigate={handleNavigate} scriptRunning={scriptRunning} />
 
       {/* Main content area — scrollable */}
       <main className="flex-1 overflow-hidden p-6">

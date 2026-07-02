@@ -11,7 +11,7 @@ describe('NavBar', () => {
   })
 
   it('shows all nav items: Requirements, My VMs, Create VM, Activity, Docs', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={false} />)
     expect(screen.getByRole('button', { name: 'Requirements' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'My VMs' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create VM' })).toBeInTheDocument()
@@ -20,32 +20,44 @@ describe('NavBar', () => {
   })
 
   it('calls onNavigate with the correct page name when a button is clicked', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
     expect(onNavigate).toHaveBeenCalledWith('setup')
   })
 
   it('calls onNavigate with "logs" when Activity is clicked', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }))
     expect(onNavigate).toHaveBeenCalledWith('logs')
   })
 
   it('calls onNavigate with "create-vm" when Create VM is clicked', () => {
-    render(<NavBar currentPage="landing" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={false} />)
     fireEvent.click(screen.getByRole('button', { name: 'Create VM' }))
     expect(onNavigate).toHaveBeenCalledWith('create-vm')
   })
 
   it('applies active styling to the current page button', () => {
-    render(<NavBar currentPage="setup" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="setup" onNavigate={onNavigate} scriptRunning={false} />)
     const setupBtn = screen.getByRole('button', { name: 'Requirements' })
     expect(setupBtn.className).toMatch(/bg-zinc-600/)
   })
 
   it('does not apply active styling to inactive page buttons', () => {
-    render(<NavBar currentPage="setup" onNavigate={onNavigate} />)
+    render(<NavBar currentPage="setup" onNavigate={onNavigate} scriptRunning={false} />)
     const landingBtn = screen.getByRole('button', { name: 'My VMs' })
     expect(landingBtn.className).not.toMatch(/bg-zinc-600/)
+  })
+
+  it('disables all nav buttons when a script is running', () => {
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
+    const buttons = screen.getAllByRole('button')
+    buttons.forEach((btn) => expect(btn).toBeDisabled())
+  })
+
+  it('does not call onNavigate when a button is clicked while a script is running', () => {
+    render(<NavBar currentPage="landing" onNavigate={onNavigate} scriptRunning={true} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Requirements' }))
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 })
