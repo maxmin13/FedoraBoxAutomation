@@ -89,16 +89,12 @@ tomcat_versions() {
 }
 
 httpd_versions() {
-  local list="" dir ver active_ver=""
-  if [[ -L /opt/httpd ]]; then
-    active_ver=$(readlink /opt/httpd)
-    active_ver="${active_ver#/opt/httpd-}"
-  fi
+  local list="" dir ver
   while IFS= read -r dir; do
     ver="${dir#/opt/httpd-}"
     [[ "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
     [[ -n "${list}" ]] && list="${list}, "
-    if [[ "${ver}" == "${active_ver}" ]]; then
+    if systemctl is-enabled --quiet "httpd-${ver}.service" 2>/dev/null; then
       list="${list}${ver} (active)"
     else
       list="${list}${ver}"

@@ -217,3 +217,30 @@ CURLSTUB
     [ "$status" -eq 0 ]
     grep -q 'HTTPD_HOME' /root/.bash_profile
 }
+
+@test "warns when a different httpd version is already running" {
+    cat > "$TEST_TMPDIR/bin/systemctl" << SYSTEMCTLSTUB
+#!/bin/bash
+printf "systemctl %s\n" "\$*" >> "${CALLS_FILE}"
+if [[ "\$*" == *"list-units"* ]]; then
+    echo "httpd-2.4.60.service loaded active running Apache HTTP Server 2.4.60"
+    echo "httpd-${VERSION}.service loaded active running Apache HTTP Server ${VERSION}"
+fi
+exit 0
+SYSTEMCTLSTUB
+    chmod +x "$TEST_TMPDIR/bin/systemctl"
+
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"httpd-2.4.60.service"* ]]
+    [[ "$output" == *"systemctl stop httpd-2.4.60.service"* ]]
+    [[ "$output" == *"systemctl start httpd-${VERSION}"* ]]
+    # The version just installed must not be listed as something to stop
+    ! [[ "$output" == *"systemctl stop httpd-${VERSION}.service"* ]]
+}
+
+@test "does not warn when no other httpd version is running" {
+    run bash "$SCRIPT" root "${VERSION}"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Another Apache version is currently running"* ]]
+}

@@ -189,3 +189,23 @@ log_info "--- To start  : systemctl start ${SERVICE_NAME}"
 log_info "--- To stop   : systemctl stop ${SERVICE_NAME}"
 log_info "--- To enable at boot: systemctl enable ${SERVICE_NAME}"
 log_info "--- To test   : curl http://localhost"
+log_info "--- To check which version is actually serving traffic:"
+log_info "---   sudo ss -ltnp 'sport = :80'"
+log_info "---   sudo readlink -f /proc/<PID>/exe"
+
+# A different version's service may already be bound to the same port(s).
+# Point that out explicitly rather than letting the new service silently
+# fail to start later with a confusing "Address already in use".
+OTHER_RUNNING=$(systemctl list-units --type=service --state=running --no-legend --plain 'httpd-*.service' 2>/dev/null \
+    | awk '{print $1}' | grep -v "^${SERVICE_NAME}\.service$" || true)
+if [[ -n "${OTHER_RUNNING}" ]]; then
+    log_warn "Another Apache version is currently running and using the same port(s):"
+    for _svc in ${OTHER_RUNNING}; do
+        log_warn "  ${_svc}"
+    done
+    log_warn "To switch to the version you just installed:"
+    for _svc in ${OTHER_RUNNING}; do
+        log_warn "  systemctl stop ${_svc}"
+    done
+    log_warn "  systemctl start ${SERVICE_NAME}"
+fi
