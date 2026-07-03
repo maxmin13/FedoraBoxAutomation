@@ -164,15 +164,27 @@ if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
    exit 1
 fi
 
-# Write a profile.d drop-in so every new shell session gets the correct
-# JAVA_HOME and has ${JAVA_HOME}/bin first on PATH.  Overwriting the file
-# on each run avoids duplicate lines and works for all users automatically.
-cat > /etc/profile.d/jdk.sh << EOF
-export JAVA_HOME=${JAVA_HOME_VAL}
-export PATH="\${JAVA_HOME}/bin:\${PATH}"
-EOF
-chmod 644 /etc/profile.d/jdk.sh
-log_info "JAVA_HOME set to ${JAVA_HOME_VAL} — open a new terminal for the change to take effect"
+# Set JAVA_HOME in the login user's ~/.bash_profile, matching the other
+# provisioning scripts (httpd.sh, k3s.sh, python.sh, openssl.sh) rather than
+# a system-wide /etc/profile.d drop-in. Re-running with a different major
+# version must replace the old JAVA_HOME line, not just add another one, so
+# strip any previous export before appending the current one.
+PROFILE="${HOME_DIR}/.bash_profile"
+touch "${PROFILE}"
+sed -i '/^export JAVA_HOME=/d; /^export PATH="\${JAVA_HOME}\/bin:\${PATH}"$/d' "${PROFILE}"
+{
+    echo ''
+    echo '# Java JDK'
+    echo "export JAVA_HOME=${JAVA_HOME_VAL}"
+    echo 'export PATH="${JAVA_HOME}/bin:${PATH}"'
+} >> "${PROFILE}"
+chown "${LOGIN_USER}:${LOGIN_USER}" "${PROFILE}" 2>/dev/null || true
+
+# Remove a jdk.sh drop-in left by an older version of this script, so it
+# doesn't keep exporting a stale JAVA_HOME system-wide.
+rm -f /etc/profile.d/jdk.sh
+
+log_info "JAVA_HOME added to ~/.bash_profile — open a new terminal for the change to take effect"
 
 export JAVA_HOME="${JAVA_HOME_VAL}"
 export PATH="${JAVA_HOME}/bin:${PATH}"

@@ -175,14 +175,42 @@ CURLSTUB
     [[ "$output" == *"Could not determine latest JDK version"* ]]
 }
 
-@test "writes JAVA_HOME to /etc/profile.d/jdk.sh after a successful install" {
+@test "writes JAVA_HOME to the login user's ~/.bash_profile after a successful install" {
     mkdir -p /usr/java/jdk-21.0.1/bin
     printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
     chmod +x /usr/java/jdk-21.0.1/bin/java
 
     run bash "$SCRIPT" root 21
     [ "$status" -eq 0 ]
-    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /etc/profile.d/jdk.sh
+    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /root/.bash_profile
+}
+
+@test "replaces the previous JAVA_HOME line instead of duplicating it when switching versions" {
+    echo 'export JAVA_HOME=/usr/java/jdk-17.0.9' >> /root/.bash_profile
+    echo 'export PATH="${JAVA_HOME}/bin:${PATH}"' >> /root/.bash_profile
+
+    mkdir -p /usr/java/jdk-21.0.1/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
+    chmod +x /usr/java/jdk-21.0.1/bin/java
+
+    run bash "$SCRIPT" root 21
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^export JAVA_HOME=' /root/.bash_profile)" -eq 1 ]
+    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /root/.bash_profile
+    ! grep -q "jdk-17.0.9" /root/.bash_profile
+}
+
+@test "removes a leftover /etc/profile.d/jdk.sh from an older script version" {
+    mkdir -p /etc/profile.d
+    echo 'export JAVA_HOME=/usr/java/jdk-17.0.9' > /etc/profile.d/jdk.sh
+
+    mkdir -p /usr/java/jdk-21.0.1/bin
+    printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
+    chmod +x /usr/java/jdk-21.0.1/bin/java
+
+    run bash "$SCRIPT" root 21
+    [ "$status" -eq 0 ]
+    [ ! -f /etc/profile.d/jdk.sh ]
 }
 
 @test "exits 1 when JAVA_HOME cannot be determined" {
