@@ -90,6 +90,8 @@ install_jdk() {
       wget -q --tries=3 "${JDK_URL}" -O "${WORK_DIR}/jdk.rpm"
       dnf install -y "${WORK_DIR}/jdk.rpm"
       log_info "Oracle JDK ${TARGET_MAJOR} installed."
+      rm -rf "${WORK_DIR}"
+      trap - EXIT
    else
       local PKG="temurin-${TARGET_MAJOR}-jdk"
       if rpm -q "${PKG}" &>/dev/null; then
