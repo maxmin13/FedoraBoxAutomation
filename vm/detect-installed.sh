@@ -82,7 +82,11 @@ tomcat_versions() {
     port="${base##*-}"
     ver="${base%-*}"
     [[ -n "${list}" ]] && list="${list}, "
-    list="${list}${ver}:${port}"
+    if systemctl is-enabled --quiet "tomcat-${ver}-${port}.service" 2>/dev/null; then
+      list="${list}${ver}:${port} (active)"
+    else
+      list="${list}${ver}:${port}"
+    fi
   done < <(compgen -G "/opt/apache-tomcat-*" 2>/dev/null | sort -V)
   [[ -z "${list}" ]] && { echo false; return; }
   echo "\"${list}\""

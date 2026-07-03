@@ -112,9 +112,10 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
 // What "active" means differs per tool depending on how detect-installed.sh
 // picks it (alternatives selection, a symlink target, a boot-enabled service, ...).
 const ACTIVE_HINTS: Record<string, string> = {
-  java:  'Selected via the system alternatives — the version that java -version resolves to.',
-  maven: 'The version /usr/local/bin/mvn points to.',
-  httpd: 'The version whose systemd service is enabled to start at boot.',
+  java:   'Selected via the system alternatives — the version that java -version resolves to.',
+  maven:  'The version /usr/local/bin/mvn points to.',
+  httpd:  'The version whose systemd service is enabled to start at boot.',
+  tomcat: 'The version:port instance whose systemd service is enabled to start at boot. Multiple instances can be active at once since each runs on its own port.',
 }
 
 interface VmDetailPageProps {
