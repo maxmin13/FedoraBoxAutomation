@@ -6,6 +6,7 @@ import ProvisionPage from './ProvisionPage'
 import { useAuthGate } from '../hooks/useAuthGate'
 import VmLoginPage from './VmLoginPage'
 import WarnIcon from '../components/WarnIcon'
+import Tooltip from '../components/Tooltip'
 
 // Maps detect-installed.sh JSON keys to user-facing labels, grouped by category.
 const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }[] = [
@@ -107,6 +108,14 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     ],
   },
 ]
+
+// What "active" means differs per tool depending on how detect-installed.sh
+// picks it (alternatives selection, a symlink target, a boot-enabled service, ...).
+const ACTIVE_HINTS: Record<string, string> = {
+  java:  'Selected via the system alternatives — the version that java -version resolves to.',
+  maven: 'The version /usr/local/bin/mvn points to.',
+  httpd: 'The version whose systemd service is enabled to start at boot.',
+}
 
 interface VmDetailPageProps {
   vm: Vm
@@ -445,9 +454,8 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                           {versions.map((v) => {
                                             const isActive = v.endsWith(' (active)')
                                             const ver = isActive ? v.replace(' (active)', '') : v
-                                            return (
+                                            const badge = (
                                               <span
-                                                key={ver}
                                                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
                                                   isActive
                                                     ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
@@ -457,6 +465,13 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                                 {ver}
                                                 {isActive && <span className="text-green-500 text-[9px]">active</span>}
                                               </span>
+                                            )
+                                            return isActive ? (
+                                              <Tooltip key={ver} tip={ACTIVE_HINTS[tool.key] ?? 'Currently the active version.'}>
+                                                {badge}
+                                              </Tooltip>
+                                            ) : (
+                                              <span key={ver}>{badge}</span>
                                             )
                                           })}
                                         </div>
