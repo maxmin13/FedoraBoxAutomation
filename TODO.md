@@ -3,3 +3,5 @@
 # review readme file snapshots
 
 # create a new vm, verify all the provision scripts after change most recent version
+
+# finish testing the provision scrpts starting from postgresql

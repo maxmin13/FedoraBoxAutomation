@@ -116,3 +116,30 @@ RPMSTUB
     run bash "$SCRIPT"
     ! grep -q "^postgresql-setup" "$CALLS_FILE"
 }
+
+@test "warns when a different postgresql version is already running" {
+    cat > "$TEST_TMPDIR/bin/systemctl" << SYSTEMCTLSTUB
+#!/bin/bash
+printf "systemctl %s\n" "\$*" >> "${CALLS_FILE}"
+if [[ "\$*" == *"list-units"* ]]; then
+    echo "postgresql-16.service loaded active running PostgreSQL 16 database server"
+    echo "postgresql.service loaded active running PostgreSQL database server"
+fi
+exit 0
+SYSTEMCTLSTUB
+    chmod +x "$TEST_TMPDIR/bin/systemctl"
+
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"postgresql-16.service"* ]]
+    [[ "$output" == *"systemctl stop postgresql-16.service"* ]]
+    [[ "$output" == *"systemctl start postgresql"* ]]
+    # The version just installed must not be listed as something to stop
+    ! [[ "$output" == *"systemctl stop postgresql.service"* ]]
+}
+
+@test "does not warn when no other postgresql version is running" {
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Another PostgreSQL version is currently running"* ]]
+}

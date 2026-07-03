@@ -4,9 +4,9 @@
 ## Description: Installs PostgreSQL server, initialises the database cluster,
 ##              enables remote connections, and installs pgAdmin 4 desktop.
 ##              Without a version argument installs from the Fedora repo.
-##              With a version (14-17) installs from the PGDG repo.
+##              With a version (14-18) installs from the PGDG repo.
 ## Usage:       sudo ./postgresql.sh [version]
-## Parameters:  $1  version  Optional major version: 14 | 15 | 16 | 17
+## Parameters:  $1  version  Optional major version: 14 | 15 | 16 | 17 | 18
 ##
 
 source /tmp/common.sh
@@ -80,9 +80,31 @@ else
 fi
 
 log_info "Service  : systemctl start|stop|restart|status ${SVC_NAME}"
-log_info "CLI      : psql -U postgres"
+log_info "Enable at boot: systemctl enable ${SVC_NAME}"
+log_info "CLI      : sudo -u postgres psql   (peer auth - no password set by default)"
 log_info "Create   : createdb <dbname> -U postgres"
 log_info "Logs     : journalctl -u ${SVC_NAME}"
 log_info "Config   : ${CONF_DIR}/postgresql.conf"
 log_info "HBA      : ${CONF_DIR}/pg_hba.conf"
 log_info "pgAdmin  : launch pgAdmin 4 from the Applications menu"
+log_info "--- To check which version is actually accepting connections:"
+log_info "---   sudo ss -ltnp 'sport = :5432'"
+log_info "---   sudo readlink -f /proc/<PID>/exe"
+
+# A different PostgreSQL version may already be running on the same port -
+# all versions default to 5432 unless reconfigured - so a newly enabled
+# instance can silently fail to bind. Point that out explicitly rather than
+# letting it fail later with a confusing "Address already in use".
+OTHER_RUNNING=$(systemctl list-units --type=service --state=running --no-legend --plain 'postgresql*.service' 2>/dev/null \
+    | awk '{print $1}' | grep -v "^${SVC_NAME}\.service$" || true)
+if [[ -n "${OTHER_RUNNING}" ]]; then
+    log_warn "Another PostgreSQL version is currently running and may be using the same port (5432):"
+    for _svc in ${OTHER_RUNNING}; do
+        log_warn "  ${_svc}"
+    done
+    log_warn "To switch to the version you just installed:"
+    for _svc in ${OTHER_RUNNING}; do
+        log_warn "  systemctl stop ${_svc}"
+    done
+    log_warn "  systemctl start ${SVC_NAME}"
+fi

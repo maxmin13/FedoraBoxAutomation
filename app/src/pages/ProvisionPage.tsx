@@ -136,6 +136,7 @@ const CATEGORIES: CategoryDef[] = [
         argType: 'custom', argPrompts: ['Version'], argDefaults: [''],
         argOptions: [[
           { value: '',   label: 'Latest (Fedora repo)' },
+          { value: '18', label: '18 - PGDG' },
           { value: '17', label: '17 - PGDG' },
           { value: '16', label: '16 - PGDG' },
           { value: '15', label: '15 - PGDG' },

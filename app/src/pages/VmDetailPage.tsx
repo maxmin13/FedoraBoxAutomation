@@ -116,6 +116,7 @@ const ACTIVE_HINTS: Record<string, string> = {
   maven:  'The version /usr/local/bin/mvn points to.',
   httpd:  'The version whose systemd service is enabled to start at boot.',
   tomcat: 'The version:port instance whose systemd service is enabled to start at boot. Multiple instances can be active at once since each runs on its own port.',
+  postgresql: 'The version whose systemd service is enabled to start at boot. All versions default to port 5432, so only one can actually accept connections unless the others are reconfigured to a different port.',
 }
 
 interface VmDetailPageProps {

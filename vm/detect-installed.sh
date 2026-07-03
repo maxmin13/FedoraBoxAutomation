@@ -162,12 +162,22 @@ mariadb_version() {
 }
 
 postgresql_version() {
-  local list="" ver pkg
-  for pkg in postgresql17-server postgresql16-server postgresql15-server postgresql14-server postgresql-server; do
+  local list="" ver pkg svc
+  for pkg in postgresql18-server postgresql17-server postgresql16-server postgresql15-server postgresql14-server postgresql-server; do
     if rpm -q "${pkg}" &>/dev/null; then
       ver=$(rpm -q "${pkg}" --queryformat '%{VERSION}')
+      if [[ "${pkg}" == "postgresql-server" ]]; then
+        svc="postgresql"
+      else
+        svc="postgresql-${pkg#postgresql}"
+        svc="${svc%-server}"
+      fi
       [[ -n "${list}" ]] && list="${list}, "
-      list="${list}${ver}"
+      if systemctl is-enabled --quiet "${svc}.service" 2>/dev/null; then
+        list="${list}${ver} (active)"
+      else
+        list="${list}${ver}"
+      fi
     fi
   done
   [[ -z "${list}" ]] && { echo false; return; }
