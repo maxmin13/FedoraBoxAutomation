@@ -24,6 +24,9 @@ else
 fi
 
 log_info "Service : systemctl start|stop|restart|status mariadb"
-log_info "CLI     : mysql -u root -p"
-log_info "Secure  : mysql_secure_installation"
+log_info "No root password is set by default - root auth uses the unix_socket"
+log_info "plugin, which checks the OS user instead of a password:"
+log_info "CLI     : sudo mysql -u root"
+log_info "To set a real root password (also required for TCP/remote access):"
+log_info "Secure  : sudo mysql_secure_installation"
 log_info "Logs    : journalctl -u mariadb"
