@@ -2,9 +2,9 @@
 
 ##
 ## Description: Installs a JDK alongside any existing versions and sets
-##              JAVA_HOME in the login user's ~/.bash_profile. Multiple JDK
-##              versions coexist; the requested version becomes the active
-##              default via the alternatives system.
+##              JAVA_HOME in the login user's ~/.bash_profile and ~/.bashrc.
+##              Multiple JDK versions coexist; the requested version becomes
+##              the active default via the alternatives system.
 ##
 ##              Oracle JDK is used for versions 21+ (freely downloadable).
 ##              OpenJDK from Fedora repos is used for versions 17 and below.
@@ -164,27 +164,33 @@ if [[ -z "${JAVA_HOME_VAL}" || ! -x "${JAVA_HOME_VAL}/bin/java" ]]; then
    exit 1
 fi
 
-# Set JAVA_HOME in the login user's ~/.bash_profile, matching the other
-# provisioning scripts (httpd.sh, k3s.sh, python.sh, openssl.sh) rather than
-# a system-wide /etc/profile.d drop-in. Re-running with a different major
-# version must replace the old JAVA_HOME line, not just add another one, so
-# strip any previous export before appending the current one.
-PROFILE="${HOME_DIR}/.bash_profile"
-touch "${PROFILE}"
-sed -i '/^export JAVA_HOME=/d; /^export PATH="\${JAVA_HOME}\/bin:\${PATH}"$/d' "${PROFILE}"
-{
-    echo ''
-    echo '# Java JDK'
-    echo "export JAVA_HOME=${JAVA_HOME_VAL}"
-    echo 'export PATH="${JAVA_HOME}/bin:${PATH}"'
-} >> "${PROFILE}"
-chown "${LOGIN_USER}:${LOGIN_USER}" "${PROFILE}" 2>/dev/null || true
+# Set JAVA_HOME in both ~/.bash_profile (login shells, matching the other
+# provisioning scripts: httpd.sh, k3s.sh, python.sh, openssl.sh) and
+# ~/.bashrc (interactive non-login shells — most desktop terminal windows
+# use these, so .bash_profile alone would only take effect after a full
+# logout/login). Re-running with a different major version must replace the
+# old JAVA_HOME line, not just add another one, so strip any previous export
+# before appending the current one.
+write_java_home() {
+    local profile="$1"
+    touch "${profile}"
+    sed -i '/^export JAVA_HOME=/d; /^export PATH="\${JAVA_HOME}\/bin:\${PATH}"$/d' "${profile}"
+    {
+        echo ''
+        echo '# Java JDK'
+        echo "export JAVA_HOME=${JAVA_HOME_VAL}"
+        echo 'export PATH="${JAVA_HOME}/bin:${PATH}"'
+    } >> "${profile}"
+    chown "${LOGIN_USER}:${LOGIN_USER}" "${profile}" 2>/dev/null || true
+}
+write_java_home "${HOME_DIR}/.bash_profile"
+write_java_home "${HOME_DIR}/.bashrc"
 
 # Remove a jdk.sh drop-in left by an older version of this script, so it
 # doesn't keep exporting a stale JAVA_HOME system-wide.
 rm -f /etc/profile.d/jdk.sh
 
-log_info "JAVA_HOME added to ~/.bash_profile — open a new terminal for the change to take effect"
+log_info "JAVA_HOME added to ~/.bash_profile and ~/.bashrc — open a new terminal for the change to take effect"
 
 export JAVA_HOME="${JAVA_HOME_VAL}"
 export PATH="${JAVA_HOME}/bin:${PATH}"

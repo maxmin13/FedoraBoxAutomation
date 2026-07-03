@@ -69,6 +69,8 @@ STUB
 
     [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
     touch /root/.bash_profile
+    [[ -f /root/.bashrc ]] && cp /root/.bashrc "$TEST_TMPDIR/bashrc.bak"
+    touch /root/.bashrc
 
     rm -rf /usr/java /usr/lib/jvm/temurin-* /etc/yum.repos.d/adoptium.repo /etc/profile.d/jdk.sh
 }
@@ -83,6 +85,11 @@ teardown() {
         mv "$TEST_TMPDIR/bash_profile.bak" /root/.bash_profile
     else
         rm -f /root/.bash_profile
+    fi
+    if [[ -f "$TEST_TMPDIR/bashrc.bak" ]]; then
+        mv "$TEST_TMPDIR/bashrc.bak" /root/.bashrc
+    else
+        rm -f /root/.bashrc
     fi
     rm -rf /usr/java /usr/lib/jvm/temurin-* /etc/yum.repos.d/adoptium.repo /etc/profile.d/jdk.sh
     rm -rf "$TEST_TMPDIR"
@@ -175,7 +182,7 @@ CURLSTUB
     [[ "$output" == *"Could not determine latest JDK version"* ]]
 }
 
-@test "writes JAVA_HOME to the login user's ~/.bash_profile after a successful install" {
+@test "writes JAVA_HOME to the login user's ~/.bash_profile and ~/.bashrc after a successful install" {
     mkdir -p /usr/java/jdk-21.0.1/bin
     printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
     chmod +x /usr/java/jdk-21.0.1/bin/java
@@ -183,11 +190,14 @@ CURLSTUB
     run bash "$SCRIPT" root 21
     [ "$status" -eq 0 ]
     grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /root/.bash_profile
+    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /root/.bashrc
 }
 
 @test "replaces the previous JAVA_HOME line instead of duplicating it when switching versions" {
-    echo 'export JAVA_HOME=/usr/java/jdk-17.0.9' >> /root/.bash_profile
-    echo 'export PATH="${JAVA_HOME}/bin:${PATH}"' >> /root/.bash_profile
+    for f in /root/.bash_profile /root/.bashrc; do
+        echo 'export JAVA_HOME=/usr/java/jdk-17.0.9' >> "$f"
+        echo 'export PATH="${JAVA_HOME}/bin:${PATH}"' >> "$f"
+    done
 
     mkdir -p /usr/java/jdk-21.0.1/bin
     printf '#!/bin/bash\necho ok\n' > /usr/java/jdk-21.0.1/bin/java
@@ -195,9 +205,11 @@ CURLSTUB
 
     run bash "$SCRIPT" root 21
     [ "$status" -eq 0 ]
-    [ "$(grep -c '^export JAVA_HOME=' /root/.bash_profile)" -eq 1 ]
-    grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" /root/.bash_profile
-    ! grep -q "jdk-17.0.9" /root/.bash_profile
+    for f in /root/.bash_profile /root/.bashrc; do
+        [ "$(grep -c '^export JAVA_HOME=' "$f")" -eq 1 ]
+        grep -q "JAVA_HOME=/usr/java/jdk-21.0.1" "$f"
+        ! grep -q "jdk-17.0.9" "$f"
+    done
 }
 
 @test "removes a leftover /etc/profile.d/jdk.sh from an older script version" {
