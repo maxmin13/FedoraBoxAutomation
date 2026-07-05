@@ -72,6 +72,7 @@ teardown() {
         rm -f /var/lib/pgsql/data/postgresql.conf
     fi
     rm -f /var/lib/pgsql/data/PG_VERSION
+    rm -rf /var/lib/pgsql/14 /var/lib/pgsql/16 /usr/pgsql-14 /usr/pgsql-16
     rm -rf "$TEST_TMPDIR"
 }
 
@@ -142,4 +143,272 @@ SYSTEMCTLSTUB
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" != *"Another PostgreSQL version is currently running"* ]]
+}
+
+@test "PGDG: adds the repo and installs the versioned package when not present" {
+    # Not installed yet on the first check; installed by the time dnf install
+    # (mocked) has "run" - simulates a successful PGDG install.
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql16-server"*)
+        COUNT_FILE="${TEST_TMPDIR}/rpm16_calls"
+        COUNT=\$(cat "\$COUNT_FILE" 2>/dev/null || echo 0)
+        echo \$(( COUNT + 1 )) > "\$COUNT_FILE"
+        [[ "\$COUNT" -eq 0 ]] && exit 1
+        exit 0
+        ;;
+    *"-q pgdg-fedora-repo"*) exit 1 ;;
+    *"-E %fedora"*)          echo 44; exit 0 ;;
+    *)                       exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    mkdir -p /usr/pgsql-16/bin
+    cat > /usr/pgsql-16/bin/postgresql-16-setup << SETUPSTUB
+#!/bin/bash
+printf "postgresql-16-setup %s\n" "\$*" >> "${CALLS_FILE}"
+exit 0
+SETUPSTUB
+    chmod +x /usr/pgsql-16/bin/postgresql-16-setup
+    mkdir -p /var/lib/pgsql/16/data
+    touch /var/lib/pgsql/16/data/postgresql.conf /var/lib/pgsql/16/data/pg_hba.conf
+
+    run bash "$SCRIPT" 16
+    [ "$status" -eq 0 ]
+    grep -q "pgdg-fedora-repo-latest.noarch.rpm" "$CALLS_FILE"
+    grep -q "^dnf install -y postgresql16-server postgresql16" "$CALLS_FILE"
+    grep -q "^postgresql-16-setup initdb" "$CALLS_FILE"
+}
+
+@test "PGDG: skips re-adding the repo when it is already installed from a previous run" {
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql16-server"*)
+        COUNT_FILE="${TEST_TMPDIR}/rpm16_calls"
+        COUNT=\$(cat "\$COUNT_FILE" 2>/dev/null || echo 0)
+        echo \$(( COUNT + 1 )) > "\$COUNT_FILE"
+        [[ "\$COUNT" -eq 0 ]] && exit 1
+        exit 0
+        ;;
+    *"-q pgdg-fedora-repo"*) exit 0 ;;
+    *"-E %fedora"*)          echo 44; exit 0 ;;
+    *)                       exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    mkdir -p /usr/pgsql-16/bin
+    cat > /usr/pgsql-16/bin/postgresql-16-setup << SETUPSTUB
+#!/bin/bash
+printf "postgresql-16-setup %s\n" "\$*" >> "${CALLS_FILE}"
+exit 0
+SETUPSTUB
+    chmod +x /usr/pgsql-16/bin/postgresql-16-setup
+    mkdir -p /var/lib/pgsql/16/data
+    touch /var/lib/pgsql/16/data/postgresql.conf /var/lib/pgsql/16/data/pg_hba.conf
+
+    run bash "$SCRIPT" 16
+    [ "$status" -eq 0 ]
+    ! grep -q "pgdg-fedora-repo-latest.noarch.rpm" "$CALLS_FILE"
+    ! [[ "$output" == *"Adding PGDG repository"* ]]
+    grep -q "^dnf install -y postgresql16-server postgresql16" "$CALLS_FILE"
+}
+
+@test "PGDG: fails clearly when the requested version has no package for this Fedora release" {
+    # rpm -q keeps failing even after "dnf install" (dnf found nothing to install -
+    # e.g. requesting a version that is already Fedora's own native version)
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql18-server"*) exit 1 ;;
+    *"-E %fedora"*)             echo 44; exit 0 ;;
+    *)                          exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    run bash "$SCRIPT" 18
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"PGDG has no postgresql18-server package"* ]]
+    ! grep -q "^postgresql-18-setup" "$CALLS_FILE"
+}
+
+@test "PGDG: falls back to already-installed when Fedora's native package already matches the requested version" {
+    # e.g. requesting 18 on Fedora 44, which already ships PostgreSQL 18
+    # natively - postgresql18-server isn't installed under that name, but
+    # postgresql-server (native) already satisfies it.
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql18-server"*) exit 1 ;;
+    *"queryformat"*)            echo "18.3"; exit 0 ;;
+    *)                          exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    run bash "$SCRIPT" 18
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already installed (postgresql-server)"* ]]
+    ! grep -q "pgdg-fedora-repo-latest" "$CALLS_FILE"
+    ! grep -q "^dnf install -y postgresql18-server" "$CALLS_FILE"
+    [[ "$output" == *"Service  : systemctl start|stop|restart|status postgresql"* ]]
+}
+
+@test "PGDG: skips the repo add and dnf install when the specific version is already installed" {
+    # Default rpm stub reports everything installed
+    run bash "$SCRIPT" 16
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already installed (postgresql16-server)"* ]]
+    ! grep -q "pgdg-fedora-repo-latest" "$CALLS_FILE"
+    ! grep -q "^dnf install -y postgresql16-server" "$CALLS_FILE"
+}
+
+@test "installing a different version proceeds even though another version is already installed" {
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql14-server"*)
+        COUNT_FILE="${TEST_TMPDIR}/rpm14_calls"
+        COUNT=\$(cat "\$COUNT_FILE" 2>/dev/null || echo 0)
+        echo \$(( COUNT + 1 )) > "\$COUNT_FILE"
+        [[ "\$COUNT" -eq 0 ]] && exit 1
+        exit 0
+        ;;
+    *"-E %fedora"*) echo 44; exit 0 ;;
+    *)              exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    mkdir -p /usr/pgsql-14/bin
+    cat > /usr/pgsql-14/bin/postgresql-14-setup << SETUPSTUB
+#!/bin/bash
+printf "postgresql-14-setup %s\n" "\$*" >> "${CALLS_FILE}"
+exit 0
+SETUPSTUB
+    chmod +x /usr/pgsql-14/bin/postgresql-14-setup
+    mkdir -p /var/lib/pgsql/14/data
+    touch /var/lib/pgsql/14/data/postgresql.conf /var/lib/pgsql/14/data/pg_hba.conf
+
+    run bash "$SCRIPT" 14
+    [ "$status" -eq 0 ]
+    grep -q "^dnf install -y postgresql14-server postgresql14" "$CALLS_FILE"
+    [[ "$output" == *"Service  : systemctl start|stop|restart|status postgresql-14"* ]]
+}
+
+@test "warns using the versioned service name when a different version is running" {
+    # Default rpm stub reports postgresql16-server already installed
+    cat > "$TEST_TMPDIR/bin/systemctl" << SYSTEMCTLSTUB
+#!/bin/bash
+printf "systemctl %s\n" "\$*" >> "${CALLS_FILE}"
+if [[ "\$*" == *"list-units"* ]]; then
+    echo "postgresql.service loaded active running PostgreSQL database server"
+    echo "postgresql-16.service loaded active running PostgreSQL 16 database server"
+fi
+exit 0
+SYSTEMCTLSTUB
+    chmod +x "$TEST_TMPDIR/bin/systemctl"
+
+    run bash "$SCRIPT" 16
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"systemctl stop postgresql.service"* ]]
+    [[ "$output" == *"systemctl start postgresql-16"* ]]
+    ! [[ "$output" == *"systemctl stop postgresql-16.service"* ]]
+}
+
+@test "sets listen_addresses to allow remote connections" {
+    # postgresql-server not installed; pgadmin4-desktop already installed
+    # (a blanket rpm-fail stub would also break rpm -Uvh --force in the
+    # pgAdmin block, aborting the script under errexit).
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql-server"*) exit 1 ;;
+    *)                        exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+    rm -f "$TEST_TMPDIR/bin/sed"   # use the real sed so the edit actually happens
+    printf "#listen_addresses = 'localhost'\n" > /var/lib/pgsql/data/postgresql.conf
+
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "^listen_addresses = '\*'" /var/lib/pgsql/data/postgresql.conf
+}
+
+@test "appends an md5 host entry to pg_hba.conf and warns about remote access" {
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql-server"*) exit 1 ;;
+    *)                        exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "^host all all 0.0.0.0/0 md5$" /var/lib/pgsql/data/pg_hba.conf
+    [[ "$output" == *"Remote connections enabled"* ]]
+}
+
+@test "installs pgAdmin 4 when not present" {
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q pgadmin4-desktop"*) exit 1 ;;
+    *)                       exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "^wget .*pgadmin4-fedora-repo" "$CALLS_FILE"
+    grep -q "^rpm -Uvh --force" "$CALLS_FILE"
+    grep -q "^dnf install -y pgadmin4-desktop" "$CALLS_FILE"
+}
+
+@test "skips pgAdmin 4 install when already present" {
+    # Default rpm stub reports pgadmin4-desktop already installed
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pgAdmin 4 is already present"* ]]
+    # Must not contain the literal "already installed" banner-trigger phrase -
+    # that must only ever reflect the primary PostgreSQL package's status.
+    ! [[ "$output" == *"pgAdmin 4 already installed"* ]]
+    ! grep -q "^wget " "$CALLS_FILE"
+}
+
+@test "does not show the already-installed banner phrase for pgAdmin when PostgreSQL itself was freshly installed" {
+    # Regression test: the GUI scans [INFO] lines for the literal phrase
+    # "already installed" to decide whether to show that banner. pgAdmin
+    # being pre-existing from an earlier run must not falsely mark a run
+    # where PostgreSQL itself was actually just installed.
+    cat > "$TEST_TMPDIR/bin/rpm" << RPMSTUB
+#!/bin/bash
+printf "rpm %s\n" "\$*" >> "${CALLS_FILE}"
+case "\$*" in
+    *"-q postgresql-server"*) exit 1 ;;
+    *)                        exit 0 ;;
+esac
+RPMSTUB
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PostgreSQL successfully installed"* ]]
+    ! [[ "$output" =~ \[INFO\ *\].*already\ installed ]]
 }

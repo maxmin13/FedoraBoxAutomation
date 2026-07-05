@@ -36,9 +36,31 @@ STEP "${STEP_LABEL}"
 ####
 
 if rpm -q "${PKG_SERVER}" &>/dev/null; then
+    PKG_ALREADY_INSTALLED=true
+else
+    PKG_ALREADY_INSTALLED=false
+    # Fedora's own postgresql-server package may already satisfy the requested
+    # major version natively (e.g. Fedora 44 ships PostgreSQL 18 by default,
+    # so PGDG does not publish a separate postgresql18-server for it). Treat
+    # that as already installed instead of trying - and failing - to pull a
+    # PGDG package that does not exist for this release.
+    if [[ -n "${PG_VER}" ]]; then
+        NATIVE_MAJOR=$(rpm -q --queryformat '%{VERSION}' postgresql-server 2>/dev/null | grep -oE '^[0-9]+' || true)
+        if [[ "${NATIVE_MAJOR}" == "${PG_VER}" ]]; then
+            PKG_SERVER="postgresql-server"
+            PKG_CLIENT="postgresql"
+            SVC_NAME="postgresql"
+            DATA_DIR="/var/lib/pgsql/data"
+            CONF_DIR="${DATA_DIR}"
+            PKG_ALREADY_INSTALLED=true
+        fi
+    fi
+fi
+
+if [[ "${PKG_ALREADY_INSTALLED}" == true ]]; then
     log_info "PostgreSQL already installed (${PKG_SERVER})."
 else
-    if [[ -n "${PG_VER}" ]]; then
+    if [[ -n "${PG_VER}" ]] && ! rpm -q pgdg-fedora-repo &>/dev/null; then
         log_info "Adding PGDG repository for PostgreSQL ${PG_VER} ..."
         PGDG_RPM="https://download.postgresql.org/pub/repos/yum/reporpms/F-$(rpm -E %fedora)-x86_64/pgdg-fedora-repo-latest.noarch.rpm"
         dnf install -y "${PGDG_RPM}"
@@ -46,6 +68,12 @@ else
 
     log_info "Installing ${PKG_SERVER} ..."
     dnf install -y "${PKG_SERVER}" "${PKG_CLIENT}"
+
+    if [[ -n "${PG_VER}" ]] && ! rpm -q "${PKG_SERVER}" &>/dev/null; then
+        log_error "PGDG has no ${PKG_SERVER} package for this Fedora release - dnf installed nothing."
+        log_error "This usually means version ${PG_VER} is already Fedora's native PostgreSQL version. Install without a version argument instead."
+        exit 1
+    fi
 
     if [[ ! -f "${DATA_DIR}/PG_VERSION" ]]; then
         ${INITDB_CMD}
@@ -63,7 +91,11 @@ STEP "pgAdmin 4"
 ####
 
 if rpm -q pgadmin4-desktop &>/dev/null; then
-    log_info 'pgadmin4 already installed.'
+    # Deliberately does not contain the literal phrase "already installed" -
+    # the GUI scans [INFO] lines for that exact phrase to decide whether to
+    # show the "already installed" banner, and that must only reflect the
+    # primary PostgreSQL package's own status, not this secondary component.
+    log_info 'pgAdmin 4 is already present - skipping.'
 else
     log_info 'Installing pgAdmin 4 ...'
 
