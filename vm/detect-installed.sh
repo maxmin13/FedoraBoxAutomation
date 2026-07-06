@@ -69,10 +69,14 @@ java_versions() {
 }
 
 intellij_version() {
-  local dir
-  dir=$(compgen -G '/opt/idea-IC-*' 2>/dev/null | head -1)
-  [[ -z "${dir}" ]] && { echo false; return; }
-  echo "\"${dir#/opt/idea-IC-}\""
+  local list="" dir ver
+  while IFS= read -r dir; do
+    ver="${dir#/opt/idea-IC-}"
+    [[ -n "${list}" ]] && list="${list}, "
+    list="${list}${ver}"
+  done < <(compgen -G '/opt/idea-IC-*' 2>/dev/null | sort -rV)
+  [[ -z "${list}" ]] && { echo false; return; }
+  echo "\"${list}\""
 }
 
 tomcat_versions() {
