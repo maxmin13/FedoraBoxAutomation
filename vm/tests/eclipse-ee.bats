@@ -14,6 +14,36 @@ _stub() {
     chmod +x "$TEST_TMPDIR/bin/$name"
 }
 
+# wget that actually writes a valid gzip file to the -O destination, and a tar
+# that produces a fake extracted 'eclipse-installer' dir under /opt (the
+# archive's own fixed top-level name, before the script renames it) — needed
+# so a fresh-install run can reach the mv/symlink steps instead of failing at
+# the gzip integrity check.
+_stub_real_download() {
+    cat > "$TEST_TMPDIR/bin/wget" << WGETSTUB
+#!/bin/bash
+printf "wget %s\n" "\$*" >> "${CALLS_FILE}"
+args=("\$@")
+for ((i=0; i<\${#args[@]}; i++)); do
+    if [[ "\${args[i]}" == "-O" ]]; then
+        echo 'fake-tarball-content' | gzip > "\${args[i+1]}"
+    fi
+done
+exit 0
+WGETSTUB
+    chmod +x "$TEST_TMPDIR/bin/wget"
+
+    cat > "$TEST_TMPDIR/bin/tar" << TARSTUB
+#!/bin/bash
+printf "tar %s\n" "\$*" >> "${CALLS_FILE}"
+mkdir -p /opt/eclipse-installer
+printf '#!/bin/bash\necho "Eclipse Installer"\n' > /opt/eclipse-installer/eclipse-inst
+chmod +x /opt/eclipse-installer/eclipse-inst
+exit 0
+TARSTUB
+    chmod +x "$TEST_TMPDIR/bin/tar"
+}
+
 setup() {
     TEST_TMPDIR="$(mktemp -d)"
     export CALLS_FILE="$TEST_TMPDIR/calls.log"
@@ -36,10 +66,11 @@ STUB
     _stub wget 0
     _stub tar  0
 
-    # Default: Eclipse Enterprise installer already downloaded
-    mkdir -p /opt/eclipse-installer
-    printf '#!/bin/bash\necho "Eclipse Installer"\n' > /opt/eclipse-installer/eclipse-inst
-    chmod +x /opt/eclipse-installer/eclipse-inst
+    # Default: Eclipse Enterprise installer 2026-03 already downloaded
+    mkdir -p /opt/eclipse-ee-installer-2026-03
+    printf '#!/bin/bash\necho "Eclipse Installer"\n' > /opt/eclipse-ee-installer-2026-03/eclipse-inst
+    chmod +x /opt/eclipse-ee-installer-2026-03/eclipse-inst
+    ln -sfn /opt/eclipse-ee-installer-2026-03 /opt/eclipse-ee-installer
 }
 
 teardown() {
@@ -48,7 +79,7 @@ teardown() {
     else
         rm -f /tmp/common.sh
     fi
-    rm -rf /opt/eclipse-installer
+    rm -rf /opt/eclipse-ee-installer-2026-03 /opt/eclipse-ee-installer-2025-06 /opt/eclipse-ee-installer /opt/eclipse-installer
     rm -f /usr/share/applications/eclipse-installer.desktop
     rm -rf "$TEST_TMPDIR"
 }
@@ -65,20 +96,49 @@ teardown() {
 
 @test "removes an incomplete installer directory and calls wget" {
     # Directory exists but eclipse-inst is not executable — incomplete download
-    rm -f /opt/eclipse-installer/eclipse-inst
-    touch /opt/eclipse-installer/eclipse-inst   # file exists, not executable
+    rm -f /opt/eclipse-ee-installer-2026-03/eclipse-inst
+    touch /opt/eclipse-ee-installer-2026-03/eclipse-inst   # file exists, not executable
     run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "calls wget when the installer is not present" {
-    rm -rf /opt/eclipse-installer
+    rm -rf /opt/eclipse-ee-installer-2026-03 /opt/eclipse-ee-installer
     run bash "$SCRIPT" 2026-03
     grep -q "^wget " "$CALLS_FILE"
 }
 
 @test "accepts an explicit release argument" {
-    rm -rf /opt/eclipse-installer
+    rm -rf /opt/eclipse-ee-installer-2025-06
     run bash "$SCRIPT" 2025-06
     grep -q "2025-06" "$CALLS_FILE"
+}
+
+@test "symlinks /opt/eclipse-ee-installer to the versioned install dir after a fresh install" {
+    rm -rf /opt/eclipse-ee-installer-2025-06
+    _stub_real_download
+    run bash "$SCRIPT" 2025-06
+    [ "$status" -eq 0 ]
+    [[ "$(readlink /opt/eclipse-ee-installer)" == "/opt/eclipse-ee-installer-2025-06" ]]
+}
+
+@test "installs a different release without removing the one already present" {
+    # setup() already installed release 2026-03; requesting a different one
+    # must not be blocked or overwritten just because /opt/eclipse-ee-installer
+    # (the symlink) already points somewhere.
+    _stub_real_download
+    run bash "$SCRIPT" 2025-06
+    [ "$status" -eq 0 ]
+    grep -q "2025-06" "$CALLS_FILE"
+    [ -x /opt/eclipse-ee-installer-2026-03/eclipse-inst ]
+    [ -x /opt/eclipse-ee-installer-2025-06/eclipse-inst ]
+    [[ "$(readlink /opt/eclipse-ee-installer)" == "/opt/eclipse-ee-installer-2025-06" ]]
+}
+
+@test "does not re-download when the same release is already installed" {
+    _stub_real_download
+    run bash "$SCRIPT" 2026-03
+    [ "$status" -eq 0 ]
+    ! grep -q "^wget " "$CALLS_FILE"
+    [[ "$output" == *"already installed"* ]]
 }
