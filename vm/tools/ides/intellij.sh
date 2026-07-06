@@ -63,7 +63,10 @@ else
     if [[ ! -f "${CACHED_TAR}" ]]; then
         log_info "Downloading IntelliJ IDEA Community ${IDEA_VERSION} from ${IDEA_URL} ..."
         wget -q --tries=3 "${IDEA_URL}" -O "${CACHED_TAR}"
-        gzip -t "${CACHED_TAR}" 2>/dev/null || {
+        # tar -tf validates both the gzip layer and the tar structure inside it -
+        # gzip -t alone can pass on a truncated download that is still a broken
+        # tar archive, which only then fails later during the real extraction.
+        tar -tf "${CACHED_TAR}" >/dev/null 2>&1 || {
             rm -f "${CACHED_TAR}"
             log_error "IntelliJ IDEA ${IDEA_VERSION} archive is corrupt or the download was incomplete. Check the version number and network connectivity."
             exit 1
@@ -75,7 +78,21 @@ else
 
     log_info "Extracting ..."
     EXTRACT_TMP=$(mktemp -d)
-    tar -xf "${CACHED_TAR}" --directory "${EXTRACT_TMP}"
+    TAR_ERR=$(mktemp)
+    if ! tar -xf "${CACHED_TAR}" --directory "${EXTRACT_TMP}" 2>"${TAR_ERR}"; then
+        cat "${TAR_ERR}" >&2
+        if grep -q 'No space left on device' "${TAR_ERR}"; then
+            rm -rf "${EXTRACT_TMP}"
+            rm -f "${TAR_ERR}"
+            log_error "Extraction failed: no space left on device. The archive itself is fine - free up disk space on the VM (check with 'df -h /opt') and re-run; no need to re-download."
+            exit 1
+        fi
+        rm -rf "${EXTRACT_TMP}"
+        rm -f "${CACHED_TAR}" "${TAR_ERR}"
+        log_error "Failed to extract the IntelliJ IDEA ${IDEA_VERSION} archive - it may be corrupt or truncated. Cache cleared; re-run to re-download."
+        exit 1
+    fi
+    rm -f "${TAR_ERR}"
     EXTRACTED_DIR=$(find "${EXTRACT_TMP}" -maxdepth 1 -mindepth 1 -type d | head -1)
     if [[ -z "${EXTRACTED_DIR}" ]]; then
         rm -rf "${EXTRACT_TMP}"
