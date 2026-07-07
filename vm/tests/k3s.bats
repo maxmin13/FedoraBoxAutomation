@@ -40,10 +40,6 @@ require_login_user() {
 }
 STUB
 
-    _stub systemctl 0
-    _stub timeout   0
-    _stub chmod     0
-
     # k3s.sh checks the absolute path /usr/local/bin/k3s directly (not PATH),
     # so a PATH-based stub has no effect. Back up any real install and replace
     # it with a stand-in for the default "already installed" state.
@@ -61,18 +57,6 @@ exit 0
 CURLSTUB
     sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/curl"
     chmod +x "$TEST_TMPDIR/bin/curl"
-
-    # Pre-create kubeconfig so the copy step succeeds
-    mkdir -p /etc/rancher/k3s
-    printf 'apiVersion: v1\nclusters: []\n' > /etc/rancher/k3s/k3s.yaml
-
-    [[ -f /root/.bash_profile ]] && cp /root/.bash_profile "$TEST_TMPDIR/bash_profile.bak"
-    echo "# .bash_profile" > /root/.bash_profile
-
-    mkdir -p /root/.kube
-    if [[ -f /root/.kube/config ]]; then
-        cp /root/.kube/config "$TEST_TMPDIR/kube_config.bak"
-    fi
 }
 
 teardown() {
@@ -86,17 +70,6 @@ teardown() {
     else
         rm -f /usr/local/bin/k3s
     fi
-    if [[ -f "$TEST_TMPDIR/bash_profile.bak" ]]; then
-        mv "$TEST_TMPDIR/bash_profile.bak" /root/.bash_profile
-    else
-        rm -f /root/.bash_profile
-    fi
-    if [[ -f "$TEST_TMPDIR/kube_config.bak" ]]; then
-        mv "$TEST_TMPDIR/kube_config.bak" /root/.kube/config
-    else
-        rm -f /root/.kube/config
-    fi
-    rm -rf /etc/rancher/k3s
     rm -rf "$TEST_TMPDIR"
 }
 
@@ -122,19 +95,23 @@ teardown() {
     grep -q "^curl " "$CALLS_FILE"
 }
 
-@test "copies kubeconfig to the user home directory" {
+@test "does not call systemctl start or enable on k3s" {
+    run bash "$SCRIPT" root
+    ! grep -qE '^systemctl (start|enable) k3s' "$CALLS_FILE"
+}
+
+@test "skips the k3s install script entirely when already installed" {
     run bash "$SCRIPT" root
     [ "$status" -eq 0 ]
-    [[ -f /root/.kube/config ]]
+    ! grep -q "k3s-install.sh" "$CALLS_FILE"
 }
 
-@test "adds KUBECONFIG to .bash_profile when not present" {
+@test "tells the user k3s is not enabled or started" {
     run bash "$SCRIPT" root
-    grep -q 'KUBECONFIG' /root/.bash_profile
+    [[ "$output" == *"k3s is installed but not enabled or started."* ]]
 }
 
-@test "skips adding KUBECONFIG when already in .bash_profile" {
-    echo 'export KUBECONFIG=~/.kube/config' >> /root/.bash_profile
+@test "gives manual start instructions" {
     run bash "$SCRIPT" root
-    [ "$(grep -c 'KUBECONFIG' /root/.bash_profile)" -eq 1 ]
+    [[ "$output" == *"systemctl start k3s"* ]]
 }

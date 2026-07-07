@@ -117,6 +117,7 @@ const ACTIVE_HINTS: Record<string, string> = {
   httpd:  'The version whose systemd service is enabled to start at boot.',
   tomcat: 'The version:port instance whose systemd service is enabled to start at boot. Multiple instances can be active at once since each runs on its own port.',
   postgresql: 'The version whose systemd service is enabled to start at boot. All versions default to port 5432, so only one can actually accept connections unless the others are reconfigured to a different port.',
+  k3s: 'The systemd service is enabled to start at boot. k3s.sh installs it disabled by default — enable it with systemctl enable k3s.',
 }
 
 interface VmDetailPageProps {
@@ -454,8 +455,10 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                       {versions.length > 0 && (
                                         <div className="flex flex-wrap gap-1">
                                           {versions.map((v) => {
-                                            const isActive = v.endsWith(' (active)')
-                                            const ver = isActive ? v.replace(' (active)', '') : v
+                                            const stateMatch = v.match(/ \((active|enabled)\)$/)
+                                            const isActive = !!stateMatch
+                                            const stateWord = stateMatch?.[1] ?? ''
+                                            const ver = isActive ? v.slice(0, stateMatch.index) : v
                                             const badge = (
                                               <span
                                                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
@@ -465,11 +468,11 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                                 }`}
                                               >
                                                 {ver}
-                                                {isActive && <span className="text-green-500 text-[9px]">active</span>}
+                                                {isActive && <span className="text-green-500 text-[9px]">{stateWord}</span>}
                                               </span>
                                             )
                                             return isActive ? (
-                                              <Tooltip key={ver} tip={ACTIVE_HINTS[tool.key] ?? 'Currently the active version.'}>
+                                              <Tooltip key={ver} tip={ACTIVE_HINTS[tool.key] ?? `Currently the ${stateWord} version.`}>
                                                 {badge}
                                               </Tooltip>
                                             ) : (

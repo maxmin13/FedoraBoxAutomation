@@ -49,6 +49,14 @@ sudo -u "${LOGIN_USER}" sg docker -c "minikube version"
 sudo -u "${LOGIN_USER}" sg docker -c "minikube config view"
 
 log_info "minikube driver set to ${DRIVER_NM} for ${LOGIN_USER}."
+log_info "--- About the 'these changes will take effect upon a minikube delete and"
+log_info "    then a minikube start' warning above ---"
+log_info "minikube config set only writes the driver setting to config.json - it"
+log_info "does not touch a cluster that already exists. If a cluster is already"
+log_info "running, it keeps using whatever driver it was created with; the new"
+log_info "setting only applies the next time you run 'minikube delete' followed"
+log_info "by 'minikube start'. Re-running this script is safe either way - it"
+log_info "never deletes or restarts an existing cluster on its own."
 log_info 'Commands: minikube start --force | stop | status | dashboard | logs'
 log_info "To enable metrics-server after first start: minikube addons enable metrics-server"
 

@@ -4,7 +4,7 @@
 
 # create a new vm, verify all the provision scripts after change most recent version
 
-# finish testing the provision scrpts done until postgresql
+# finish testing the provision scrpts done until containers
 
 # details page: clicking a version badge (httpd/tomcat/postgresql) should pop up
 # a confirmation to enable/disable that version's systemd service - needs an IPC

@@ -87,7 +87,7 @@ tomcat_versions() {
     ver="${base%-*}"
     [[ -n "${list}" ]] && list="${list}, "
     if systemctl is-enabled --quiet "tomcat-${ver}-${port}.service" 2>/dev/null; then
-      list="${list}${ver}:${port} (active)"
+      list="${list}${ver}:${port} (enabled)"
     else
       list="${list}${ver}:${port}"
     fi
@@ -103,7 +103,7 @@ httpd_versions() {
     [[ "${ver}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
     [[ -n "${list}" ]] && list="${list}, "
     if systemctl is-enabled --quiet "httpd-${ver}.service" 2>/dev/null; then
-      list="${list}${ver} (active)"
+      list="${list}${ver} (enabled)"
     else
       list="${list}${ver}"
     fi
@@ -178,7 +178,7 @@ postgresql_version() {
       fi
       [[ -n "${list}" ]] && list="${list}, "
       if systemctl is-enabled --quiet "${svc}.service" 2>/dev/null; then
-        list="${list}${ver} (active)"
+        list="${list}${ver} (enabled)"
       else
         list="${list}${ver}"
       fi
@@ -186,6 +186,18 @@ postgresql_version() {
   done
   [[ -z "${list}" ]] && { echo false; return; }
   echo "\"${list}\""
+}
+
+k3s_version() {
+  which k3s >/dev/null 2>&1 || { echo false; return; }
+  local ver
+  ver=$(k3s --version 2>/dev/null | awk 'NR==1{gsub("^v","",$3); sub(/\+.*/,"",$3); print $3}')
+  [[ -z "${ver}" ]] && { echo false; return; }
+  if systemctl is-enabled --quiet k3s 2>/dev/null; then
+    echo "\"${ver} (enabled)\""
+  else
+    echo "\"${ver}\""
+  fi
 }
 
 ansible_version() {
@@ -255,7 +267,7 @@ cat <<JSON
   ),
   "docker":           $(which docker >/dev/null 2>&1 && docker --version 2>/dev/null | awk '{gsub(",","",$3); print "\""$3"\""}' || echo false),
   "minikube":         $(which minikube >/dev/null 2>&1 && minikube version --short 2>/dev/null | sed 's/^v//' | awk '{print "\""$1"\""}' || echo false),
-  "k3s":              $(which k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk 'NR==1{gsub("^v","",$3); sub(/\+.*/,"",$3); print "\""$3"\""}' || echo false),
+  "k3s":              $(k3s_version),
   "awsCli":           $(which aws >/dev/null 2>&1 && aws --version 2>/dev/null | awk '{split($1,a,"/"); print "\""a[2]"\""}' || echo false),
   "ecsCli":           $([ -x /usr/local/bin/ecs-cli ] && /usr/local/bin/ecs-cli --version 2>/dev/null | awk '{gsub("[()]","",$3); print "\""$3"\""}' || echo false),
   "openssl":          $(openssl_version),

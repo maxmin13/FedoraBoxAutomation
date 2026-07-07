@@ -8,7 +8,8 @@
 ##              cloud cluster. Ideal for testing real deployment configs locally
 ##              before pushing to production.
 ##              Does not require Docker -- k3s uses its own containerd runtime.
-##              Sets up kubeconfig for the login user so kubectl works without sudo.
+##              Installs the k3s binary only -- the service is not enabled or
+##              started, matching minikube.sh; start it manually when needed.
 ## Usage:       sudo ./k3s.sh <login-user>
 ## Parameters:  $1  <login-user>  Non-root desktop username (e.g. maxmin)
 ##
@@ -23,7 +24,6 @@ HOME_DIR=$(eval echo "~${LOGIN_USER}")
 STEP "k3s"
 ####
 
-FRESH_INSTALL=false
 K3S_BIN='/usr/local/bin/k3s'
 
 if [[ -x "${K3S_BIN}" ]]
@@ -37,67 +37,25 @@ else
 
     curl -sfL https://get.k3s.io -o "${WORK_DIR}/k3s-install.sh"
     chmod +x "${WORK_DIR}/k3s-install.sh"
-    "${WORK_DIR}/k3s-install.sh"
+    INSTALL_K3S_SKIP_START=true INSTALL_K3S_SKIP_ENABLE=true "${WORK_DIR}/k3s-install.sh"
 
     log_info "k3s installed: $("${K3S_BIN}" --version)"
-    FRESH_INSTALL=true
 fi
 
-systemctl status k3s --no-pager || true
-if ! systemctl is-active --quiet k3s; then
-    log_warn "k3s is installed but not currently running."
-    log_warn "If k3s exited unexpectedly, check logs with: journalctl -u k3s -n 50 --no-pager"
-    log_warn "Then start it with: systemctl start k3s"
-fi
-
-####
-STEP "kubectl access for ${LOGIN_USER}"
-####
-
-log_info "Waiting for k3s kubeconfig to be ready ..."
-timeout 30 bash -c 'until [[ -f /etc/rancher/k3s/k3s.yaml ]]; do sleep 1; done'
-
-mkdir -p "${HOME_DIR}/.kube"
-cp /etc/rancher/k3s/k3s.yaml "${HOME_DIR}/.kube/config"
-chown "${LOGIN_USER}:${LOGIN_USER}" "${HOME_DIR}/.kube/config"
-chmod 600 "${HOME_DIR}/.kube/config"
-log_info "kubeconfig copied to ${HOME_DIR}/.kube/config"
-
-if ! grep -q 'KUBECONFIG' "${HOME_DIR}/.bash_profile"
-then
-    echo 'export KUBECONFIG=~/.kube/config' >> "${HOME_DIR}/.bash_profile"
-    log_info "KUBECONFIG added to ~/.bash_profile"
-else
-    log_info "KUBECONFIG already in ~/.bash_profile"
-fi
-
-####
-STEP "Cluster status"
-####
-
-if [[ "${FRESH_INSTALL}" == 'true' ]]; then
-    log_info "Waiting for node to be ready (up to 60s) ..."
-    if env -i PATH="${PATH}" HOME="${HOME}" timeout 60 bash -c \
-        'until /usr/local/bin/k3s kubectl get nodes 2>/dev/null | grep -q " Ready"; do sleep 2; done'
-    then
-        "${K3S_BIN}" kubectl get nodes
-        "${K3S_BIN}" kubectl get pods --all-namespaces
-    else
-        log_warn "Node not Ready within 60s — k3s may still be initializing."
-        log_warn "Check with: k3s kubectl get nodes"
-    fi
-fi
-
-if systemctl is-active --quiet k3s; then
-    log_info "k3s is running. Use kubectl (after re-login) or k3s kubectl immediately."
-else
-    log_warn "k3s is installed but not running. Start it with: systemctl start k3s"
-fi
-log_info "Start        : systemctl start k3s"
-log_info "Stop         : systemctl stop k3s"
+log_info "k3s is installed but not enabled or started."
+log_info ""
+log_info "--- To use the cluster ---"
+log_info "1. Start                     : systemctl start k3s"
+log_info "2. Enable at boot (optional) : systemctl enable k3s"
+log_info "3. Copy kubeconfig for ${LOGIN_USER}:"
+log_info "     mkdir -p ${HOME_DIR}/.kube"
+log_info "     cp /etc/rancher/k3s/k3s.yaml ${HOME_DIR}/.kube/config"
+log_info "     chown ${LOGIN_USER}:${LOGIN_USER} ${HOME_DIR}/.kube/config && chmod 600 ${HOME_DIR}/.kube/config"
+log_info "4. Add to shell              : echo 'export KUBECONFIG=~/.kube/config' >> ${HOME_DIR}/.bash_profile"
+log_info "5. Log out and back in for KUBECONFIG to take effect."
+log_info ""
 log_info "Status       : systemctl status k3s"
+log_info "Logs         : journalctl -u k3s -f"
 log_info "Nodes        : kubectl get nodes"
 log_info "All pods     : kubectl get pods --all-namespaces"
 log_info "Deploy app   : kubectl apply -f <file.yaml>"
-log_info "Logs         : journalctl -u k3s -f"
-log_warn "NOTE: Log out and back in for KUBECONFIG to take effect in new terminals."
