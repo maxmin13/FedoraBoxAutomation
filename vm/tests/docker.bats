@@ -45,6 +45,9 @@ STUB
     _stub dnf       0
     _stub systemctl 0
     _stub usermod   0
+    printf '#!/bin/bash\nprintf "rpm %%s\\n" "$*" >> "%s"\n[[ "$*" == "-q docker-ce" ]] && exit 0\nexit 1\n' \
+        "$CALLS_FILE" > "$TEST_TMPDIR/bin/rpm"
+    chmod +x "$TEST_TMPDIR/bin/rpm"
     # id -nG returns groups including docker
     printf '#!/bin/bash\n[[ "$1" == "-u" ]] && echo 0 && exit 0\n[[ "$1" == "-nG" ]] && echo "users wheel docker" && exit 0\n' \
         > "$TEST_TMPDIR/bin/id"
@@ -77,26 +80,23 @@ teardown() {
 }
 
 @test "installs Docker CE packages when Docker is not present" {
-    _stub docker 1   # exit 1 = docker not found
+    _stub rpm 1   # exit 1 = docker-ce package not found
     run bash "$SCRIPT" testuser
     grep -q "^dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "$CALLS_FILE"
 }
 
-@test "prints systemctl instructions after installing" {
-    # "docker version" (daemon check) fails pre-install; "docker --version"
-    # (client banner) succeeds once dnf install "installs" the stub package.
-    cat > "$TEST_TMPDIR/bin/docker" << 'DOCKERSTUB'
-#!/bin/bash
-printf "docker %s\n" "$*" >> "PLACEHOLDER"
-if [[ "$1" == "version" ]]; then
-    exit 1
-fi
-echo "Docker version 24.0.0, build abcdef"
-exit 0
-DOCKERSTUB
-    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/docker"
-    chmod +x "$TEST_TMPDIR/bin/docker"
+@test "does not report success when Docker is already installed" {
+    run bash "$SCRIPT" testuser
+    [[ "$output" == *"Docker already installed."* ]]
+    [[ "$output" != *"Docker successfully installed."* ]]
+}
 
+@test "enables and starts the docker service" {
+    run bash "$SCRIPT" testuser
+    grep -q "^systemctl enable --now docker" "$CALLS_FILE"
+}
+
+@test "prints systemctl instructions after installing" {
     run bash "$SCRIPT" testuser
     [[ "$output" == *"systemctl start|stop|restart|status docker"* ]]
 }

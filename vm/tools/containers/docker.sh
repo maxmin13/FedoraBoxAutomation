@@ -17,7 +17,7 @@ require_login_user "${LOGIN_USER}"
 STEP "Docker"
 ####
 
-if ! docker version > /dev/null 2>&1
+if ! rpm -q docker-ce &>/dev/null
 then
     dnf install -y dnf-plugins-core
     dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo --overwrite
@@ -28,6 +28,7 @@ else
     log_info 'Docker already installed.'
 fi
 
+systemctl enable --now docker
 docker --version
 
 if ! id -nG "${LOGIN_USER}" | grep -q docker
