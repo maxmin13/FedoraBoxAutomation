@@ -2,10 +2,13 @@
 
 ##
 ## Description: Configures the GNOME desktop environment for a Fedora VM.
-##              Disables Wayland (forces X11), sets background image, silences
-##              the bell, configures Gedit and Nautilus (adds /opt bookmark),
-##              sets up the Git prompt, applies kernel parameters for minikube,
-##              and disables GNOME keyring.
+##              Disables Wayland (forces X11) where the GNOME X11/Xorg session
+##              is available, sets background image, silences the bell,
+##              configures Gedit and Nautilus (adds /opt bookmark), sets up
+##              the Git prompt, applies kernel parameters for minikube, and
+##              disables GNOME keyring. Recent Fedora releases have dropped
+##              the GNOME X11/Xorg session entirely -- on those, Wayland
+##              cannot be disabled and this step warns and continues.
 ## Usage:       sudo ./desktop-config.sh <login-user> [background-image-filename]
 ## Parameters:  $1  <login-user>               Non-root desktop username (e.g. maxmin)
 ##              $2  [background-image-filename] Image filename in /usr/share/backgrounds/ (optional)
@@ -24,23 +27,50 @@ STEP "Dependencies"
 
 dnf install -y dbus-x11
 
+# gnome-xorg.desktop (the session set as DefaultSession below) is provided by
+# gnome-session-xsession, which needs an actual Xorg server to run against.
+# Recent Fedora spins don't install either by default -- without them,
+# WaylandEnable=false is a no-op: GDM has no X11 session to fall back to and
+# silently keeps starting Wayland, for the greeter and the user session alike.
+# Package availability varies by release, so this must never abort the rest
+# of the script -- the dnf call runs as an if-condition, which set -e exempts
+# from aborting on failure even when the package is missing from the repos.
+X11_SESSION_AVAILABLE=false
+if rpm -q xorg-x11-server-Xorg gnome-session-xsession &>/dev/null
+then
+    log_info 'X11/Xorg GNOME session already installed.'
+    X11_SESSION_AVAILABLE=true
+elif dnf install -y --skip-unavailable xorg-x11-server-Xorg gnome-session-xsession \
+     && rpm -q xorg-x11-server-Xorg gnome-session-xsession &>/dev/null
+then
+    log_info 'X11/Xorg GNOME session installed.'
+    X11_SESSION_AVAILABLE=true
+else
+    log_warn 'X11/Xorg GNOME session packages are not available from the configured repositories -- Wayland cannot be disabled on this system.'
+fi
+
 ####
 STEP "Disable Wayland"
 ####
 
-if grep -q 'WaylandEnable' /etc/gdm/custom.conf; then
-  sed -i 's/#\?WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
+if [[ "${X11_SESSION_AVAILABLE}" == true ]]
+then
+    if grep -q 'WaylandEnable' /etc/gdm/custom.conf; then
+      sed -i 's/#\?WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
+    else
+      sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm/custom.conf
+    fi
+
+    log_info 'Wayland disabled.'
+
+    if ! grep -q 'DefaultSession=gnome-xorg.desktop' '/etc/gdm/custom.conf'; then
+      sed -i '/WaylandEnable=false/a DefaultSession=gnome-xorg.desktop' /etc/gdm/custom.conf
+    fi
+
+    log_info 'XORG set.'
 else
-  sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm/custom.conf
+    log_warn 'Skipping Wayland disable -- no X11/Xorg GNOME session is installed.'
 fi
-
-log_info 'Wayland disabled.'
-
-if ! grep -q 'DefaultSession=gnome-xorg.desktop' '/etc/gdm/custom.conf'; then
-  sed -i '/WaylandEnable=false/a DefaultSession=gnome-xorg.desktop' /etc/gdm/custom.conf
-fi
-
-log_info 'XORG set.'
 
 USER_UID="$(id -u "${LOGIN_USER}")"
 DBUS="unix:path=/run/user/${USER_UID}/bus"

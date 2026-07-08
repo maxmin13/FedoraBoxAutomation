@@ -47,6 +47,20 @@ STUB
     _stub chown      0
     _stub chmod      0
 
+    # Default rpm stub: not installed on the first check, installed on the
+    # second (post-dnf-install) check -- simulates a successful install.
+    # Individual tests can override this with _stub rpm <code> for other cases.
+    cat > "$TEST_TMPDIR/bin/rpm" << 'RPMSTUB'
+#!/bin/bash
+printf "rpm %s\n" "$*" >> "PLACEHOLDER"
+COUNT_FILE="COUNTPLACEHOLDER"
+count=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
+echo "$count" > "$COUNT_FILE"
+[[ $count -gt 1 ]]
+RPMSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g; s|COUNTPLACEHOLDER|${TEST_TMPDIR}/rpm-call-count|g" "$TEST_TMPDIR/bin/rpm"
+    chmod +x "$TEST_TMPDIR/bin/rpm"
+
     # id -u <user> must return a UID number so gsettings_set/get can build DBUS path
     cat > "$TEST_TMPDIR/bin/id" << 'IDSTUB'
 #!/bin/bash
@@ -131,6 +145,40 @@ teardown() {
 @test "installs dbus-x11 dependency via dnf" {
     run bash "$SCRIPT" root
     grep -q "^dnf install -y dbus-x11" "$CALLS_FILE"
+}
+
+@test "installs the X11/Xorg GNOME session when it is missing" {
+    run bash "$SCRIPT" root
+    grep -q "^dnf install -y --skip-unavailable xorg-x11-server-Xorg gnome-session-xsession" "$CALLS_FILE"
+}
+
+@test "skips installing the X11/Xorg GNOME session when already installed" {
+    _stub rpm 0
+    run bash "$SCRIPT" root
+    [ "$status" -eq 0 ]
+    ! grep -q "^dnf install -y --skip-unavailable xorg-x11-server-Xorg gnome-session-xsession" "$CALLS_FILE"
+}
+
+@test "warns and keeps running the rest of the script when the X11 session packages are unavailable" {
+    _stub rpm 1  # never becomes installed, even after the install attempt
+
+    cat > "$TEST_TMPDIR/bin/dnf" << 'DNFSTUB'
+#!/bin/bash
+printf "dnf %s\n" "$*" >> "PLACEHOLDER"
+if [[ "$*" == *"xorg-x11-server-Xorg"* ]]; then
+    echo "No match for argument: gnome-session-xsession" >&2
+    exit 1
+fi
+exit 0
+DNFSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/dnf"
+    chmod +x "$TEST_TMPDIR/bin/dnf"
+
+    run bash "$SCRIPT" root
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"X11/Xorg GNOME session packages are not available"* ]]
+    ! grep -q 'WaylandEnable=false' /etc/gdm/custom.conf
+    grep -q "core.autocrlf" "$CALLS_FILE"  # later steps still ran
 }
 
 @test "disables Wayland by editing gdm configuration" {
