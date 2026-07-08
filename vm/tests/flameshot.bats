@@ -41,8 +41,23 @@ require_login_user() {
 STUB
 
     _stub dnf  0
-    _stub sudo 0
     _stub rpm  1  # flameshot not installed by default
+
+    # Custom sudo stub: logs every call, and answers `gsettings list-keys` for the
+    # media-keys schema with MEDIA_KEYS_SCHEMA_KEYS (defaults to the older GNOME
+    # schema that still has the legacy screenshot/screenshot-clip keys).
+    cat > "$TEST_TMPDIR/bin/sudo" << 'SUDOSTUB'
+#!/bin/bash
+printf "sudo %s\n" "$*" >> "PLACEHOLDER"
+if [[ "$*" == *"list-keys org.gnome.settings-daemon.plugins.media-keys"* ]]; then
+    printf '%s\n' "${MEDIA_KEYS_SCHEMA_KEYS:-screenshot
+screenshot-clip
+custom-keybindings}"
+fi
+exit 0
+SUDOSTUB
+    sed -i "s|PLACEHOLDER|${CALLS_FILE}|g" "$TEST_TMPDIR/bin/sudo"
+    chmod +x "$TEST_TMPDIR/bin/sudo"
 
     cat > "$TEST_TMPDIR/bin/id" << 'IDSTUB'
 #!/bin/bash
@@ -91,7 +106,16 @@ teardown() {
     grep -q "flameshot gui" "$CALLS_FILE"
 }
 
-@test "disables built-in screenshot shortcut" {
+@test "disables built-in screenshot shortcut when the schema still has it" {
     run bash "$SCRIPT" root
     grep -q "screenshot \[\]" "$CALLS_FILE"
+}
+
+@test "succeeds and skips the legacy screenshot keys when the schema no longer has them" {
+    export MEDIA_KEYS_SCHEMA_KEYS='custom-keybindings'
+    run bash "$SCRIPT" root
+    [ "$status" -eq 0 ]
+    ! grep -q "screenshot \[\]" "$CALLS_FILE"
+    ! grep -q "screenshot-clip \[\]" "$CALLS_FILE"
+    grep -q "flameshot gui" "$CALLS_FILE"
 }

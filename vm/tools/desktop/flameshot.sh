@@ -39,16 +39,24 @@ fi
 STEP "Print Screen key binding"
 ####
 
+MEDIA_KEYS_SCHEMA='org.gnome.settings-daemon.plugins.media-keys'
 BINDING_PATH='/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/'
-EXISTING="$(gsettings_get org.gnome.settings-daemon.plugins.media-keys custom-keybindings 2>/dev/null || echo '@as []')"
+EXISTING="$(gsettings_get "${MEDIA_KEYS_SCHEMA}" custom-keybindings 2>/dev/null || echo '@as []')"
 
 if echo "${EXISTING}" | grep -q "${BINDING_PATH}"
 then
     log_info 'Print Screen key already configured for Flameshot.'
 else
-    gsettings_set org.gnome.settings-daemon.plugins.media-keys screenshot '[]'
-    gsettings_set org.gnome.settings-daemon.plugins.media-keys screenshot-clip '[]'
-    gsettings_set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['${BINDING_PATH}']"
+    # Older GNOME versions bind Print Screen to a built-in "screenshot" action via
+    # these keys; newer GNOME dropped them in favour of an in-shell screenshot UI,
+    # so only clear them when the schema actually still defines them.
+    SCHEMA_KEYS="$(sudo -u "${LOGIN_USER}" DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="${DBUS}" gsettings list-keys "${MEDIA_KEYS_SCHEMA}" 2>/dev/null)"
+    for key in screenshot screenshot-clip; do
+        if echo "${SCHEMA_KEYS}" | grep -qx "${key}"; then
+            gsettings_set "${MEDIA_KEYS_SCHEMA}" "${key}" '[]'
+        fi
+    done
+    gsettings_set "${MEDIA_KEYS_SCHEMA}" custom-keybindings "['${BINDING_PATH}']"
     gsettings_set "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BINDING_PATH}" name 'Flameshot'
     gsettings_set "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BINDING_PATH}" command 'flameshot gui'
     gsettings_set "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:${BINDING_PATH}" binding 'Print'
