@@ -268,8 +268,8 @@ describe('VmDetailPage — Shared folders section', () => {
 
 describe('VmDetailPage — Installed tools Refresh button', () => {
   async function openToolsTab() {
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Tools' })).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tools' })) })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Provisioned' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Provisioned' })) })
   }
 
   it('shows "Checking..." (disabled) while queryVmInstalled is in flight', async () => {
@@ -355,14 +355,14 @@ describe('VmDetailPage — VM not running', () => {
 
 describe('VmDetailPage — Installed tools section', () => {
   async function switchToToolsTab() {
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Tools' })).toBeInTheDocument())
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tools' })) })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Provisioned' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Provisioned' })) })
   }
 
   it('shows "VM is stopped" message when the VM is powered off', async () => {
     render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
     await switchToToolsTab()
-    await waitFor(() => expect(screen.getByText(/INSTALLED TOOLS/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/PROVISIONED TOOLS/i)).toBeInTheDocument())
     expect(screen.getByText(/VM is stopped/i)).toBeInTheDocument()
   })
 

@@ -279,7 +279,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
               onClick={() => setRightTab('tools')}
               className={`px-3 py-1 text-xs rounded transition-colors ${rightTab === 'tools' ? 'bg-zinc-700 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'}`}
             >
-              Tools
+              Provisioned
             </button>
           </div>
         )}
@@ -409,7 +409,7 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
             {rightTab === 'tools' && (
               <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-2 pt-2 pb-1.5 shrink-0">
-                  <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Installed tools</h2>
+                  <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Provisioned tools</h2>
                   <button
                     onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
                     disabled={toolsStatus === 'loading'}
