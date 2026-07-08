@@ -381,9 +381,13 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                         return (
                           <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
                             <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">
-                              <Tooltip tip={PROC_DESC[p.name] ?? 'No description available for this process'}>
+                              {PROC_DESC[p.name] ? (
+                                <Tooltip tip={PROC_DESC[p.name]}>
+                                  <span>{p.name}</span>
+                                </Tooltip>
+                              ) : (
                                 <span>{p.name}</span>
-                              </Tooltip>
+                              )}
                             </td>
                             <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
                             <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
@@ -631,6 +635,13 @@ const PROC_DESC: Record<string, string> = {
   'systemd-resolve':   'DNS cache and hostname resolver',
   'systemd-udevd':     'Daemon that handles kernel device events and udev rules',
   'NetworkManager':    'Daemon that manages wired and wireless network connections',
+  'gnome-software':    'GNOME desktop app store — checks for and installs package/flatpak updates in the background',
+  'gnome-shell':       'GNOME desktop shell — renders the desktop, top bar, windows and app launcher',
+  'dnf5daemon-serv':   'DNF5 background service — handles package install/update/remove requests over D-Bus (used by gnome-software)',
+  'wireplumber':       'Audio/video session manager for PipeWire — routes and connects audio streams',
+  'unix_chkpwd':       'PAM helper that verifies a Unix password against /etc/shadow — spawned briefly during login/sudo',
+  'xdg-desktop-por':   'Desktop portal — lets sandboxed/Flatpak apps request file access, screen sharing and other permissions',
+  'ibus-engine-tb':    'IBus input method engine — provides input method support for typing in a specific language/script',
   'sshd':              'SSH server that accepts incoming secure shell connections',
   'firewalld':         'Firewall daemon that manages iptables and nftables rules',
   'tuned':             'Performance tuning daemon that adjusts kernel parameters to match a workload profile',
@@ -661,6 +672,7 @@ const CRITICAL_PROCS = new Set([
   'systemd-network', 'systemd-resolve', 'systemd-udevd',
   'VBoxService', 'VBoxClient',
   'NetworkManager', 'dbus-daemon', 'polkitd', 'firewalld', 'sshd',
+  'gnome-shell',
 ])
 
 function killTip(name: string): string {

@@ -6,5 +6,3 @@
 # handler to run systemctl enable|disable via guestcontrol and resolve the right
 # service name per tool+version (not applicable to java/maven, which use alternatives)
 
-
-why do you have in performance tooltip: no description available for this prosess

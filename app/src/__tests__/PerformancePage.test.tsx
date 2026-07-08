@@ -83,7 +83,7 @@ describe('PerformancePage — Running Processes card', () => {
     expect(screen.getByText(/Kubernetes control plane/)).toBeInTheDocument()
   })
 
-  it('falls back to a generic tooltip for a process with no known description', async () => {
+  it('shows no tooltip for a process with no known description', async () => {
     window.electronAPI.queryVmPerformance = vi.fn().mockResolvedValue({
       ...SNAPSHOT_1,
       processes: [{ pid: 999, name: 'mystery-proc', cpu: 1, mem: 1, rssMB: 10 }],
@@ -91,7 +91,7 @@ describe('PerformancePage — Running Processes card', () => {
     render(<PerformancePage vm={VM} onBack={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('mystery-proc')).toBeInTheDocument())
     fireEvent.mouseEnter(screen.getByText('mystery-proc'))
-    expect(screen.getByText('No description available for this process')).toBeInTheDocument()
+    expect(screen.queryByText('No description available for this process')).not.toBeInTheDocument()
   })
 
   it('keeps the table visible instead of blanking it when a later refresh fails transiently', async () => {
