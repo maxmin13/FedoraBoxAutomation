@@ -24,3 +24,4 @@ desktop.ini
 
 # Claude Code local settings (machine-specific, contains path permissions)
 .claude/settings.local.json
+/.vite/
