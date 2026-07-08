@@ -186,16 +186,19 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     if (procLoadingRef.current) return
     procLoadingRef.current = true
     window.electronAPI.logUiAction(`performance "${vm.name}": Load processes`)
-    if (!silent) setProcState('loading')
+    // Only show the full loading placeholder on the very first load — once we
+    // have a good snapshot, keep showing it while a refresh runs in the
+    // background (same pattern as the Diagnostics card).
+    if (!silent && procStateRef.current !== 'ok') setProcState('loading')
     setProcError(null)
     const result = await window.electronAPI.queryVmPerformance(vm.name)
     procLoadingRef.current = false
     if (!result.ok) {
-      // Silent background polls race with the diagnostics script and kill calls,
-      // which also use guestcontrol — an occasional session-conflict blip is
-      // expected. Don't blank an already-good process list over a transient
-      // failure; only surface it once it stops recovering.
-      if (silent && procStateRef.current === 'ok') return
+      // Background/refresh polls race with the diagnostics script and kill
+      // calls, which also use guestcontrol — an occasional session-conflict
+      // blip is expected. Don't blank an already-good process list over a
+      // transient failure; only surface it once it stops recovering.
+      if (procStateRef.current === 'ok') return
       if (result.vmStopped)     { setProcState('stopped');        return }
       if (result.noCredentials) { setProcState('no-credentials'); return }
       setProcError(result.error ?? 'Unknown error')

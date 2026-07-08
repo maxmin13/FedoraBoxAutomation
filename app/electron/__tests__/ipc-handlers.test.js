@@ -1,6 +1,7 @@
 const { parseVmList, parseChecksOutput } = require('../ipc-handlers')
 const fs            = require('fs')
 const childProcess  = require('child_process')
+const { promisify } = require('util')
 
 // ── Shared setup helper ───────────────────────────────────────────────────────
 // Injects an electron stub + optional extra require.cache entries,
@@ -1818,5 +1819,254 @@ describe('log-error handler', () => {
     await logErrorHandler({}, 'Something went wrong', null)
     expect(mockLogError).toHaveBeenCalledTimes(1)
     expect(mockLogError).toHaveBeenCalledWith('[renderer] uncaught error:', 'Something went wrong')
+  })
+})
+
+// ── kill-vm-process handler ───────────────────────────────────────────────────
+//
+// kill-vm-process uses execFileAsync (promisify(execFile)) for the guestcontrol
+// calls. Node's promisify() returns original[util.promisify.custom] verbatim
+// when present, so attaching that symbol to a plain vi.fn() lets the mock
+// resolve/reject directly instead of needing a callback-style implementation.
+
+describe('kill-vm-process handler', () => {
+  let killVmProcessHandler
+  let mockExec           // isVmRunning (execAsync / promisify(exec))
+  let mockExecFileAsync  // the guestcontrol calls (execFileAsync)
+  let mockReadFile
+
+  const CREDS_STORE = { FedoraBox: { user: 'root', pass: 'secret' } }
+
+  function stubRunning() {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
+  }
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExec = vi.fn()
+    mockExecFileAsync = vi.fn()
+    const fakeExecFile = Object.assign(vi.fn(), { [promisify.custom]: mockExecFileAsync })
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: vi.fn(), exec: mockExec, execFile: fakeExecFile },
+    }
+    mockReadFile = vi.spyOn(fs.promises, 'readFile')
+    killVmProcessHandler = loadHandlers()('kill-vm-process')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    mockReadFile.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExec.mockReset()
+    mockExecFileAsync.mockReset()
+    mockReadFile.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns an error without calling guestcontrol when the VM is not running', async () => {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: false, error: 'VM is not running' })
+    expect(mockExecFileAsync).not.toHaveBeenCalled()
+  })
+
+  it('returns an error when no credentials are saved', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}))
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: false, error: 'No credentials saved' })
+  })
+
+  it('reports success when the owning systemd unit is stopped', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'ok:systemctl:k3s.service\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports success on a plain kill -9 fallback for a non-systemd process', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'ok:kill9:123\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'gnome-software' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports success when the process was already gone', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'ok:gone\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'sleep' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns a specific error when systemctl stop fails', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'err:systemctl:k3s.service\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: false, error: 'systemctl stop k3s.service failed' })
+  })
+
+  it('returns a specific error when kill -9 fails', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'err:kill9:123\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'gnome-software' })
+    expect(result).toEqual({ ok: false, error: 'kill -9 failed — process may have already exited' })
+  })
+
+  it('returns a generic error for unrecognised guest output', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'garbage\n' })
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: false, error: 'Unexpected response from guest' })
+  })
+
+  it('recovers a successful kill from an exit-code false-failure', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('exit 1'), { stdout: 'ok:systemctl:k3s.service\n', code: 1 }))
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports a busy-VM error when guestcontrol fails without timing out', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('boom'), { stdout: '', stderr: '', killed: false }))
+    const result = await killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    expect(result).toEqual({ ok: false, error: 'Could not stop k3s-server — the VM may be busy (diagnostics still running?)' })
+  })
+
+  it('retries the post-timeout verification and recovers once the process is confirmed gone', async () => {
+    vi.useFakeTimers()
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync
+      .mockRejectedValueOnce(Object.assign(new Error('timeout'), { killed: true, stdout: '' })) // main call times out
+      .mockResolvedValueOnce({ stdout: 'running\n' })  // verify attempt 1 — still tearing down
+      .mockResolvedValueOnce({ stdout: 'gone\n' })     // verify attempt 2 — confirmed gone
+
+    const resultPromise = killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    await vi.advanceTimersByTimeAsync(3000) // backoff before the second verify attempt
+    const result = await resultPromise
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports the timeout error if the process never confirms as gone', async () => {
+    vi.useFakeTimers()
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync
+      .mockRejectedValueOnce(Object.assign(new Error('timeout'), { killed: true, stdout: '' }))
+      .mockResolvedValue({ stdout: 'running\n' }) // every verify attempt still reports running
+
+    const resultPromise = killVmProcessHandler({}, { vmName: 'FedoraBox', pid: 123, procName: 'k3s-server' })
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(3000)
+    const result = await resultPromise
+    expect(result).toEqual({ ok: false, error: 'Could not stop k3s-server — the operation timed out' })
+  })
+})
+
+// ── query-vm-performance handler ──────────────────────────────────────────────
+
+describe('query-vm-performance handler', () => {
+  let queryPerfHandler
+  let mockExec
+  let mockExecFileAsync
+  let mockReadFile
+
+  const CREDS_STORE = { FedoraBox: { user: 'root', pass: 'secret' } }
+  const PERF_JSON = '{"cpuPct":12.3,"ramTotalMB":8192,"ramUsedMB":2048,"ramFreeMB":6144,"processes":[{"pid":1,"name":"k3s-server","cpu":98.6,"mem":1.2,"rssMB":408}]}'
+
+  function stubRunning() {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
+  }
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExec = vi.fn()
+    mockExecFileAsync = vi.fn()
+    const fakeExecFile = Object.assign(vi.fn(), { [promisify.custom]: mockExecFileAsync })
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: vi.fn(), exec: mockExec, execFile: fakeExecFile },
+    }
+    mockReadFile = vi.spyOn(fs.promises, 'readFile')
+    queryPerfHandler = loadHandlers()('query-vm-performance')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    mockReadFile.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExec.mockReset()
+    mockExecFileAsync.mockReset()
+    mockReadFile.mockReset()
+  })
+
+  it('returns vmStopped when the VM is not running', async () => {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, vmStopped: true })
+  })
+
+  it('returns noCredentials when nothing is saved for the VM', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}))
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, noCredentials: true })
+  })
+
+  it('returns the parsed performance snapshot on success', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: PERF_JSON + '\n' })
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result.ok).toBe(true)
+    expect(result.cpuPct).toBe(12.3)
+    expect(result.ramTotalMB).toBe(8192)
+    expect(result.processes).toHaveLength(1)
+    expect(result.processes[0].name).toBe('k3s-server')
+  })
+
+  it('recovers a valid snapshot from an exit-code false-failure', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('exit 1'), { stdout: PERF_JSON + '\n', code: 1 }))
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result.ok).toBe(true)
+    expect(result.cpuPct).toBe(12.3)
+  })
+
+  it('returns a busy-VM message when guestcontrol times out', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('timeout'), { killed: true, stdout: '' }))
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, error: 'The VM is not responding — it may be busy. Try again in a moment.' })
+  })
+
+  it('returns a generic error when guestcontrol fails without a timeout or usable stdout', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('boom'), { stdout: '', stderr: 'auth failed', killed: false }))
+    const result = await queryPerfHandler({}, { vmName: 'FedoraBox' })
+    expect(result).toEqual({ ok: false, error: 'Could not read performance data from the VM.' })
   })
 })
