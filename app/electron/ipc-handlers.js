@@ -31,6 +31,8 @@ const ROOT = app?.isPackaged
 
 const DOCS_DIR = path.join(ROOT, 'docs')
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 // VM state store — keyed by VM name; stored in userData so it survives reinstalls
 // and is writable when the app is installed in Program Files.
 const CREDS_DIR  = app?.isPackaged
@@ -789,6 +791,31 @@ function registerIpcHandlers(win) {
       } else if (rawOut === 'ok:gone') {
         log.vm(`[kill] "${vmName}"  ${label} — process was already gone (exit-code false-failure)`)
         return { ok: true }
+      }
+      if (error.killed && safeProc) {
+        // guestcontrol's --wait-stdout can hang past the timeout waiting for the
+        // stdout pipe to close — an orphaned child (e.g. a containerd-shim left
+        // behind by a killed k3s unit) can inherit the FD and keep it open even
+        // though the target process is already dead. A heavy unit's teardown
+        // (tearing down CNI namespaces, iptables rules per pod, etc.) can also
+        // still be in progress at the moment of the first check, so retry a
+        // few times with a short backoff before reporting a false failure.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) await sleep(3000)
+          try {
+            const { stdout: verifyOut } = await execFileAsync('VBoxManage', [
+              'guestcontrol', vmName,
+              'run', '--exe', '/bin/bash',
+              '--username', user, '--password', pass,
+              '--wait-stdout',
+              '--', '-c', `pgrep -x "${safeProc}" >/dev/null 2>&1 && echo running || echo gone`,
+            ], { encoding: 'utf8', timeout: 15000 })
+            if (verifyOut.includes('gone')) {
+              log.vm(`[kill] "${vmName}"  ${label} — guestcontrol timed out, but verified the process is gone (attempt ${attempt + 1})`)
+              return { ok: true }
+            }
+          } catch { /* verification call itself failed/timed out too — retry */ }
+        }
       }
       // Log raw VBoxManage output to diagnose failures (session conflict, timeout, auth, etc.)
       log.vm(`[kill] "${vmName}"  ${label} — VBoxManage exit=${error.code ?? '?'} killed=${!!error.killed}`)

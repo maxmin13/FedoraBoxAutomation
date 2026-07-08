@@ -48,8 +48,11 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const [killTarget,  setKillTarget]  = useState<{ pid: number; name: string } | null>(null)
 
   const procLoadingRef   = useRef(false)
+  const procStateRef     = useRef(procState)
+  useEffect(() => { procStateRef.current = procState }, [procState])
   const diagUnsubLineRef = useRef<(() => void) | null>(null)
   const diagUnsubDoneRef = useRef<(() => void) | null>(null)
+  const diagBufferRef    = useRef<ScriptLine[]>([])
 
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
 
@@ -88,7 +91,10 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
 
   function handleRefresh() {
     window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
+    setKillError(null)
+    setFixError(null)
     setInfoKey((k) => k + 1)
+    loadProcesses()
     runDiagnostics(vmUser, vmPass, loginUser)
   }
 
@@ -98,17 +104,21 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     diagUnsubLineRef.current?.(); diagUnsubLineRef.current = null
     diagUnsubDoneRef.current?.(); diagUnsubDoneRef.current = null
 
-    setDiagLines([])
+    // Keep showing the last completed report while this run is in flight —
+    // only swap it out once the new one finishes, so refreshing doesn't blank
+    // the card back to a bare loading state (same pattern as the process list).
+    diagBufferRef.current = []
     setDiagError(null)
     setDiagState('running')
     onScriptRunning?.(true)
 
     const unsubLine = window.electronAPI.onScriptLine((line) => {
-      setDiagLines((prev) => [...prev, line])
+      diagBufferRef.current = [...diagBufferRef.current, line]
     })
     const unsubDone = window.electronAPI.onScriptDone(() => {
       diagUnsubLineRef.current = null
       diagUnsubDoneRef.current = null
+      setDiagLines(diagBufferRef.current)
       setDiagState('done')
       onScriptRunning?.(false)
       unsubLine()
@@ -181,6 +191,11 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     const result = await window.electronAPI.queryVmPerformance(vm.name)
     procLoadingRef.current = false
     if (!result.ok) {
+      // Silent background polls race with the diagnostics script and kill calls,
+      // which also use guestcontrol — an occasional session-conflict blip is
+      // expected. Don't blank an already-good process list over a transient
+      // failure; only surface it once it stops recovering.
+      if (silent && procStateRef.current === 'ok') return
       if (result.vmStopped)     { setProcState('stopped');        return }
       if (result.noCredentials) { setProcState('no-credentials'); return }
       setProcError(result.error ?? 'Unknown error')
@@ -362,7 +377,11 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                         const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
                         return (
                           <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
-                            <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">{p.name}</td>
+                            <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">
+                              <Tooltip tip={PROC_DESC[p.name] ?? 'No description available for this process'}>
+                                <span>{p.name}</span>
+                              </Tooltip>
+                            </td>
                             <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
                             <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
                             <td className="py-1 text-right">
@@ -398,11 +417,15 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
               <p className="text-amber-400 text-xs shrink-0">No credentials saved — open Detail to set them.</p>
             )}
 
-            {diagState === 'running' && (
+            {diagState === 'running' && diagLines.length === 0 && (
               <div className="space-y-2 shrink-0">
                 <p className="text-zinc-300 text-sm font-medium">Running Performance Check...</p>
                 <ProgressBar />
               </div>
+            )}
+
+            {diagState === 'running' && diagLines.length > 0 && (
+              <p className="text-zinc-500 text-xs shrink-0">Refreshing...</p>
             )}
 
             {diagError && vmNotRunning(diagLines) && (
@@ -415,7 +438,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
               <p className="text-red-400 text-xs shrink-0">{diagError}</p>
             )}
 
-            {diagState === 'done' && diagLines.length > 0 && !vmNotRunning(diagLines) && (
+            {diagLines.length > 0 && !vmNotRunning(diagLines) && (
               <DiagReport sections={parseDiagReport(diagLines)} />
             )}
           </div>

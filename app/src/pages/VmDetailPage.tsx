@@ -17,6 +17,12 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     ],
   },
   {
+    category: 'AI Tools',
+    tools: [
+      { key: 'claudeCode', label: 'Claude Code' },
+    ],
+  },
+  {
     category: 'Languages',
     tools: [
       { key: 'java',   label: 'Java' },
@@ -99,12 +105,6 @@ const TOOL_GROUPS: { category: string; tools: { key: string; label: string }[] }
     category: 'Automation',
     tools: [
       { key: 'ansible', label: 'Ansible' },
-    ],
-  },
-  {
-    category: 'AI Tools',
-    tools: [
-      { key: 'claudeCode', label: 'Claude Code' },
     ],
   },
 ]
