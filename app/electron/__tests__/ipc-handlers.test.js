@@ -2070,3 +2070,127 @@ describe('query-vm-performance handler', () => {
     expect(result).toEqual({ ok: false, error: 'Could not read performance data from the VM.' })
   })
 })
+
+// ── toggle-vm-service handler ─────────────────────────────────────────────────
+
+describe('toggle-vm-service handler', () => {
+  let toggleServiceHandler
+  let mockExec
+  let mockExecFileAsync
+  let mockReadFile
+
+  const CREDS_STORE = { FedoraBox: { user: 'root', pass: 'secret' } }
+
+  function stubRunning() {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="running"\n', stderr: '' }))
+  }
+
+  beforeAll(() => {
+    const cpId = require.resolve('child_process')
+    mockExec = vi.fn()
+    mockExecFileAsync = vi.fn()
+    const fakeExecFile = Object.assign(vi.fn(), { [promisify.custom]: mockExecFileAsync })
+    require.cache[cpId] = {
+      id: cpId, filename: cpId, loaded: true,
+      exports: { execSync: vi.fn(), exec: mockExec, execFile: fakeExecFile },
+    }
+    mockReadFile = vi.spyOn(fs.promises, 'readFile')
+    toggleServiceHandler = loadHandlers()('toggle-vm-service')
+  })
+
+  afterAll(() => {
+    delete require.cache[require.resolve('child_process')]
+    mockReadFile.mockRestore()
+    cleanupHandlers()
+  })
+
+  beforeEach(() => {
+    mockExec.mockReset()
+    mockExecFileAsync.mockReset()
+    mockReadFile.mockReset()
+  })
+
+  it('rejects an invalid action without calling guestcontrol', async () => {
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'restart' })
+    expect(result).toEqual({ ok: false, error: 'Invalid action' })
+    expect(mockExecFileAsync).not.toHaveBeenCalled()
+  })
+
+  it('returns an error without calling guestcontrol when the VM is not running', async () => {
+    mockExec.mockImplementationOnce((cmd, opts, cb) => cb(null, { stdout: 'VMState="poweroff"\n', stderr: '' }))
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'VM is not running' })
+    expect(mockExecFileAsync).not.toHaveBeenCalled()
+  })
+
+  it('returns an error when no credentials are saved', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}))
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'No credentials saved' })
+  })
+
+  it('reports success when the unit is disabled', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'ok:disable:httpd-2.4.58.service\n' })
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports success when the unit is enabled', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'ok:enable:k3s.service\n' })
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'k3s', version: '1.30.2', action: 'enable' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('returns a specific error for a tool with no systemd unit', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'err:unsupported:java\n' })
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'java', version: '21', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'java is not managed by systemd' })
+  })
+
+  it('returns an error when systemctl fails', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'err:disable:httpd-2.4.58.service\n' })
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'Could not disable the service — see logs for details' })
+  })
+
+  it('returns a generic error for unrecognised guest output', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'garbage\n' })
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'Unexpected response from guest' })
+  })
+
+  it('recovers a successful toggle from an exit-code false-failure', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('exit 1'), { stdout: 'ok:disable:httpd-2.4.58.service\n', code: 1 }))
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('reports a timeout error when guestcontrol times out', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('timeout'), { killed: true, stdout: '' }))
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'Could not disable the service — the operation timed out' })
+  })
+
+  it('reports a busy-VM error when guestcontrol fails without timing out', async () => {
+    stubRunning()
+    mockReadFile.mockResolvedValueOnce(JSON.stringify(CREDS_STORE))
+    mockExecFileAsync.mockRejectedValueOnce(Object.assign(new Error('boom'), { stdout: '', stderr: '', killed: false }))
+    const result = await toggleServiceHandler({}, { vmName: 'FedoraBox', toolKey: 'httpd', version: '2.4.58', action: 'disable' })
+    expect(result).toEqual({ ok: false, error: 'Could not disable the service — the VM may be busy' })
+  })
+})

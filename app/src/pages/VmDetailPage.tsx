@@ -167,7 +167,27 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
   const [toolsPage,      setToolsPage]      = useState(0)
   const TOOLS_PAGE_SIZE = 5
 
+  const [toggleTarget, setToggleTarget] = useState<{ toolKey: string; toolLabel: string; version: string; action: 'enable' | 'disable' } | null>(null)
+  const [toggling,     setToggling]     = useState(false)
+  const [toggleError,  setToggleError]  = useState<string | null>(null)
+
   const { withAuth, loginRequired, onLoginSuccess, onLoginBack } = useAuthGate(vm.name)
+
+  async function confirmToggle() {
+    if (!toggleTarget) return
+    const { toolKey, version, action } = toggleTarget
+    setToggleTarget(null)
+    window.electronAPI.logUiAction(`detail "${vm.name}": ${action} service for "${toolKey}" ${version}`)
+    setToggling(true)
+    setToggleError(null)
+    const result = await window.electronAPI.toggleVmService(vm.name, toolKey, version, action)
+    setToggling(false)
+    if (!result.ok) {
+      setToggleError(result.error ?? 'Failed to update the service')
+      return
+    }
+    setToolsKey((k) => k + 1)
+  }
 
   function backToDetail() {
     setView('detail')
@@ -257,6 +277,17 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
       <ShareLogsPage vm={vm} onBack={backToDetail} onScriptRunning={onScriptRunning} />
     </div>
     <div style={{ display: view === 'share-logs' ? 'none' : '' }} className="h-full flex flex-col overflow-hidden">
+
+      {toggleTarget && (
+        <ToggleServiceModal
+          toolLabel={toggleTarget.toolLabel}
+          version={toggleTarget.version}
+          action={toggleTarget.action}
+          busy={toggling}
+          onConfirm={confirmToggle}
+          onCancel={() => setToggleTarget(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-3 shrink-0">
@@ -411,13 +442,16 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                 <div className="flex items-center justify-between px-2 pt-2 pb-1.5 shrink-0">
                   <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Provisioned tools</h2>
                   <button
-                    onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); withAuth(() => setToolsKey((k) => k + 1)) }}
+                    onClick={() => { window.electronAPI.logUiAction(`detail "${vm.name}": refresh Installed Tools`); setToggleError(null); withAuth(() => setToolsKey((k) => k + 1)) }}
                     disabled={toolsStatus === 'loading'}
                     className="px-2 py-0.5 text-xs border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {toolsStatus === 'loading' ? 'Checking...' : 'Refresh'}
                   </button>
                 </div>
+                {toggleError && (
+                  <p className="text-red-400 text-xs px-2 pb-1.5 shrink-0">{toggleError}</p>
+                )}
                 <div className="flex-1 min-h-0 overflow-hidden px-2 flex flex-col">
                   {toolsStatus === 'idle' || toolsStatus === 'loading' ? (
                     <p className="text-zinc-500 text-sm">Checking...</p>
@@ -455,23 +489,48 @@ export default function VmDetailPage({ vm, onBack, onScriptRunning, refreshKey, 
                                       {versions.length > 0 && (
                                         <div className="flex flex-wrap gap-1">
                                           {versions.map((v) => {
-                                            const stateMatch = v.match(/ \((active|enabled)\)$/)
-                                            const isActive = !!stateMatch
+                                            const stateMatch = v.match(/ \((active|enabled|disabled)\)$/)
                                             const stateWord = stateMatch?.[1] ?? ''
-                                            const ver = isActive ? v.slice(0, stateMatch.index) : v
+                                            const ver = stateMatch ? v.slice(0, stateMatch.index) : v
+                                            // "active"/"enabled" both mean "this is the one currently in
+                                            // effect" — highlighted green, same as before.
+                                            const isHighlighted = stateWord === 'active' || stateWord === 'enabled'
+                                            // "enabled"/"disabled" both come from an actual systemd unit
+                                            // check (see ACTIVE_HINTS) — toggleable either way. "active"
+                                            // covers non-systemd cases like java/maven's alternatives
+                                            // selection, which have no service to toggle.
+                                            const isSystemd = stateWord === 'enabled' || stateWord === 'disabled'
                                             const badge = (
                                               <span
                                                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none ${
-                                                  isActive
+                                                  isHighlighted
                                                     ? 'bg-zinc-700 text-zinc-200 ring-1 ring-green-500/40'
                                                     : 'bg-zinc-900 text-zinc-500'
-                                                }`}
+                                                } ${isSystemd ? 'cursor-pointer hover:ring-1 hover:ring-zinc-400/60' : ''}`}
                                               >
                                                 {ver}
-                                                {isActive && <span className="text-green-500 text-[9px]">{stateWord}</span>}
+                                                {isHighlighted && <span className="text-green-500 text-[9px]">{stateWord}</span>}
+                                                {stateWord === 'disabled' && <span className="text-zinc-600 text-[9px]">disabled</span>}
                                               </span>
                                             )
-                                            return isActive ? (
+                                            if (isSystemd) {
+                                              const action = stateWord === 'enabled' ? 'disable' : 'enable'
+                                              const hint = stateWord === 'enabled'
+                                                ? (ACTIVE_HINTS[tool.key] ?? 'Enabled to start at boot.')
+                                                : 'Not currently enabled to start at boot.'
+                                              return (
+                                                <Tooltip key={ver} tip={`${hint} Click to ${action}.`}>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => withAuth(() => setToggleTarget({ toolKey: tool.key, toolLabel: tool.label, version: ver, action }))}
+                                                    className="inline-flex"
+                                                  >
+                                                    {badge}
+                                                  </button>
+                                                </Tooltip>
+                                              )
+                                            }
+                                            return isHighlighted ? (
                                               <Tooltip key={ver} tip={ACTIVE_HINTS[tool.key] ?? `Currently the ${stateWord} version.`}>
                                                 {badge}
                                               </Tooltip>
@@ -600,6 +659,61 @@ function Row({ label, value, mono = false }: { label: string; value: string; mon
           {copied ? 'Copied!' : 'Copy'}
         </button>
       )}
+    </div>
+  )
+}
+
+function ToggleServiceModal({
+  toolLabel, version, action, busy, onConfirm, onCancel,
+}: {
+  toolLabel: string
+  version: string
+  action: 'enable' | 'disable'
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-zinc-800 border border-zinc-700 rounded-xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-zinc-400 text-sm text-center mb-2">
+          {action === 'enable' ? 'Enable this service at startup?' : 'Disable this service at startup?'}
+        </p>
+        <p className="text-zinc-100 text-2xl font-bold text-center break-all mb-1">{toolLabel} {version}</p>
+        <p className="text-zinc-500 text-xs text-center mb-8">
+          {action === 'enable'
+            ? 'The service will start automatically the next time the VM boots. This does not start it now.'
+            : 'The service will no longer start automatically at boot. This does not stop it now.'}
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="px-4 py-2 text-sm bg-blue-700 hover:bg-blue-600 text-white font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? 'Working...' : action === 'enable' ? 'Enable' : 'Disable'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -60,3 +60,15 @@ teardown() {
     OUTPUT="$output"
     [[ "$(_json_field intellij)" == "2025.3, 2025.1.2, 2024.1.7" ]]
 }
+
+@test "reports docker false when not installed" {
+    run bash "$SCRIPT"
+    OUTPUT="$output"
+    [[ "$(_json_field docker)" == "false" ]]
+}
+
+@test "reports mariadb false when not installed" {
+    run bash "$SCRIPT"
+    OUTPUT="$output"
+    [[ "$(_json_field mariadb)" == "false" ]]
+}

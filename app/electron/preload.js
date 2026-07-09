@@ -84,6 +84,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Sends SIGTERM to a process inside the VM by PID via guestcontrol
   killVmProcess: (vmName, pid, procName) => ipcRenderer.invoke('kill-vm-process', { vmName, pid, procName }),
+  // Enables/disables the systemd unit backing a provisioned tool's startup-at-boot behaviour
+  toggleVmService: (vmName, toolKey, version, action) => ipcRenderer.invoke('toggle-vm-service', { vmName, toolKey, version, action }),
   // Kills any in-flight query-vm-installed process for the given VM
   cancelQueryVmInstalled: (vmName) => ipcRenderer.invoke('cancel-query-vm-installed', { vmName }),
 

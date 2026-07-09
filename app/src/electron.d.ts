@@ -141,6 +141,7 @@ declare global {
         | { ok: false; vmStopped?: boolean; noCredentials?: boolean; error?: string }
       >
       killVmProcess: (vmName: string, pid: number, procName?: string) => Promise<{ ok: boolean; error?: string }>
+      toggleVmService: (vmName: string, toolKey: string, version: string, action: 'enable' | 'disable') => Promise<{ ok: boolean; error?: string }>
       createVm: (params: CreateVmParams) => Promise<{ ok: boolean; error?: string }>
       startVm: (name: string) => Promise<{ ok: boolean; error?: string }>
       stopVm: (name: string) => Promise<{ ok: boolean; error?: string }>

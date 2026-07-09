@@ -830,6 +830,86 @@ function registerIpcHandlers(win) {
     }
   })
 
+  // ── toggle-vm-service ─────────────────────────────────────
+  // Enables or disables the systemd unit backing a provisioned tool's
+  // startup-at-boot behaviour. Unit-name resolution mirrors the logic in
+  // vm/detect-installed.sh (httpd-<ver>, tomcat-<ver>-<port>, postgresql
+  // package-dependent, fixed names for docker/mariadb/k3s) and runs inside
+  // the guest so it can check installed packages the same way that script
+  // does, rather than guessing the unit name from the version string alone.
+  // Returns { ok: true } on success.
+  // Returns { ok: false, error: string } on failure.
+  handleIpc('toggle-vm-service', async (_event, { vmName, toolKey, version, action }) => {
+    if (action !== 'enable' && action !== 'disable') return { ok: false, error: 'Invalid action' }
+    if (!await isVmRunning(vmName)) return { ok: false, error: 'VM is not running' }
+    const store = await readCredsStore()
+    const entry = store[vmName]
+    if (!entry?.user || !entry?.pass) return { ok: false, error: 'No credentials saved' }
+    const { user, pass } = entry
+    const safeTool = (toolKey || '').replace(/[^a-zA-Z0-9]/g, '')
+    const safeVersion = (version || '').replace(/[^a-zA-Z0-9_.:\-]/g, '')
+    const label = `${toolKey} ${version}`
+    const script = [
+      `TOOL=${safeTool}`,
+      `VERSION=${safeVersion}`,
+      `ACTION=${action}`,
+      `case "$TOOL" in`,
+      `  httpd) UNIT="httpd-\${VERSION}.service" ;;`,
+      `  tomcat)`,
+      `    VER="\${VERSION%%:*}"; PORT="\${VERSION##*:}"`,
+      `    UNIT="tomcat-\${VER}-\${PORT}.service" ;;`,
+      `  postgresql)`,
+      `    MAJOR="\${VERSION%%.*}"`,
+      `    if rpm -q "postgresql\${MAJOR}-server" &>/dev/null; then UNIT="postgresql-\${MAJOR}.service"`,
+      `    else UNIT="postgresql.service"; fi ;;`,
+      `  k3s) UNIT="k3s.service" ;;`,
+      `  docker) UNIT="docker.service" ;;`,
+      `  mariadb) UNIT="mariadb.service" ;;`,
+      `  *) echo "err:unsupported:$TOOL"; exit 0 ;;`,
+      `esac`,
+      `if systemctl "$ACTION" "$UNIT" 2>&1; then echo "ok:$ACTION:$UNIT"`,
+      `else echo "err:$ACTION:$UNIT"; fi`,
+    ].join('\n')
+    const encoded = Buffer.from(script).toString('base64')
+    const runCmd = `echo '${encoded}' | base64 -d | bash 2>&1`
+    try {
+      const { stdout } = await execFileAsync('VBoxManage', [
+        'guestcontrol', vmName,
+        'run', '--exe', '/bin/bash',
+        '--username', user, '--password', pass,
+        '--wait-stdout',
+        '--', '-c', runCmd,
+      ], { encoding: 'utf8', timeout: 30000 })
+      const out = (stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      if (out.startsWith('ok:')) {
+        log.vm(`[toggle-service] "${vmName}"  ${label} — ${out.slice(3)}`)
+        return { ok: true }
+      } else if (out.startsWith('err:unsupported:')) {
+        log.vm(`[toggle-service] "${vmName}"  ${label} — tool is not systemd-managed`)
+        return { ok: false, error: `${toolKey} is not managed by systemd` }
+      } else if (out.startsWith('err:')) {
+        log.vm(`[toggle-service] "${vmName}"  ${label} — systemctl ${action} failed: ${out.slice(4)}`)
+        return { ok: false, error: `Could not ${action} the service — see logs for details` }
+      } else {
+        log.vm(`[toggle-service] "${vmName}"  ${label} — unexpected output: ${stdout.trim().slice(0, 200)}`)
+        return { ok: false, error: 'Unexpected response from guest' }
+      }
+    } catch (error) {
+      const rawOut = (error.stdout || '').split('\n').map(l => l.trim()).find(l => l.startsWith('ok:') || l.startsWith('err:')) || ''
+      if (rawOut.startsWith('ok:')) {
+        log.vm(`[toggle-service] "${vmName}"  ${label} — ${rawOut.slice(3)} (exit-code false-failure)`)
+        return { ok: true }
+      }
+      log.vm(`[toggle-service] "${vmName}"  ${label} — VBoxManage exit=${error.code ?? '?'} killed=${!!error.killed}`)
+      if (error.stdout) log.vm(`[toggle-service] "${vmName}"  stdout: ${error.stdout.trim().slice(0, 400)}`)
+      if (error.stderr) log.vm(`[toggle-service] "${vmName}"  stderr: ${error.stderr.trim().slice(0, 400)}`)
+      const friendly = error.killed
+        ? `Could not ${action} the service — the operation timed out`
+        : `Could not ${action} the service — the VM may be busy`
+      return { ok: false, error: friendly }
+    }
+  })
+
   // ── get-script-state ─────────────────────────────────────
   // Returns the buffered output of the current or most recent script run so
   // the renderer can reconnect to an in-progress or just-completed run after

@@ -89,7 +89,7 @@ tomcat_versions() {
     if systemctl is-enabled --quiet "tomcat-${ver}-${port}.service" 2>/dev/null; then
       list="${list}${ver}:${port} (enabled)"
     else
-      list="${list}${ver}:${port}"
+      list="${list}${ver}:${port} (disabled)"
     fi
   done < <(compgen -G "/opt/apache-tomcat-*" 2>/dev/null | sort -V)
   [[ -z "${list}" ]] && { echo false; return; }
@@ -105,7 +105,7 @@ httpd_versions() {
     if systemctl is-enabled --quiet "httpd-${ver}.service" 2>/dev/null; then
       list="${list}${ver} (enabled)"
     else
-      list="${list}${ver}"
+      list="${list}${ver} (disabled)"
     fi
   done < <(compgen -G "/opt/httpd-*" 2>/dev/null | sort -rV)
   [[ -z "${list}" ]] && { echo false; return; }
@@ -162,7 +162,11 @@ mariadb_version() {
     ver=$(rpm -q mariadb-server --queryformat '%{VERSION}')
   fi
   [[ -z "${ver}" ]] && { echo false; return; }
-  echo "\"${ver}\""
+  if systemctl is-enabled --quiet mariadb 2>/dev/null; then
+    echo "\"${ver} (enabled)\""
+  else
+    echo "\"${ver} (disabled)\""
+  fi
 }
 
 postgresql_version() {
@@ -180,12 +184,24 @@ postgresql_version() {
       if systemctl is-enabled --quiet "${svc}.service" 2>/dev/null; then
         list="${list}${ver} (enabled)"
       else
-        list="${list}${ver}"
+        list="${list}${ver} (disabled)"
       fi
     fi
   done
   [[ -z "${list}" ]] && { echo false; return; }
   echo "\"${list}\""
+}
+
+docker_version() {
+  which docker >/dev/null 2>&1 || { echo false; return; }
+  local ver
+  ver=$(docker --version 2>/dev/null | awk '{gsub(",","",$3); print $3}')
+  [[ -z "${ver}" ]] && { echo false; return; }
+  if systemctl is-enabled --quiet docker 2>/dev/null; then
+    echo "\"${ver} (enabled)\""
+  else
+    echo "\"${ver} (disabled)\""
+  fi
 }
 
 k3s_version() {
@@ -196,7 +212,7 @@ k3s_version() {
   if systemctl is-enabled --quiet k3s 2>/dev/null; then
     echo "\"${ver} (enabled)\""
   else
-    echo "\"${ver}\""
+    echo "\"${ver} (disabled)\""
   fi
 }
 
@@ -265,7 +281,7 @@ cat <<JSON
     done < <(compgen -G "/opt/vscode-*" 2>/dev/null | sort -rV)
     [[ -z "${list}" ]] && echo false || echo "\"${list}\""
   ),
-  "docker":           $(which docker >/dev/null 2>&1 && docker --version 2>/dev/null | awk '{gsub(",","",$3); print "\""$3"\""}' || echo false),
+  "docker":           $(docker_version),
   "minikube":         $(which minikube >/dev/null 2>&1 && minikube version --short 2>/dev/null | sed 's/^v//' | awk '{print "\""$1"\""}' || echo false),
   "k3s":              $(k3s_version),
   "awsCli":           $(which aws >/dev/null 2>&1 && aws --version 2>/dev/null | awk '{split($1,a,"/"); print "\""a[2]"\""}' || echo false),

@@ -44,6 +44,7 @@ beforeEach(() => {
     runShareFolder:         vi.fn().mockResolvedValue({ ok: true }),
     pickFolder:             vi.fn().mockResolvedValue({ folderPath: null }),
     saveVmCredentials:      vi.fn().mockResolvedValue({ ok: true }),
+    toggleVmService:        vi.fn().mockResolvedValue({ ok: true }),
     logUiAction:            vi.fn(),
   } as unknown as typeof window.electronAPI
 })
@@ -296,6 +297,144 @@ describe('VmDetailPage — Installed tools Refresh button', () => {
     await waitFor(() => expect(screen.getByText(/VM is stopped/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled()
+  })
+})
+
+// ── Systemd service toggle ──────────────────────────────────────────────────────
+
+describe('VmDetailPage — systemd service toggle', () => {
+  async function openToolsTab() {
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Provisioned' })).toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Provisioned' })) })
+  }
+
+  beforeEach(() => {
+    Object.assign(window.electronAPI, {
+      loadVmCredentials:  vi.fn().mockResolvedValue({ ok: true, user: 'root', pass: 'secret', loginUser: 'fedora' }),
+      checkVmCredentials: vi.fn().mockResolvedValue({ ok: true }),
+    })
+  })
+
+  it('renders an "(enabled)" badge as a clickable button', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (enabled)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    expect(screen.getByText('2.4.58').closest('button')).not.toBeNull()
+  })
+
+  it('does not render an "(active)" badge (non-systemd) as a button', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, java: '21 (active)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('21')).toBeInTheDocument())
+    expect(screen.getByText('21').closest('button')).toBeNull()
+  })
+
+  it('clicking an "(enabled)" badge opens a confirmation to disable it', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (enabled)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('2.4.58').closest('button')!)
+
+    await waitFor(() => expect(screen.getByText('Disable this service at startup?')).toBeInTheDocument())
+    expect(screen.getByText('Apache HTTP Server 2.4.58')).toBeInTheDocument()
+  })
+
+  it('confirming the toggle calls toggleVmService and re-queries installed tools', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (enabled)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('2.4.58').closest('button')!)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument())
+
+    const queryCallsBefore = (window.electronAPI.queryVmInstalled as ReturnType<typeof vi.fn>).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Disable' }))
+
+    await waitFor(() => expect(window.electronAPI.toggleVmService).toHaveBeenCalledWith('FedoraBox', 'httpd', '2.4.58', 'disable'))
+    await waitFor(() => expect((window.electronAPI.queryVmInstalled as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(queryCallsBefore))
+  })
+
+  it('shows an error banner when toggling fails', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (enabled)' },
+    })
+    window.electronAPI.toggleVmService = vi.fn().mockResolvedValue({ ok: false, error: 'Could not disable the service — the VM may be busy' })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('2.4.58').closest('button')!)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Disable' }))
+
+    await waitFor(() => expect(screen.getByText('Could not disable the service — the VM may be busy')).toBeInTheDocument())
+  })
+
+  it('cancelling the confirmation does not call toggleVmService', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (enabled)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('2.4.58').closest('button')!)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Disable this service at startup?')).not.toBeInTheDocument()
+    expect(window.electronAPI.toggleVmService).not.toHaveBeenCalled()
+  })
+
+  it('renders a "(disabled)" badge as a clickable button, distinct from a plain version', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, httpd: '2.4.58 (disabled)', php: '8.2.1' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('2.4.58')).toBeInTheDocument())
+    expect(screen.getByText('2.4.58').closest('button')).not.toBeNull()
+    // A plain version with no suffix (e.g. PHP, which has no systemd unit at all) stays non-clickable.
+    expect(screen.getByText('8.2.1').closest('button')).toBeNull()
+  })
+
+  it('clicking a "(disabled)" badge opens a confirmation to enable it', async () => {
+    window.electronAPI.getVmInfo = vi.fn().mockResolvedValue({ ok: true, info: RUNNING_INFO })
+    window.electronAPI.queryVmInstalled = vi.fn().mockResolvedValue({
+      ok: true,
+      installed: { ...ALL_FALSE, k3s: '1.30.2 (disabled)' },
+    })
+    render(<VmDetailPage vm={VM} onBack={vi.fn()} onScriptRunning={vi.fn()} />)
+    await openToolsTab()
+    await waitFor(() => expect(screen.getByText('1.30.2')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('1.30.2').closest('button')!)
+
+    await waitFor(() => expect(screen.getByText('Enable this service at startup?')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Enable' }))
+    await waitFor(() => expect(window.electronAPI.toggleVmService).toHaveBeenCalledWith('FedoraBox', 'k3s', '1.30.2', 'enable'))
   })
 })
 
