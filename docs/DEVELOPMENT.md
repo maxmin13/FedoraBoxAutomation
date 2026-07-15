@@ -64,6 +64,21 @@ vm/
 
 ---
 
+## Platform Choice: Why PowerShell, Why Windows-Only
+
+The host side (`host/*.ps1`) is written in PowerShell and the app targets Windows 11 Home specifically. This is not just a language choice — the sanity checks (`virtualbox-sanity-checks.ps1`) test for **Windows-specific** concerns that don't translate to other platforms: Hyper-V, Windows Hypervisor Platform, Secure Boot, and RAM/disk/CPU state read via WMI/CIM cmdlets (see the Sanity Check Thresholds table in `CLAUDE.md`).
+
+Swapping PowerShell for a cross-platform language (Node.js in the Electron main process, or Python) would not by itself make the app run on Linux. It would remove the extra process hop (Node -> PowerShell -> VBoxManage) and simplify logging/IPC, but the sanity-check *logic* would still need a full rewrite:
+
+- Hyper-V / WHP / Secure Boot checks have no Linux equivalent — the analogous Linux concern is a KVM/VirtualBox conflict over virtualization extensions.
+- WMI/CIM-based RAM, disk, and CPU checks would need to become `/proc/meminfo`, `df`, `/proc/cpuinfo` (or similar).
+- The guest-side Bash scripts (`vm/`) are already Linux-native and would need no changes.
+- Electron itself is cross-platform, so the GUI layer is not the blocker.
+
+In short: the platform lock-in is architectural (the checks encode Windows-only virtualization conflicts), not a syntactic one caused by using `.ps1` files. PowerShell was picked because it ships with Windows 11 and has first-class WMI/CIM access for exactly the checks this project needs.
+
+---
+
 ## Running the App
 
 ```powershell
