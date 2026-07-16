@@ -50,6 +50,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   const procLoadingRef   = useRef(false)
   const procStateRef     = useRef(procState)
   useEffect(() => { procStateRef.current = procState }, [procState])
+  const diagStateRef     = useRef(diagState)
+  useEffect(() => { diagStateRef.current = diagState }, [diagState])
   const diagUnsubLineRef = useRef<(() => void) | null>(null)
   const diagUnsubDoneRef = useRef<(() => void) | null>(null)
   const diagBufferRef    = useRef<ScriptLine[]>([])
@@ -64,6 +66,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   useEffect(() => {
     setInfo(null)
     setLoadError(null)
+    window.electronAPI.logUiAction(`performance "${vm.name}": Load VM info`)
     window.electronAPI.getVmInfo(vm.name).then((result) => {
       if (result.ok) setInfo(result.info)
       else setLoadError(result.error ?? 'Could not load VM info')
@@ -73,6 +76,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   // On mount: load credentials, run processes first (fast, ~1.5 s), then diagnostics.
   // Sequential order avoids concurrent guestcontrol sessions that cause session conflicts.
   useEffect(() => {
+    window.electronAPI.logUiAction(`performance "${vm.name}": Load credentials`)
     window.electronAPI.loadVmCredentials(vm.name).then(async (saved) => {
       const user  = saved.ok && saved.user      ? saved.user      : ''
       const pass  = saved.ok && saved.pass      ? saved.pass      : ''
@@ -89,18 +93,21 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
     }
   }, [vm.name, credKey])
 
-  function handleRefresh() {
+  async function handleRefresh() {
     window.electronAPI.logUiAction(`performance "${vm.name}": Refresh`)
     setKillError(null)
     setFixError(null)
     setInfoKey((k) => k + 1)
-    loadProcesses()
+    // Sequential order avoids concurrent guestcontrol sessions that cause
+    // session conflicts (same reasoning as the mount effect above).
+    await loadProcesses()
     runDiagnostics(vmUser, vmPass, loginUser)
   }
 
   async function runDiagnostics(user: string, pass: string, login: string) {
     if (!user || !pass) return
 
+    window.electronAPI.logUiAction(`performance "${vm.name}": Run diagnostics`)
     diagUnsubLineRef.current?.(); diagUnsubLineRef.current = null
     diagUnsubDoneRef.current?.(); diagUnsubDoneRef.current = null
 
@@ -210,7 +217,15 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
   }
 
   useEffect(() => {
-    const id = setInterval(() => loadProcesses(true), 5000)
+    // Skip polls while diagnostics are in flight — both use guestcontrol on
+    // the same VM and running them concurrently causes session conflicts.
+    const id = setInterval(() => {
+      if (diagStateRef.current === 'running') {
+        window.electronAPI.logUiAction(`performance "${vm.name}": Skipped poll - diagnostics in flight`)
+        return
+      }
+      loadProcesses(true)
+    }, 5000)
     return () => clearInterval(id)
   }, [vm.name, credKey])
 
@@ -270,8 +285,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
       {info && (
         <div className="flex-1 min-h-0 flex gap-4">
 
-          {/* Left column: Performance settings + Running Processes */}
-          <div className="w-96 shrink-0 flex flex-col gap-4">
+          {/* Left column: Performance settings + Diagnostics */}
+          <div className="w-[30rem] shrink-0 flex flex-col gap-4">
 
             {/* Performance card */}
             <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4 space-y-3 shrink-0">
@@ -338,115 +353,115 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
               </div>
             </div>
 
-            {/* Running Processes card */}
-            <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-2 overflow-hidden">
-              <div className="flex items-center shrink-0">
-                <Tooltip tip="Top 6 processes inside the VM by CPU usage, sampled via guestcontrol — updates every 5 seconds">
-                  <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
-                </Tooltip>
-              </div>
+            {/* Diagnostics card */}
+            <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3 overflow-hidden">
+              <Tooltip tip="Runs a guest-side check for common performance problems: Guest Additions modules, swap pressure, NIC and storage driver recommendations">
+                <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default shrink-0">Diagnostics</h2>
+              </Tooltip>
 
-              {procState === 'idle' && (
-                <p className="text-zinc-500 text-xs">Loading...</p>
-              )}
-              {procState === 'loading' && (
-                <p className="text-zinc-400 text-xs">Sampling CPU usage...</p>
-              )}
-              {procState === 'stopped' && (
-                <p className="text-zinc-500 text-xs">VM is not running.</p>
-              )}
-              {procState === 'no-credentials' && (
-                <p className="text-zinc-500 text-xs">No credentials saved — run a provisioning script first.</p>
-              )}
-              {procState === 'error' && (
-                <p className="text-red-400 text-xs font-mono break-words">{procError}</p>
+              {diagState === 'idle' && !vmUser && (
+                <p className="text-amber-400 text-xs shrink-0">No credentials saved — open Detail to set them.</p>
               )}
 
-              {procState === 'ok' && procSnapshot && (
-                <div className="space-y-2">
-                  <UsageBar label="CPU" used={Math.round(procSnapshot.cpuPct)} total={100} unit="%" tip="Overall CPU usage across all cores, sampled over 500 ms from /proc/stat" />
-                  <UsageBar label="RAM" used={procSnapshot.ramUsedMB} total={procSnapshot.ramTotalMB} unit="MB" tip="Physical memory usage reported by free -m inside the VM" />
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-zinc-500 border-b border-zinc-700">
-                        <th className="text-left pb-2 pr-2 font-medium"><Tooltip tip="Process name (comm field from ps)">Name</Tooltip></th>
-                        <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="CPU usage averaged over the process lifetime">CPU %</Tooltip></th>
-                        <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="Resident Set Size — physical RAM currently held by this process, in MB">RSS MB</Tooltip></th>
-                        <th className="pb-2 font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {procSnapshot.processes.map((p) => {
-                        const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
-                        return (
-                          <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
-                            <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">
-                              {PROC_DESC[p.name] ? (
-                                <Tooltip tip={PROC_DESC[p.name]}>
-                                  <span>{p.name}</span>
-                                </Tooltip>
-                              ) : (
-                                <span>{p.name}</span>
-                              )}
-                            </td>
-                            <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
-                            <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
-                            <td className="py-1 text-right">
-                              {!CRITICAL_PROCS.has(p.name) && (
-                                <Tooltip tip={diagState === 'running' ? 'Wait for diagnostics to finish before killing a process' : killTip(p.name)}>
-                                  <button
-                                    onClick={() => withAuth(() => setKillTarget({ pid: p.pid, name: p.name }))}
-                                    disabled={killing !== null || diagState === 'running'}
-                                    className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    {killing === p.pid ? '...' : 'Kill'}
-                                  </button>
-                                </Tooltip>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+              {diagState === 'running' && diagLines.length === 0 && (
+                <div className="space-y-2 shrink-0">
+                  <p className="text-zinc-300 text-sm font-medium">Running Performance Check...</p>
+                  <ProgressBar />
                 </div>
+              )}
+
+              {diagState === 'running' && diagLines.length > 0 && (
+                <p className="text-zinc-500 text-xs shrink-0">Refreshing...</p>
+              )}
+
+              {diagError && vmNotRunning(diagLines) && (
+                <p className="text-amber-400 text-sm shrink-0">
+                  The VM is not running — start it from My VMs, then Refresh.
+                </p>
+              )}
+
+              {diagError && !vmNotRunning(diagLines) && (
+                <p className="text-red-400 text-xs shrink-0">{diagError}</p>
+              )}
+
+              {diagLines.length > 0 && !vmNotRunning(diagLines) && (
+                <DiagReport sections={parseDiagReport(diagLines)} />
               )}
             </div>
           </div>
 
-          {/* Right column: Diagnostics (full height) */}
-          <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3 min-h-0">
-            <Tooltip tip="Runs a guest-side check for common performance problems: Guest Additions modules, swap pressure, NIC and storage driver recommendations">
-              <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default shrink-0">Diagnostics</h2>
-            </Tooltip>
+          {/* Right column: Running Processes (full height) */}
+          <div className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-2 min-h-0 overflow-hidden">
+            <div className="flex items-center shrink-0">
+              <Tooltip tip="Top 14 processes inside the VM by CPU usage, sampled via guestcontrol — updates every 5 seconds">
+                <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default">Running Processes</h2>
+              </Tooltip>
+            </div>
 
-            {diagState === 'idle' && !vmUser && (
-              <p className="text-amber-400 text-xs shrink-0">No credentials saved — open Detail to set them.</p>
+            {procState === 'idle' && (
+              <p className="text-zinc-500 text-xs">Loading...</p>
+            )}
+            {procState === 'loading' && (
+              <p className="text-zinc-400 text-xs">Sampling CPU usage...</p>
+            )}
+            {procState === 'stopped' && (
+              <p className="text-zinc-500 text-xs">VM is not running.</p>
+            )}
+            {procState === 'no-credentials' && (
+              <p className="text-zinc-500 text-xs">No credentials saved — run a provisioning script first.</p>
+            )}
+            {procState === 'error' && (
+              <p className="text-red-400 text-xs font-mono break-words">{procError}</p>
             )}
 
-            {diagState === 'running' && diagLines.length === 0 && (
-              <div className="space-y-2 shrink-0">
-                <p className="text-zinc-300 text-sm font-medium">Running Performance Check...</p>
-                <ProgressBar />
+            {procState === 'ok' && procSnapshot && (
+              <div className="space-y-2">
+                <UsageBar label="CPU" used={Math.round(procSnapshot.cpuPct)} total={100} unit="%" tip="Overall CPU usage across all cores, sampled over 500 ms from /proc/stat" />
+                <UsageBar label="RAM" used={procSnapshot.ramUsedMB} total={procSnapshot.ramTotalMB} unit="MB" tip="Physical memory usage reported by free -m inside the VM" />
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-zinc-500 border-b border-zinc-700">
+                      <th className="text-left pb-2 pr-2 font-medium"><Tooltip tip="Process name (comm field from ps)">Name</Tooltip></th>
+                      <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="CPU usage averaged over the process lifetime">CPU %</Tooltip></th>
+                      <th className="text-right pb-2 pr-2 font-medium"><Tooltip tip="Resident Set Size — physical RAM currently held by this process, in MB">RSS MB</Tooltip></th>
+                      <th className="pb-2 font-medium"><Tooltip tip="Force-stop a runaway or stuck process — disabled while diagnostics are running">Kill</Tooltip></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {procSnapshot.processes.map((p) => {
+                      const heavy = p.cpu > CPU_WARN || p.rssMB > RSS_WARN
+                      return (
+                        <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
+                          <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">
+                            {PROC_DESC[p.name] ? (
+                              <Tooltip tip={PROC_DESC[p.name]}>
+                                <span>{p.name}</span>
+                              </Tooltip>
+                            ) : (
+                              <span>{p.name}</span>
+                            )}
+                          </td>
+                          <td className="py-1 pr-2 text-right font-mono">{p.cpu.toFixed(1)}</td>
+                          <td className="py-1 pr-2 text-right font-mono">{p.rssMB}</td>
+                          <td className="py-1 text-right">
+                            {!CRITICAL_PROCS.has(p.name) && (
+                              <Tooltip tip={diagState === 'running' ? 'Wait for diagnostics to finish before killing a process' : killTip(p.name)}>
+                                <button
+                                  onClick={() => withAuth(() => setKillTarget({ pid: p.pid, name: p.name }))}
+                                  disabled={killing !== null || diagState === 'running'}
+                                  className="px-1.5 py-0.5 text-xs bg-red-900 hover:bg-red-700 text-red-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {killing === p.pid ? '...' : 'Kill'}
+                                </button>
+                              </Tooltip>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-
-            {diagState === 'running' && diagLines.length > 0 && (
-              <p className="text-zinc-500 text-xs shrink-0">Refreshing...</p>
-            )}
-
-            {diagError && vmNotRunning(diagLines) && (
-              <p className="text-amber-400 text-sm shrink-0">
-                The VM is not running — start it from My VMs, then Refresh.
-              </p>
-            )}
-
-            {diagError && !vmNotRunning(diagLines) && (
-              <p className="text-red-400 text-xs shrink-0">{diagError}</p>
-            )}
-
-            {diagLines.length > 0 && !vmNotRunning(diagLines) && (
-              <DiagReport sections={parseDiagReport(diagLines)} />
             )}
           </div>
 
@@ -655,6 +670,7 @@ const PROC_DESC: Record<string, string> = {
   'fprintd':           'Fingerprint authentication daemon',
   'bash':              'Bash shell session',
   'sh':                'POSIX shell session',
+  'awk':               'Text-processing tool — here it\'s the sampling script itself parsing /proc/stat, free and ps output',
   'python3':           'Python 3 interpreter',
   'python':            'Python interpreter',
   'node':              'Node.js runtime',
@@ -794,7 +810,7 @@ const PROC_DESC: Record<string, string> = {
   'rcu_preempt':       'Kernel RCU (Read-Copy-Update) grace-period thread for the preemptible RCU flavour',
   'rcu_tasks_kthread': 'Kernel RCU-tasks grace-period housekeeping thread',
   'rcu_tasks_rude_kthread': 'Kernel RCU-tasks-rude grace-period housekeeping thread',
-  'rcu_exp_gp_kthread_worker': 'Kernel thread that drives expedited RCU grace periods',
+  'rcu_exp_gp_kthr':   'Kernel thread that drives expedited RCU grace periods',
   'btrfs-cleaner':     'Btrfs kernel thread that cleans up deleted subvolumes and unused extents',
   'btrfs-transaction': 'Btrfs kernel thread that commits filesystem transactions',
 
@@ -903,7 +919,7 @@ function diagTip(text: string): string | undefined {
 function DiagReport({ sections }: { sections: DiagSection[] }) {
   if (sections.length === 0) return null
   return (
-    <div className="grid grid-cols-3 gap-x-6 gap-y-4 pt-1">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1">
       {sections.map((sec) => (
         <div key={sec.title}>
           <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider mb-1.5">{sec.title}</p>
