@@ -194,7 +194,7 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
 
           {/* Selected check detail */}
           {selectedCheck && (
-            <div>
+            <div className="pb-8">
               <div className="flex items-center gap-3 mb-3">
                 <span
                   className={`text-xs font-mono font-bold px-2 py-1 rounded ${STATUS_BADGE[selectedCheck.status]}`}
@@ -239,22 +239,18 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
           title="Disable Hyper-V"
           description={<>
             <p>
-              <strong className="text-zinc-300">What is Hyper-V?</strong><br />
-              Hyper-V is Microsoft's built-in hypervisor — the same type of software as VirtualBox, but
-              made by Windows. When active, it takes exclusive control of your CPU's virtualisation hardware,
-              leaving VirtualBox unable to access it. This causes VMs to fail to start or run very slowly.
-            </p>
-            <p>
-              You do not need Hyper-V to use VirtualBox. Disabling it frees the hardware for VirtualBox.
+              Hyper-V is Microsoft's hypervisor. When active it claims the CPU's virtualisation hardware,
+              so VirtualBox can't use it — VMs fail to start or run very slowly. VirtualBox doesn't need
+              Hyper-V, so disabling it is safe.
             </p>
             <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
-              <strong>On Windows Home:</strong> the command below will fail with "Feature name
-              Microsoft-Hyper-V-All is unknown" — that's expected, not an error to fix. Home editions don't
-              ship the Hyper-V feature package at all, so it was never the cause here. Check the Windows
-              Hypervisor Platform and Virtual Machine Platform checks instead.
+              <strong>On Windows Home:</strong> the command below fails with "Feature name
+              Microsoft-Hyper-V-All is unknown" — expected, not an error. Home doesn't ship Hyper-V, so
+              check Windows Hypervisor Platform / Virtual Machine Platform instead.
             </p>
           </>}
           commands={['Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All']}
+          elevated
         />
       )
 
@@ -264,31 +260,18 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
           title="Disable Windows Hypervisor Platform"
           description={<>
             <p>
-              <strong className="text-zinc-300">What is Windows Hypervisor Platform?</strong><br />
-              It is a Windows feature that exposes Hyper-V virtualisation APIs to third-party applications
-              such as Android emulators or WSL2. Like Hyper-V itself, it competes with VirtualBox for
-              control of the CPU's virtualisation hardware.
-            </p>
-            <p>
-              VirtualBox 7+ can coexist with it, but older versions cannot. If you are on VirtualBox 6.x
-              or experiencing VM startup failures, disabling it is the safest fix.
-            </p>
-            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
-              <strong>Run in an elevated PowerShell</strong> (Run as Administrator), then reboot for the
-              change to take effect.
+              Exposes Hyper-V's virtualisation APIs to apps like Android emulators or WSL2, competing with
+              VirtualBox for the CPU's virtualisation hardware. VirtualBox 7+ tolerates it, but disabling
+              it is the safest fix for VM startup failures or slowness.
             </p>
             <p className="text-zinc-500">
-              This setting persists across reboots and normal Windows Updates — it won't silently revert on
-              its own. It can, however, get re-enabled automatically the next time you install or update
-              something that needs the hypervisor (Android Studio's emulator, WSL, Docker Desktop). If
-              VirtualBox slows down again later, that's the first thing to check.
-            </p>
-            <p className="text-zinc-500">
-              To re-enable later: <code className="bg-zinc-900 px-1 rounded">Enable-WindowsOptionalFeature
-              -Online -FeatureName HypervisorPlatform -All</code>, then reboot.
+              Persists until reversed, but gets re-enabled automatically by things like WSL or Android
+              Studio's emulator. Re-enable: <code className="bg-zinc-900 px-1 rounded">Enable-WindowsOptionalFeature
+              -Online -FeatureName HypervisorPlatform -All</code>.
             </p>
           </>}
           commands={['Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform']}
+          elevated
         />
       )
 
@@ -298,34 +281,13 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
           title="Disable Virtual Machine Platform"
           description={<>
             <p>
-              <strong className="text-zinc-300">What is Virtual Machine Platform?</strong><br />
-              It is a Windows feature that provides the underlying infrastructure for WSL2 (Windows Subsystem
-              for Linux) and other virtualisation-based tools. Like Hyper-V, it uses the CPU's virtualisation
-              hardware and can interfere with VirtualBox on older versions.
-            </p>
-            <p>
-              VirtualBox 7+ tolerates it, but if you are on an older version or seeing VM startup or
-              performance issues (VMs starting very slowly is a common symptom), disabling it is the safest
-              option. Note: disabling this will also disable WSL2 and Docker Desktop's WSL2 backend until
-              you re-enable it.
-            </p>
-            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
-              <strong>Run each command below in an elevated PowerShell</strong> (Run as Administrator), in
-              order, then reboot for the change to take effect.
+              Underlies WSL2 and other virtualisation tools; like Hyper-V it claims the CPU's virtualisation
+              hardware. VirtualBox 7+ tolerates it, but disabling it fixes VM startup/slowness issues. This
+              also disables WSL2 until re-enabled.
             </p>
             <p className="text-zinc-500">
-              Both the feature toggle and the <code className="bg-zinc-900 px-1 rounded">bcdedit</code> setting
-              persist across reboots and normal Windows Updates — they won't silently revert on their own.
-              They can, however, get re-enabled automatically the next time you reinstall/update WSL, install
-              Docker Desktop's WSL2 backend, or run <code className="bg-zinc-900 px-1 rounded">wsl --install</code> —
-              those installers commonly turn Virtual Machine Platform (and the boot flag) back on for their
-              own needs. If VirtualBox slows down again later, that's the first thing to check.
-            </p>
-            <p className="text-zinc-500">
-              To re-enable WSL2 later: <code className="bg-zinc-900 px-1 rounded">Enable-WindowsOptionalFeature
-              -Online -FeatureName VirtualMachinePlatform -All</code>, set{' '}
-              <code className="bg-zinc-900 px-1 rounded">bcdedit /set hypervisorlaunchtype auto</code>, and
-              reboot.
+              Persists until reversed, but reinstalling WSL, Docker Desktop, or <code className="bg-zinc-900 px-1 rounded">wsl --install</code> will
+              typically re-enable it.
             </p>
           </>}
           commands={[
@@ -334,6 +296,7 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
             'bcdedit /set hypervisorlaunchtype off',
             'Restart-Computer',
           ]}
+          elevated
         />
       )
 
@@ -342,16 +305,10 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
         <FixInstructions
           title="Enable CPU Virtualisation in BIOS"
           description={<>
-            <p>
-              <strong className="text-zinc-300">What is CPU Virtualisation?</strong><br />
-              It is a hardware feature (Intel VT-x or AMD-V) built into your processor that lets your PC
-              run virtual machines. VirtualBox requires it.
-            </p>
             <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
-              <strong>Note:</strong> Windows does not always detect this setting correctly — it may report
-              it as disabled even when it is on. Try starting a VM first. If it works, no action is needed.
+              <strong>Note:</strong> Windows doesn't always detect this correctly — try starting a VM
+              first; if it works, no action is needed.
             </p>
-            <p><strong className="text-zinc-300">How to enable it:</strong></p>
             <ol className="list-decimal list-inside space-y-1 pl-1">
               <li>Restart your PC.</li>
               <li>
@@ -365,7 +322,6 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
               <li>Look for <em>Intel VT-x</em>, <em>AMD-V</em>, <em>SVM</em>, or <em>Virtualisation Technology</em>.</li>
               <li>Set it to <strong>Enabled</strong>, save and reboot.</li>
             </ol>
-            <p className="text-zinc-500">The exact location depends on your motherboard manufacturer.</p>
           </>}
         />
       )
@@ -374,18 +330,7 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
       return (
         <FixInstructions
           title="Secure Boot"
-          description={<>
-            <p>
-              <strong className="text-zinc-300">What is Secure Boot?</strong><br />
-              Secure Boot is a UEFI security feature that prevents unsigned or untrusted software from
-              loading during startup.
-            </p>
-            <p>
-              VirtualBox 7+ is signed and fully supports Secure Boot — no action is needed if you are on
-              VirtualBox 7 or later. If you are on an older version and experiencing driver signing errors,
-              you may need to disable Secure Boot in your BIOS/UEFI settings.
-            </p>
-          </>}
+          description="VirtualBox 7+ is signed and fully supports Secure Boot — no action needed on VirtualBox 7+. On an older version with driver signing errors, disable Secure Boot in BIOS/UEFI."
         />
       )
 
@@ -469,9 +414,10 @@ interface FixInstructionsProps {
   title: string
   description: React.ReactNode
   commands?: string[]
+  elevated?: boolean
 }
 
-function FixInstructions({ title, description, commands }: FixInstructionsProps) {
+function FixInstructions({ title, description, commands, elevated }: FixInstructionsProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
   function copyCommand(cmd: string, index: number) {
@@ -483,6 +429,8 @@ function FixInstructions({ title, description, commands }: FixInstructionsProps)
   return (
     <div className="space-y-2">
       <p className="text-zinc-200 text-sm font-bold">{title}</p>
+
+      <div className="text-zinc-400 text-sm space-y-2 break-words">{description}</div>
 
       {commands && commands.length > 0 && (
         <div className="space-y-1.5 mt-1">
@@ -502,7 +450,9 @@ function FixInstructions({ title, description, commands }: FixInstructionsProps)
         </div>
       )}
 
-      <div className="text-zinc-400 text-sm space-y-2">{description}</div>
+      {elevated && (
+        <p className="text-zinc-500 text-xs">Run as Administrator, then reboot to apply.</p>
+      )}
     </div>
   )
 }
