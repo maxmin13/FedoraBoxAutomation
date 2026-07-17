@@ -57,6 +57,20 @@ function Write-Section {
     Write-Host $Title -ForegroundColor Cyan
 }
 
+# Get-WindowsOptionalFeature requires elevation. When it fails (the common
+# case for a non-admin run of the Electron GUI), fall back to systeminfo's
+# "A hypervisor has been detected" line — it doesn't require Administrator
+# and reliably reports whether *some* Windows hypervisor (Hyper-V, WHP, or
+# WSL2's Virtual Machine Platform) is active, even though it can't say which
+# one. Cached because all three checks below hit this fallback together.
+function Test-SysteminfoHypervisorDetected {
+    if (-not $script:sysinfoHvChecked) {
+        $script:sysinfoHvChecked  = $true
+        $script:sysinfoHvDetected = [bool](systeminfo | Select-String "A hypervisor has been detected")
+    }
+    return $script:sysinfoHvDetected
+}
+
 # ── 1. OS VERSION ─────────────────────────────────────────────────────────────
 
 Write-Section "[1] Operating System"
@@ -195,8 +209,14 @@ try {
         Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'pass' -Detail "Not enabled"
     }
 } catch {
-    Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
-        -Detail "Could not check Hyper-V status (run as Administrator for accurate results)."
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature (run as Administrator), but a Windows hypervisor is active - this can slow VirtualBox VMs significantly."
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details), but systeminfo reports a Windows hypervisor is active - likely Hyper-V, Windows Hypervisor Platform, or WSL2's Virtual Machine Platform. This forces VirtualBox into a slower compatibility mode, which can make VMs noticeably slower to start and run. Disable the feature you don't need (e.g. 'wsl --shutdown' plus disabling Virtual Machine Platform) and reboot to restore full speed."
+    } else {
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
+            -Detail "Could not check Hyper-V status (run as Administrator for accurate results)."
+    }
 }
 
 # ── 6. WINDOWS HYPERVISOR PLATFORM ───────────────────────────────────────────
@@ -216,8 +236,14 @@ try {
         Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'pass' -Detail "Not enabled"
     }
 } catch {
-    Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
-        -Detail "Could not check Windows Hypervisor Platform status (run as Administrator)."
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
+    } else {
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
+            -Detail "Could not check Windows Hypervisor Platform status (run as Administrator)."
+    }
 }
 
 # ── 7. VIRTUAL MACHINE PLATFORM ───────────────────────────────────────────────
@@ -237,8 +263,14 @@ try {
         Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'pass' -Detail "Not enabled"
     }
 } catch {
-    Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
-        -Detail "Could not check Virtual Machine Platform status (run as Administrator)."
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
+    } else {
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
+            -Detail "Could not check Virtual Machine Platform status (run as Administrator)."
+    }
 }
 
 # ── 8. SECURE BOOT ────────────────────────────────────────────────────────────

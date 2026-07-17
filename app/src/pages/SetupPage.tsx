@@ -133,22 +133,32 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
         {checks.length > 0 && (
           <div className="w-56 shrink-0 flex flex-col gap-1 overflow-y-auto min-h-0">
             {checks.map((check) => (
-              <button
-                key={check.id}
-                onClick={() => { window.electronAPI.logUiAction(`setup: select check "${check.label}"`); setSelectedId(check.id) }}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors border ${
-                  selectedId === check.id
-                    ? 'bg-zinc-600 border-zinc-500'
-                    : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'
-                }`}
-              >
-                <span
-                  className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${STATUS_BADGE[check.status]}`}
+              <div key={check.id}>
+                {/* hyperv/whp/vmp all flag the same underlying symptom — a
+                    Windows hypervisor claiming VT-x from VirtualBox — so
+                    they're grouped under one label to signal they're related,
+                    not three unrelated failures. */}
+                {check.id === 'hyperv' && (
+                  <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider px-3 pt-2 pb-1">
+                    Hypervisor
+                  </p>
+                )}
+                <button
+                  onClick={() => { window.electronAPI.logUiAction(`setup: select check "${check.label}"`); setSelectedId(check.id) }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors border ${
+                    selectedId === check.id
+                      ? 'bg-zinc-600 border-zinc-500'
+                      : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'
+                  }`}
                 >
-                  {STATUS_ICON[check.status]}
-                </span>
-                <span className="text-zinc-100 text-sm font-medium truncate">{check.label}</span>
-              </button>
+                  <span
+                    className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${STATUS_BADGE[check.status]}`}
+                  >
+                    {STATUS_ICON[check.status]}
+                  </span>
+                  <span className="text-zinc-100 text-sm font-medium truncate">{check.label}</span>
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -237,8 +247,14 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
             <p>
               You do not need Hyper-V to use VirtualBox. Disabling it frees the hardware for VirtualBox.
             </p>
+            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
+              <strong>On Windows Home:</strong> the command below will fail with "Feature name
+              Microsoft-Hyper-V-All is unknown" — that's expected, not an error to fix. Home editions don't
+              ship the Hyper-V feature package at all, so it was never the cause here. Check the Windows
+              Hypervisor Platform and Virtual Machine Platform checks instead.
+            </p>
           </>}
-          command="Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All"
+          commands={['Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All']}
         />
       )
 
@@ -257,8 +273,22 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
               VirtualBox 7+ can coexist with it, but older versions cannot. If you are on VirtualBox 6.x
               or experiencing VM startup failures, disabling it is the safest fix.
             </p>
+            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
+              <strong>Run in an elevated PowerShell</strong> (Run as Administrator), then reboot for the
+              change to take effect.
+            </p>
+            <p className="text-zinc-500">
+              This setting persists across reboots and normal Windows Updates — it won't silently revert on
+              its own. It can, however, get re-enabled automatically the next time you install or update
+              something that needs the hypervisor (Android Studio's emulator, WSL, Docker Desktop). If
+              VirtualBox slows down again later, that's the first thing to check.
+            </p>
+            <p className="text-zinc-500">
+              To re-enable later: <code className="bg-zinc-900 px-1 rounded">Enable-WindowsOptionalFeature
+              -Online -FeatureName HypervisorPlatform -All</code>, then reboot.
+            </p>
           </>}
-          command="Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform"
+          commands={['Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform']}
         />
       )
 
@@ -274,11 +304,36 @@ function getActionForCheck(check: CheckResult): React.ReactNode | undefined {
               hardware and can interfere with VirtualBox on older versions.
             </p>
             <p>
-              VirtualBox 7+ tolerates it, but if you are on an older version or seeing VM startup issues,
-              disabling it is the safest option. Note: disabling this will also disable WSL2.
+              VirtualBox 7+ tolerates it, but if you are on an older version or seeing VM startup or
+              performance issues (VMs starting very slowly is a common symptom), disabling it is the safest
+              option. Note: disabling this will also disable WSL2 and Docker Desktop's WSL2 backend until
+              you re-enable it.
+            </p>
+            <p className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-zinc-300">
+              <strong>Run each command below in an elevated PowerShell</strong> (Run as Administrator), in
+              order, then reboot for the change to take effect.
+            </p>
+            <p className="text-zinc-500">
+              Both the feature toggle and the <code className="bg-zinc-900 px-1 rounded">bcdedit</code> setting
+              persist across reboots and normal Windows Updates — they won't silently revert on their own.
+              They can, however, get re-enabled automatically the next time you reinstall/update WSL, install
+              Docker Desktop's WSL2 backend, or run <code className="bg-zinc-900 px-1 rounded">wsl --install</code> —
+              those installers commonly turn Virtual Machine Platform (and the boot flag) back on for their
+              own needs. If VirtualBox slows down again later, that's the first thing to check.
+            </p>
+            <p className="text-zinc-500">
+              To re-enable WSL2 later: <code className="bg-zinc-900 px-1 rounded">Enable-WindowsOptionalFeature
+              -Online -FeatureName VirtualMachinePlatform -All</code>, set{' '}
+              <code className="bg-zinc-900 px-1 rounded">bcdedit /set hypervisorlaunchtype auto</code>, and
+              reboot.
             </p>
           </>}
-          command="Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform"
+          commands={[
+            'wsl --shutdown',
+            'Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform',
+            'bcdedit /set hypervisorlaunchtype off',
+            'Restart-Computer',
+          ]}
         />
       )
 
@@ -413,34 +468,37 @@ function InstallVirtualBoxAction() {
 interface FixInstructionsProps {
   title: string
   description: React.ReactNode
-  command?: string
+  commands?: string[]
 }
 
-function FixInstructions({ title, description, command }: FixInstructionsProps) {
-  const [copied, setCopied] = useState(false)
+function FixInstructions({ title, description, commands }: FixInstructionsProps) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
-  function copyCommand() {
-    if (!command) return
-    navigator.clipboard.writeText(command)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  function copyCommand(cmd: string, index: number) {
+    navigator.clipboard.writeText(cmd)
+    setCopiedIndex(index)
+    setTimeout(() => setCopiedIndex(null), 2000)
   }
 
   return (
     <div className="space-y-2">
       <p className="text-zinc-200 text-sm font-bold">{title}</p>
 
-      {command && (
-        <div className="flex items-center gap-2 mt-1">
-          <code className="bg-zinc-900 text-zinc-200 text-xs px-3 py-1.5 rounded font-mono flex-1 overflow-x-auto">
-            {command}
-          </code>
-          <button
-            onClick={copyCommand}
-            className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded shrink-0"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
+      {commands && commands.length > 0 && (
+        <div className="space-y-1.5 mt-1">
+          {commands.map((cmd, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <code className="bg-zinc-900 text-zinc-200 text-xs px-3 py-1.5 rounded font-mono flex-1 overflow-x-auto">
+                {cmd}
+              </code>
+              <button
+                onClick={() => copyCommand(cmd, i)}
+                className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded shrink-0"
+              >
+                {copiedIndex === i ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

@@ -357,6 +357,23 @@ Describe 'Hyper-V Check' -Tag 'HyperVCheck' {
         $result = Get-CheckResult -Id 'hyperv'
         $result.status | Should -Be 'warn'
     }
+
+    It 'falls back to the systeminfo hypervisor hint when not elevated and a hypervisor is detected' {
+        Mock Get-WindowsOptionalFeature { throw 'The requested operation requires elevation.' }
+        Mock systeminfo { return 'Hyper-V Requirements:          A hypervisor has been detected.' }
+        $result = Get-CheckResult -Id 'hyperv'
+        $result.status | Should -Be 'warn'
+        $result.detail | Should -Match 'systeminfo reports a Windows hypervisor is active'
+    }
+
+    It 'falls back to the generic "run as Administrator" message when not elevated and no hypervisor is detected' {
+        Mock Get-WindowsOptionalFeature { throw 'The requested operation requires elevation.' }
+        Mock systeminfo { return 'Virtualization Enabled In Firmware: Yes' }
+        $result = Get-CheckResult -Id 'hyperv'
+        $result.status | Should -Be 'warn'
+        $result.detail | Should -Match 'run as Administrator'
+        $result.detail | Should -Not -Match 'systeminfo reports a Windows hypervisor is active'
+    }
 }
 
 # ── 7. WINDOWS HYPERVISOR PLATFORM CHECK ──────────────────────────────────────
@@ -379,6 +396,14 @@ Describe 'Windows Hypervisor Platform Check' -Tag 'WhpCheck' {
         $result = Get-CheckResult -Id 'whp'
         $result.status | Should -Be 'warn'
     }
+
+    It 'falls back to a short pointer at the Hyper-V check when not elevated and a hypervisor is detected' {
+        Mock Get-WindowsOptionalFeature { throw 'The requested operation requires elevation.' }
+        Mock systeminfo { return 'Hyper-V Requirements:          A hypervisor has been detected.' }
+        $result = Get-CheckResult -Id 'whp'
+        $result.status | Should -Be 'warn'
+        $result.detail | Should -Match 'see the Hyper-V check above'
+    }
 }
 
 # ── 8. VIRTUAL MACHINE PLATFORM CHECK ─────────────────────────────────────────
@@ -400,6 +425,14 @@ Describe 'Virtual Machine Platform Check' -Tag 'VmpCheck' {
         }
         $result = Get-CheckResult -Id 'vmp'
         $result.status | Should -Be 'warn'
+    }
+
+    It 'falls back to a short pointer at the Hyper-V check when not elevated and a hypervisor is detected' {
+        Mock Get-WindowsOptionalFeature { throw 'The requested operation requires elevation.' }
+        Mock systeminfo { return 'Hyper-V Requirements:          A hypervisor has been detected.' }
+        $result = Get-CheckResult -Id 'vmp'
+        $result.status | Should -Be 'warn'
+        $result.detail | Should -Match 'see the Hyper-V check above'
     }
 }
 
