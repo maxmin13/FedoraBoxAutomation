@@ -192,90 +192,9 @@ try {
     Add-Result -Id 'cpu' -Label 'CPU Virtualisation' -Status 'fail' -Detail "Check failed: $_"
 }
 
-# ── 5. HYPER-V ────────────────────────────────────────────────────────────────
+# ── 5. SECURE BOOT ────────────────────────────────────────────────────────────
 
-Write-Section "[5] Hyper-V"
-
-try {
-    $hyperv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All `
-        -ErrorAction SilentlyContinue
-
-    if ($hyperv -and $hyperv.State -eq "Enabled") {
-        Write-Check 'warn' "Hyper-V is ENABLED. This can conflict with VirtualBox."
-        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
-            -Detail "Hyper-V is enabled and may conflict with VirtualBox. Disable it and reboot."
-    } else {
-        Write-Check 'pass' "Hyper-V is not enabled (no conflict)"
-        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'pass' -Detail "Not enabled"
-    }
-} catch {
-    if (Test-SysteminfoHypervisorDetected) {
-        Write-Check 'warn' "Could not confirm which feature (run as Administrator), but a Windows hypervisor is active - this can slow VirtualBox VMs significantly."
-        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
-            -Detail "Could not check directly (run as Administrator for details), but systeminfo reports a Windows hypervisor is active - likely Hyper-V, Windows Hypervisor Platform, or WSL2's Virtual Machine Platform. This forces VirtualBox into a slower compatibility mode, which can make VMs noticeably slower to start and run. Disable the feature you don't need (e.g. 'wsl --shutdown' plus disabling Virtual Machine Platform) and reboot to restore full speed."
-    } else {
-        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
-            -Detail "Could not check Hyper-V status (run as Administrator for accurate results)."
-    }
-}
-
-# ── 6. WINDOWS HYPERVISOR PLATFORM ───────────────────────────────────────────
-
-Write-Section "[6] Windows Hypervisor Platform"
-
-try {
-    $whp = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform `
-        -ErrorAction SilentlyContinue
-
-    if ($whp -and $whp.State -eq "Enabled") {
-        Write-Check 'warn' "Windows Hypervisor Platform is ENABLED. May conflict with VirtualBox 6.x."
-        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
-            -Detail "Enabled. OK for VirtualBox 7+, may conflict with VirtualBox 6.x."
-    } else {
-        Write-Check 'pass' "Windows Hypervisor Platform is not enabled"
-        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'pass' -Detail "Not enabled"
-    }
-} catch {
-    if (Test-SysteminfoHypervisorDetected) {
-        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
-        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
-            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
-    } else {
-        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
-            -Detail "Could not check Windows Hypervisor Platform status (run as Administrator)."
-    }
-}
-
-# ── 7. VIRTUAL MACHINE PLATFORM ───────────────────────────────────────────────
-
-Write-Section "[7] Virtual Machine Platform (WSL2)"
-
-try {
-    $vmp = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform `
-        -ErrorAction SilentlyContinue
-
-    if ($vmp -and $vmp.State -eq "Enabled") {
-        Write-Check 'warn' "Virtual Machine Platform (WSL2) is ENABLED."
-        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
-            -Detail "Enabled. Use VirtualBox 7+ to avoid conflicts."
-    } else {
-        Write-Check 'pass' "Virtual Machine Platform is not enabled"
-        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'pass' -Detail "Not enabled"
-    }
-} catch {
-    if (Test-SysteminfoHypervisorDetected) {
-        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
-        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
-            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
-    } else {
-        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
-            -Detail "Could not check Virtual Machine Platform status (run as Administrator)."
-    }
-}
-
-# ── 8. SECURE BOOT ────────────────────────────────────────────────────────────
-
-Write-Section "[8] Secure Boot"
+Write-Section "[5] Secure Boot"
 
 try {
     $sb = Confirm-SecureBootUEFI -ErrorAction Stop
@@ -292,9 +211,9 @@ try {
         -Detail "Could not detect status. Run as Administrator for accurate results."
 }
 
-# ── 9. VIRTUALBOX INSTALLATION ────────────────────────────────────────────────
+# ── 6. VIRTUALBOX INSTALLATION ────────────────────────────────────────────────
 
-Write-Section "[9] VirtualBox Installation"
+Write-Section "[6] VirtualBox Installation"
 
 try {
     $vbox = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* `
@@ -321,9 +240,9 @@ try {
     Add-Result -Id 'vboxinst' -Label 'VirtualBox' -Status 'fail' -Detail "Check failed: $_"
 }
 
-# ── 10. POWERSHELL VERSION ────────────────────────────────────────────────────
+# ── 7. POWERSHELL VERSION ────────────────────────────────────────────────────
 
-Write-Section "[10] PowerShell Version"
+Write-Section "[7] PowerShell Version"
 
 try {
     $psVersion = $PSVersionTable.PSVersion
@@ -343,6 +262,87 @@ try {
     Add-Result -Id 'posh' -Label 'PowerShell Version' -Status 'fail' -Detail "Check failed: $_"
 }
 
+# ── 8. HYPER-V ────────────────────────────────────────────────────────────────
+
+Write-Section "[8] Hyper-V"
+
+try {
+    $hyperv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All `
+        -ErrorAction SilentlyContinue
+
+    if ($hyperv -and $hyperv.State -eq "Enabled") {
+        Write-Check 'warn' "Hyper-V is ENABLED. This can conflict with VirtualBox."
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
+            -Detail "Hyper-V is enabled and may conflict with VirtualBox. Disable it and reboot."
+    } else {
+        Write-Check 'pass' "Hyper-V is not enabled (no conflict)"
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'pass' -Detail "Not enabled"
+    }
+} catch {
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature (run as Administrator), but a Windows hypervisor is active - this can slow VirtualBox VMs significantly."
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details), but systeminfo reports a Windows hypervisor is active - likely Hyper-V, Windows Hypervisor Platform, or WSL2's Virtual Machine Platform. This forces VirtualBox into a slower compatibility mode, which can make VMs noticeably slower to start and run. Disable the feature you don't need (e.g. 'wsl --shutdown' plus disabling Virtual Machine Platform) and reboot to restore full speed."
+    } else {
+        Add-Result -Id 'hyperv' -Label 'Hyper-V' -Status 'warn' `
+            -Detail "Could not check Hyper-V status (run as Administrator for accurate results)."
+    }
+}
+
+# ── 9. WINDOWS HYPERVISOR PLATFORM ───────────────────────────────────────────
+
+Write-Section "[9] Windows Hypervisor Platform"
+
+try {
+    $whp = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform `
+        -ErrorAction SilentlyContinue
+
+    if ($whp -and $whp.State -eq "Enabled") {
+        Write-Check 'warn' "Windows Hypervisor Platform is ENABLED. May conflict with VirtualBox 6.x."
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
+            -Detail "Enabled. OK for VirtualBox 7+, may conflict with VirtualBox 6.x."
+    } else {
+        Write-Check 'pass' "Windows Hypervisor Platform is not enabled"
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'pass' -Detail "Not enabled"
+    }
+} catch {
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
+    } else {
+        Add-Result -Id 'whp' -Label 'Windows Hypervisor Platform' -Status 'warn' `
+            -Detail "Could not check Windows Hypervisor Platform status (run as Administrator)."
+    }
+}
+
+# ── 10. VIRTUAL MACHINE PLATFORM ──────────────────────────────────────────────
+
+Write-Section "[10] Virtual Machine Platform (WSL2)"
+
+try {
+    $vmp = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform `
+        -ErrorAction SilentlyContinue
+
+    if ($vmp -and $vmp.State -eq "Enabled") {
+        Write-Check 'warn' "Virtual Machine Platform (WSL2) is ENABLED."
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
+            -Detail "Enabled. Use VirtualBox 7+ to avoid conflicts."
+    } else {
+        Write-Check 'pass' "Virtual Machine Platform is not enabled"
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'pass' -Detail "Not enabled"
+    }
+} catch {
+    if (Test-SysteminfoHypervisorDetected) {
+        Write-Check 'warn' "Could not confirm which feature is responsible - see the Hyper-V check for details."
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
+            -Detail "Could not check directly (run as Administrator for details). A Windows hypervisor was detected on this system - see the Hyper-V check above for what this means and how to fix it."
+    } else {
+        Add-Result -Id 'vmp' -Label 'Virtual Machine Platform (WSL2)' -Status 'warn' `
+            -Detail "Could not check Virtual Machine Platform status (run as Administrator)."
+    }
+}
+
 # ── OUTPUT ────────────────────────────────────────────────────────────────────
 
 if ($Json) {
@@ -359,4 +359,3 @@ if ($Json) {
     Write-Host "  PASS = ready  |  WARN = review  |  FAIL = fix before continuing"
     Write-Host ""
 }
-

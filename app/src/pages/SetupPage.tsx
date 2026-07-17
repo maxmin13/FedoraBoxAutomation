@@ -131,7 +131,7 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
 
         {/* Left: check list — only shown once results exist */}
         {checks.length > 0 && (
-          <div className="w-56 shrink-0 flex flex-col gap-1 overflow-y-auto min-h-0">
+          <div className="w-72 shrink-0 flex flex-col gap-1">
             {checks.map((check) => (
               <div key={check.id}>
                 {/* hyperv/whp/vmp all flag the same underlying symptom — a
@@ -139,24 +139,24 @@ export default function SetupPage({ onScriptRunning }: { onScriptRunning: (runni
                     they're grouped under one label to signal they're related,
                     not three unrelated failures. */}
                 {check.id === 'hyperv' && (
-                  <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider px-3 pt-2 pb-1">
+                  <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider px-3 pt-1.5 pb-0.5">
                     Hypervisor
                   </p>
                 )}
                 <button
                   onClick={() => { window.electronAPI.logUiAction(`setup: select check "${check.label}"`); setSelectedId(check.id) }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors border ${
+                  className={`w-full flex items-start gap-3 px-3 py-1.5 rounded-lg text-left transition-colors border ${
                     selectedId === check.id
                       ? 'bg-zinc-600 border-zinc-500'
                       : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'
                   }`}
                 >
                   <span
-                    className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${STATUS_BADGE[check.status]}`}
+                    className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${STATUS_BADGE[check.status]}`}
                   >
                     {STATUS_ICON[check.status]}
                   </span>
-                  <span className="text-zinc-100 text-sm font-medium truncate">{check.label}</span>
+                  <span className="text-zinc-100 text-sm font-medium leading-tight">{check.label}</span>
                 </button>
               </div>
             ))}
