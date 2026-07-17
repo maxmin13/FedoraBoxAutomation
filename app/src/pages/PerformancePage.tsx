@@ -433,8 +433,8 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
                       return (
                         <tr key={p.pid} className={`border-b border-zinc-700/50 ${heavy ? 'text-amber-300' : 'text-zinc-300'}`}>
                           <td className="py-1 pr-2 font-medium truncate max-w-[7rem]">
-                            {PROC_DESC[p.name] ? (
-                              <Tooltip tip={PROC_DESC[p.name]}>
+                            {procDesc(p.name) ? (
+                              <Tooltip tip={procDesc(p.name)!}>
                                 <span>{p.name}</span>
                               </Tooltip>
                             ) : (
@@ -674,6 +674,8 @@ const PROC_DESC: Record<string, string> = {
   'python3':           'Python 3 interpreter',
   'python':            'Python interpreter',
   'node':              'Node.js runtime',
+  'claude':            'Claude Code CLI session',
+  'code':              'Visual Studio Code — appears as multiple rows because Electron apps split into separate main, renderer, GPU and utility processes that all share this name',
   'java':              'Java virtual machine',
   'nginx':             'Nginx web and proxy server',
   'httpd':             'Apache HTTP server',
@@ -814,6 +816,12 @@ const PROC_DESC: Record<string, string> = {
   'btrfs-cleaner':     'Btrfs kernel thread that cleans up deleted subvolumes and unused extents',
   'btrfs-transaction': 'Btrfs kernel thread that commits filesystem transactions',
 
+  // ── Per-CPU kernel threads (name carries a "/<core>" suffix) ────────────────
+  'ksoftirqd':         'Per-CPU kernel thread that runs software interrupt (softirq) handlers when load is too high for interrupt context',
+  'migration':         'Per-CPU kernel thread that migrates tasks between CPUs for the scheduler',
+  'cpuhp':             'Per-CPU kernel thread that handles CPU hotplug state transitions',
+  'idle_inject':       'Per-CPU kernel thread used for thermal/power capping by injecting idle time',
+
   // ── More VirtualBox / display / network ─────────────────────────────────────
   'VBoxDRMClient':     'VirtualBox Guest Additions helper that resizes the display via the kernel DRM driver',
   'VBoxService <defunct>': 'A VBoxService process that has exited but not yet been reaped by its parent — usually harmless',
@@ -833,7 +841,13 @@ const CRITICAL_PROCS = new Set([
 ])
 
 function killTip(name: string): string {
-  return PROC_DESC[name] ?? 'Use for stuck or resource-heavy processes'
+  return procDesc(name) ?? 'Use for stuck or resource-heavy processes'
+}
+
+// Per-CPU kernel threads are named "<base>/<core>" (e.g. ksoftirqd/11) — the
+// core number varies with vCPU count, so fall back to the base name.
+function procDesc(name: string): string | undefined {
+  return PROC_DESC[name] ?? PROC_DESC[name.replace(/\/\d+$/, '')]
 }
 
 // ── KillModal ─────────────────────────────────────────────────────────────────
