@@ -35,16 +35,53 @@ cpu_pct=$(awk "BEGIN {
 read -r ram_total ram_used ram_free <<< "$(free -m | awk 'NR==2{print $2, $3, $4}')"
 
 # ── Top 14 processes by CPU ──────────────────────────────────────────────────
-procs_json=$(ps -eo pid,comm,%cpu,%mem,rss --sort=-%cpu --no-headers \
-    | awk 'BEGIN { sep="" } $2 != "ps" && $3 ~ /^[0-9]/ {
+# comm alone collapses multi-process apps (Electron, JVMs, node scripts) into
+# indistinguishable rows, so pull a disambiguating suffix from the full args:
+# a Chromium/Electron --type= role, else the basename of the first script/jar
+# argument (e.g. "node (server.js)", "java (app.jar)"). The top-level process
+# of an app usually has neither (no --type=, no extra path argument) — once
+# every row is collected, any bare name that shares its base with a suffixed
+# sibling is labelled "(main)" so it's not left looking unidentified.
+procs_json=$(ps -eo pid,comm,%cpu,%mem,rss,args --sort=-%cpu --no-headers \
+    | awk '$2 != "ps" && $3 ~ /^[0-9]/ {
         if (n >= 14) exit
-        name = $2
-        gsub(/"/, "", name)
-        gsub(/[<>]/, "", name)
-        printf "%s{\"pid\":%s,\"name\":\"%s\",\"cpu\":%s,\"mem\":%s,\"rssMB\":%d}",
-            sep, $1, name, $3, $4, $5 / 1024
-        sep = ","
+        base = $2
+        gsub(/"/, "", base)
+        gsub(/[<>]/, "", base)
+
+        args = ""
+        for (i = 6; i <= NF; i++) args = args (i > 6 ? " " : "") $i
+
+        suffix = ""
+        if (match(args, /--type=[A-Za-z0-9_-]+/)) {
+            suffix = substr(args, RSTART + 7, RLENGTH - 7)
+        } else {
+            n_tok = split(args, toks, " ")
+            for (t = 2; t <= n_tok; t++) {
+                tok = toks[t]
+                if (tok !~ /^-/ && tok !~ /@/ && (tok ~ /\.[A-Za-z0-9]+$/ || tok ~ /^\//)) {
+                    gsub(/.*\//, "", tok)
+                    if (length(tok) > 0 && length(tok) <= 24 && tok !~ /^[0-9]+$/) suffix = tok
+                    break
+                }
+            }
+        }
+        gsub(/"/, "", suffix)
+
         n++
+        pid[n] = $1; pbase[n] = base; psuf[n] = suffix; pcpu[n] = $3; pmem[n] = $4; prss[n] = $5
+        baseCount[base]++
+    }
+    END {
+        sep = ""
+        for (i = 1; i <= n; i++) {
+            name = pbase[i]
+            if (psuf[i] != "") name = name " (" psuf[i] ")"
+            else if (baseCount[pbase[i]] > 1) name = name " (main)"
+            printf "%s{\"pid\":%s,\"name\":\"%s\",\"cpu\":%s,\"mem\":%s,\"rssMB\":%d}",
+                sep, pid[i], name, pcpu[i], pmem[i], prss[i] / 1024
+            sep = ","
+        }
     }')
 
 printf '{"cpuPct":%s,"ramTotalMB":%d,"ramUsedMB":%d,"ramFreeMB":%d,"processes":[%s]}\n' \

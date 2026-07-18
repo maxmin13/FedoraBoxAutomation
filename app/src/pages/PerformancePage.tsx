@@ -354,7 +354,7 @@ export default function PerformancePage({ vm, onBack, onScriptRunning }: Perform
             </div>
 
             {/* Diagnostics card */}
-            <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg p-4 flex flex-col gap-3 overflow-hidden">
+            <div className="flex-1 min-h-0 bg-zinc-800 border border-zinc-700 rounded-lg px-4 pt-4 pb-10 flex flex-col gap-3 overflow-hidden">
               <Tooltip tip="Runs a guest-side check for common performance problems: Guest Additions modules, swap pressure, NIC and storage driver recommendations">
                 <h2 className="text-zinc-400 text-xs font-semibold uppercase tracking-wider cursor-default shrink-0">Diagnostics</h2>
               </Tooltip>
@@ -845,9 +845,13 @@ function killTip(name: string): string {
 }
 
 // Per-CPU kernel threads are named "<base>/<core>" (e.g. ksoftirqd/11) — the
-// core number varies with vCPU count, so fall back to the base name.
+// core number varies with vCPU count, so fall back to the base name. Multi-
+// process apps get a disambiguating " (role)" suffix (e.g. "code (renderer)")
+// from performance.sh, so strip that too before falling back.
 function procDesc(name: string): string | undefined {
-  return PROC_DESC[name] ?? PROC_DESC[name.replace(/\/\d+$/, '')]
+  const base = name.replace(/\/\d+$/, '')
+  const withoutSuffix = base.replace(/ \(.+\)$/, '')
+  return PROC_DESC[name] ?? PROC_DESC[base] ?? PROC_DESC[withoutSuffix]
 }
 
 // ── KillModal ─────────────────────────────────────────────────────────────────
