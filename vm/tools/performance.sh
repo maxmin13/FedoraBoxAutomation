@@ -52,11 +52,20 @@ procs_json=$(ps -eo pid,comm,%cpu,%mem,rss,args --sort=-%cpu --no-headers \
         args = ""
         for (i = 6; i <= NF; i++) args = args (i > 6 ? " " : "") $i
 
+        # ps truncates comm to 15 chars, so distinct binaries sharing a
+        # 15-char prefix (abrt-dump-journal-core/-oops/-xorg) collapse into
+        # one indistinguishable base. Recover the full name from argv[0],
+        # which the kernel does not truncate, whenever that looks like the
+        # case (comm is exactly 15 chars and is a prefix of argv[0]).
+        n_tok = split(args, toks, " ")
+        argv0 = toks[1]
+        gsub(/.*\//, "", argv0)
+        if (length(base) == 15 && length(argv0) > 15 && index(argv0, base) == 1) base = argv0
+
         suffix = ""
         if (match(args, /--type=[A-Za-z0-9_-]+/)) {
             suffix = substr(args, RSTART + 7, RLENGTH - 7)
         } else {
-            n_tok = split(args, toks, " ")
             for (t = 2; t <= n_tok; t++) {
                 tok = toks[t]
                 if (tok !~ /^-/ && tok !~ /@/ && (tok ~ /\.[A-Za-z0-9]+$/ || tok ~ /^\//)) {
