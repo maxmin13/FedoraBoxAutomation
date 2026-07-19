@@ -107,7 +107,7 @@ Download link:https://github.com/maxmin13/FedoraBoxAutomation/releases/latest[Fe
 
 No installation, no Node.js, no npm.
 
-. Extract the zip to a permanent folder (e.g. `C:\Tools\FedoraBoxAutomation\`)
+. Extract the zip to a permanent folder (e.g. `C:\Program Files\FedoraBox-Automation-1.0.1-win-x64\`)
 . Double-click `FedoraBox Automation.exe`
 . Click *Setup* → *Run Analysis* to check your host
 . Click *Create VM* and follow the 4-step wizard
@@ -121,7 +121,7 @@ If Windows blocks the app with "An Application Control policy has blocked this f
 
 [source,powershell]
 ----
-Unblock-File -Path "C:\Tools\FedoraBoxAutomation\FedoraBox Automation.exe"
+Unblock-File -Path "C:\Program Files\FedoraBox-Automation-1.0.1-win-x64\FedoraBox Automation.exe"
 ----
 
 Then unpin the app from the taskbar (if already pinned) and re-pin it — the old shortcut inherited the block flag and must be recreated. If the error names a `.lnk` file in the taskbar path, unblock the shortcut directly:
