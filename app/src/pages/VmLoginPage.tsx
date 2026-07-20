@@ -117,18 +117,17 @@ export default function VmLoginPage({ onNavigate, initialVmName, onNext, onBack 
   return (
     <div className="max-w-md mx-auto">
 
-        {onBack && (
-          <div className="mb-3">
+        <div className="flex items-center gap-3 mb-1">
+          {onBack && (
             <button
               onClick={onBack}
-              className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors"
+              className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
             >
               &larr; Back
             </button>
-          </div>
-        )}
-
-        <h1 className="text-2xl font-semibold text-zinc-100 mb-1">VM Login</h1>
+          )}
+          <h1 className="text-2xl font-semibold text-zinc-100">VM Login</h1>
+        </div>
         <p className="text-zinc-400 text-sm mb-4">
           Enter the credentials for your VM to continue.
         </p>

@@ -260,11 +260,22 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
     <div className="max-w-2xl mx-auto h-full flex flex-col">
 
       {/* Pinned header */}
-      <div className="shrink-0 mb-3">
-        <h1 className="text-2xl font-semibold text-zinc-100">Create VM</h1>
-        <p className="text-zinc-400 text-sm mt-0.5">
-          Configure and create a new Fedora VirtualBox VM.
-        </p>
+      <div className="shrink-0 mb-3 flex items-start gap-3">
+        {step > 1 && (
+          <button
+            type="button"
+            onClick={() => { window.electronAPI.logUiAction(`create-vm: step ${step} back`); setStep((step - 1) as Step) }}
+            className="px-3 py-1 text-sm border border-zinc-600 hover:border-zinc-400 text-zinc-400 hover:text-zinc-200 rounded transition-colors shrink-0"
+          >
+            &larr; Back
+          </button>
+        )}
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-100">Create VM</h1>
+          <p className="text-zinc-400 text-sm mt-0.5">
+            Configure and create a new Fedora VirtualBox VM.
+          </p>
+        </div>
       </div>
 
       <div className="shrink-0">
@@ -480,18 +491,11 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
 
       {/* Pinned footer nav */}
       <div className="shrink-0 pt-3">
-        {step === 1 && <StepNav onBack={null} onNext={() => { window.electronAPI.logUiAction('create-vm: step 1 next'); setStep(2) }} nextEnabled={step1Valid} />}
-        {step === 2 && <StepNav onBack={() => { window.electronAPI.logUiAction('create-vm: step 2 back'); setStep(1) }} onNext={() => { window.electronAPI.logUiAction('create-vm: step 2 next'); setStep(3) }} nextEnabled={step2Valid} />}
-        {step === 3 && <StepNav onBack={() => { window.electronAPI.logUiAction('create-vm: step 3 back'); setStep(2) }} onNext={() => { window.electronAPI.logUiAction('create-vm: step 3 next'); setStep(4) }} nextEnabled={true} nextLabel="Review" />}
+        {step === 1 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 1 next'); setStep(2) }} nextEnabled={step1Valid} />}
+        {step === 2 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 2 next'); setStep(3) }} nextEnabled={step2Valid} />}
+        {step === 3 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 3 next'); setStep(4) }} nextEnabled={true} nextLabel="Review" />}
         {step === 4 && (
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => { window.electronAPI.logUiAction('create-vm: step 4 back'); setStep(3) }}
-              className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-            >
-              Back
-            </button>
+          <div className="flex items-center justify-end">
             <button
               type="button"
               onClick={handleCreate}
@@ -558,26 +562,14 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 }
 
 interface StepNavProps {
-  onBack:      (() => void) | null
   onNext:      () => void
   nextEnabled: boolean
   nextLabel?:  string
 }
 
-function StepNav({ onBack, onNext, nextEnabled, nextLabel = 'Next' }: StepNavProps) {
+function StepNav({ onNext, nextEnabled, nextLabel = 'Next' }: StepNavProps) {
   return (
-    <div className="flex items-center justify-between pt-2">
-      {onBack ? (
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-600 hover:border-zinc-400 rounded transition-colors"
-        >
-          Back
-        </button>
-      ) : (
-        <div />
-      )}
+    <div className="flex items-center justify-end pt-2">
       <button
         type="button"
         onClick={onNext}
