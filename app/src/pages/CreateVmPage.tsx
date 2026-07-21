@@ -348,12 +348,14 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
               />
             </div>
 
+            <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 1 next'); setStep(2) }} nextEnabled={step1Valid} />
           </div>
         )}
 
         {/* Step 2 — Hardware */}
         {step === 2 && (
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">RAM (MB)</label>
               <input type="number" value={ramMB} onChange={(e) => setRamMB(Number(e.target.value))} min={1024} step={512} className={ic} />
@@ -411,6 +413,8 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
               {cpuCapError && <p className="text-red-400 text-xs mt-1">{cpuCapError}</p>}
             </div>
           </div>
+          <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 2 next'); setStep(3) }} nextEnabled={step2Valid} />
+          </div>
         )}
 
         {/* Step 3 — Options */}
@@ -444,6 +448,8 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
                 <span className="text-sm text-zinc-300">Start VM after creation</span>
               </label>
             </div>
+
+            <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 3 next'); setStep(4) }} nextEnabled={true} nextLabel="Review" />
           </div>
         )}
 
@@ -484,27 +490,19 @@ export default function CreateVmPage({ onScriptRunning, onNavigate, navKey }: { 
                 </ConfirmSection>
               </div>
             </div>
+
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors"
+              >
+                {nameConflict ? 'Recreate VM' : 'Create VM'}
+              </button>
+            </div>
           </div>
         )}
 
-      </div>
-
-      {/* Pinned footer nav */}
-      <div className="shrink-0 pt-3">
-        {step === 1 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 1 next'); setStep(2) }} nextEnabled={step1Valid} />}
-        {step === 2 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 2 next'); setStep(3) }} nextEnabled={step2Valid} />}
-        {step === 3 && <StepNav onNext={() => { window.electronAPI.logUiAction('create-vm: step 3 next'); setStep(4) }} nextEnabled={true} nextLabel="Review" />}
-        {step === 4 && (
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors"
-            >
-              {nameConflict ? 'Recreate VM' : 'Create VM'}
-            </button>
-          </div>
-        )}
       </div>
 
     </div>
